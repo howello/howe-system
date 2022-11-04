@@ -12,6 +12,7 @@
     <modules>
         <module>howe-main</module>
         <module>howe-common</module>
+        <module>howe-admin</module>
     </modules>
 
     <properties>
