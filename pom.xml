@@ -34,6 +34,7 @@
         <swagger.version>3.0.0</swagger.version>
         <lombok.version>1.18.22</lombok.version>
         <knife4j.version>3.0.3</knife4j.version>
+        <hutool.version>5.8.7</hutool.version>
     </properties>
 
     <dependencyManagement>
@@ -47,6 +48,12 @@
             <dependency>
                 <groupId>com.howe</groupId>
                 <artifactId>howe-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.howe</groupId>
+                <artifactId>howe-admin</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
@@ -125,6 +132,11 @@
                 <version>${knife4j.version}</version>
             </dependency>
 
+            <dependency>
+                <groupId>cn.hutool</groupId>
+                <artifactId>hutool-all</artifactId>
+                <version>${hutool.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
