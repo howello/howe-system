@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="70296667-0b5f-4a1a-bc34-7dc81153025c" name="变更" comment="1、全局异常处理&#10;2、mybatisplus 配置类&#10;3、redis配置类">
+      <change afterPath="$PROJECT_DIR$/.idea/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/dictionaries" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/encodings.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/howe-admin/src/main/java/com/howe/admin/controller/config/FlexConfigController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/howe-admin/src/main/java/com/howe/admin/dto/config/LoginConfigDTO.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/constant/ListConstant.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/dao/flexConfig/FlexConfigDAO.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/dto/flexConfig/BaseConfigItemDTO.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/dto/flexConfig/ConfigDataDTO.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/dto/flexConfig/FlexConfigDTO.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/enums/flexConfig/FlexConfigBizTypeEnum.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/enums/redis/RedisKeyPrefixEnum.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/exception/child/CommonException.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/utils/config/FlexConfigUtils.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/utils/id/IdGeneratorUtil.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/utils/redis/RedisUtils.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/howe-common/src/main/resources/mapper/FlexConfigMapper.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/howe-admin/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/howe-admin/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/howe-admin/src/main/java/com/howe/admin/controller/login/LoginController.java" beforeDir="false" afterPath="$PROJECT_DIR$/howe-admin/src/main/java/com/howe/admin/controller/login/LoginController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/howe-common/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/howe-common/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/controller/BaseController.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/enums/AdminExceptionEnum.java" beforeDir="false" afterPath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/enums/exception/AdminExceptionEnum.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/enums/BaseExceptionEnum.java" beforeDir="false" afterPath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/enums/exception/BaseExceptionEnum.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/enums/CommonExceptionEnum.java" beforeDir="false" afterPath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/enums/exception/CommonExceptionEnum.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/exception/child/AdminException.java" beforeDir="false" afterPath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/exception/child/AdminException.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/exception/child/MainException.java" beforeDir="false" afterPath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/exception/child/MainException.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/utils/request/AjaxResult.java" beforeDir="false" afterPath="$PROJECT_DIR$/howe-common/src/main/java/com/howe/common/utils/request/AjaxResult.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/howe-main/src/main/java/com/howe/main/config/MybatisPlusConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/howe-main/src/main/java/com/howe/main/config/MybatisPlusConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/howe-main/src/main/java/com/howe/main/config/RedisConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/howe-main/src/main/java/com/howe/main/config/RedisConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/howe-main/src/main/java/com/howe/main/handler/GlobalExceptionHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/howe-main/src/main/java/com/howe/main/handler/GlobalExceptionHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/howe-main/src/main/resources/application.yml" beforeDir="false" afterPath="$PROJECT_DIR$/howe-main/src/main/resources/application.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="CompilerWorkspaceConfiguration">
+    <option name="MAKE_PROJECT_ON_SAVE" value="true" />
+    <option name="PARALLEL_COMPILATION" value="true" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="YML File" />
+        <option value="Interface" />
+        <option value="Enum" />
+        <option value="Class" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/howe-common" />
+    <option name="ROOT_SYNC" value="DONT_SYNC" />
+  </component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
+  </component>
+  <component name="MavenImportPreferences">
+    <option name="generalSettings">
+      <MavenGeneralSettings>
+        <option name="alwaysUpdateSnapshots" value="true" />
+        <option name="checksumPolicy" value="WARN" />
+        <option name="failureBehavior" value="FAST" />
+        <option name="mavenHome" value="D:/IDE/Maven/apache-maven-3.6.3" />
+        <option name="outputLevel" value="DEBUG" />
+        <option name="showDialogWithAdvancedSettings" value="true" />
+        <option name="userSettingsFile" value="D:\IDE\Maven\apache-maven-3.6.3\conf\settings.xml" />
+      </MavenGeneralSettings>
+    </option>
+  </component>
+  <component name="MavenRunner">
+    <option name="skipTests" value="true" />
+  </component>
+  <component name="ProblemsViewState">
+    <option name="selectedTabId" value="CurrentFile" />
+  </component>
+  <component name="ProjectId" id="2H1853a648HyJC8PuDvKatcUFDM" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
+  <component name="ProjectViewState">
+    <option name="compactDirectories" value="true" />
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showExcludedFiles" value="false" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ASKED_ADD_EXTERNAL_FILES": "true",
+    "ASKED_MARK_IGNORED_FILES_AS_EXCLUDED": "true",
+    "RequestMappingsPanelOrder0": "0",
+    "RequestMappingsPanelOrder1": "1",
+    "RequestMappingsPanelWidth0": "75",
+    "RequestMappingsPanelWidth1": "75",
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "WebServerToolWindowFactoryState": "false",
+    "import_schema_mapping": "<schema-mapping>\n  <databases>\n    <list>\n      <schema-mapping-item>\n        <source-data-source-id>bcbd34d1-5bc5-42c7-984d-42787da8781b</source-data-source-id>\n        <source-path>schema/&quot;ggfw&quot;</source-path>\n        <target-data-source-id>bcbd34d1-5bc5-42c7-984d-42787da8781b</target-data-source-id>\n        <target-path>schema/&quot;howe&quot;</target-path>\n      </schema-mapping-item>\n    </list>\n  </databases>\n</schema-mapping>",
+    "jdk.selected.JAVA_MODULE": "1.8",
+    "last_opened_file_path": "E:/howe/ruo-yi-vue-blog",
+    "node.js.detected.package.eslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "project.structure.last.edited": "项目",
+    "project.structure.proportion": "0.17",
+    "project.structure.side.proportion": "0.2",
+    "settings.editor.selected.configurable": "SQL Dialects",
+    "spring.configuration.checksum": "7567f95be3cbe8721ab71e59ffdfbf63",
+    "ts.external.directory.path": "D:\\IDE\\IDEA\\IntelliJ IDEA 2021.3.2\\plugins\\JavaScriptLanguage\\jsLanguageServicesImpl\\external",
+    "vue.rearranger.settings.migration": "true"
+  },
+  "keyToStringList": {
+    "DatabaseDriversLRU": [
+      "mysql"
+    ],
+    "com.intellij.ide.scratch.LRUPopupBuilder$1/SQL 方言": [
+      "MySQL"
+    ]
+  }
+}]]></component>
+  <component name="ReactorSettings">
+    <option name="notificationShown" value="true" />
+  </component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="E:\howe\howe-system\howe-common\src\main\java\com\howe\common\dto\flexConfig" />
+      <recent name="E:\howe\howe-system\howe-common\src\main\resources\mapper" />
+      <recent name="E:\howe\howe-system\howe-admin-vue\src\router\modules" />
+      <recent name="E:\howe\howe-system\howe-admin-vue\src\views" />
+      <recent name="E:\howe\howe-system\howe-admin-vue\src\views\login" />
+    </key>
+    <key name="CopyClassDialog.RECENTS_KEY">
+      <recent name="com.howe.common.exception.child" />
+      <recent name="com.howe.common.dao" />
+      <recent name="com.howe.common.enums.flexConfig" />
+      <recent name="com.howe.common.utils.redis" />
+      <recent name="com.howe.common.enums" />
+    </key>
+  </component>
+  <component name="RunDashboard">
+    <option name="configurationTypes">
+      <set>
+        <option value="SpringBootApplicationConfigurationType" />
+      </set>
+    </option>
+  </component>
+  <component name="RunManager" selected="Spring Boot.HoweApplication">
+    <configuration name="HoweApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+      <option name="ACTIVE_PROFILES" />
+      <option name="ALTERNATIVE_JRE_PATH" value="1.8" />
+      <option name="FRAME_DEACTIVATION_UPDATE_POLICY" value="UpdateClassesAndResources" />
+      <module name="howe-main" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="com.howe.main.Main" />
+      <option name="UPDATE_ACTION_UPDATE_POLICY" value="UpdateClassesAndTriggerFile" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="dev" type="js.build_tools.npm" temporary="true" nameIsGenerated="true">
+      <package-json value="$PROJECT_DIR$/howe-admin-vue/package.json" />
+      <command value="run" />
+      <scripts>
+        <script value="dev" />
+      </scripts>
+      <node-interpreter value="project" />
+      <envs />
+      <method v="2" />
+    </configuration>
+    <list>
+      <item itemvalue="npm.dev" />
+      <item itemvalue="Spring Boot.HoweApplication" />
+    </list>
+    <recent_temporary>
+      <list>
+        <item itemvalue="npm.dev" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="应用程序级" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="默认任务">
+      <changelist id="70296667-0b5f-4a1a-bc34-7dc81153025c" name="变更" comment="" />
+      <created>1667441044725</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1667441044725</updated>
+      <workItem from="1667441047161" duration="7409000" />
+      <workItem from="1667463596013" duration="25921000" />
+      <workItem from="1667808418534" duration="923000" />
+      <workItem from="1667810311333" duration="5813000" />
+      <workItem from="1667868611350" duration="24738000" />
+      <workItem from="1668501386489" duration="3403000" />
+      <workItem from="1668561917897" duration="6009000" />
+      <workItem from="1668569086575" duration="690000" />
+      <workItem from="1668569814461" duration="7381000" />
+      <workItem from="1668648333843" duration="2246000" />
+      <workItem from="1668655287470" duration="2805000" />
+      <workItem from="1668670010245" duration="175000" />
+      <workItem from="1668670882374" duration="7000" />
+      <workItem from="1668677959595" duration="132000" />
+      <workItem from="1668678117222" duration="15000" />
+      <workItem from="1668678143419" duration="99000" />
+      <workItem from="1668678253565" duration="403000" />
+      <workItem from="1668678932635" duration="53778000" />
+      <workItem from="1668732901904" duration="81000" />
+      <workItem from="1668733593639" duration="328000" />
+      <workItem from="1668734372047" duration="489000" />
+      <workItem from="1668999884949" duration="57000" />
+      <workItem from="1668999962401" duration="39000" />
+      <workItem from="1669000015781" duration="4472000" />
+      <workItem from="1669078246386" duration="17492000" />
+    </task>
+    <task id="LOCAL-00001" summary="第一次提交">
+      <created>1667441835951</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1667441835951</updated>
+    </task>
+    <task id="LOCAL-00002" summary="swagger集成">
+      <created>1667470658609</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1667470658609</updated>
+    </task>
+    <task id="LOCAL-00003" summary="howe-admin-vue框架提交">
+      <created>1667552114607</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1667552114607</updated>
+    </task>
+    <task id="LOCAL-00004" summary="1、error-page提交&#10;2、redirect提交&#10;3、login页面提交">
+      <created>1667553786348</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1667553786348</updated>
+    </task>
+    <task id="LOCAL-00005" summary="1、全局异常处理&#10;2、mybatisplus 配置类&#10;3、redis配置类">
+      <created>1668582313422</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1668582313422</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
+    <option name="CHECK_NEW_TODO" value="false" />
+    <option name="ADD_EXTERNAL_FILES_SILENTLY" value="true" />
+    <MESSAGE value="第一次提交" />
+    <MESSAGE value="swagger集成" />
+    <MESSAGE value="howe-admin-vue框架提交" />
+    <MESSAGE value="1、error-page提交&#10;2、redirect提交&#10;3、login页面提交" />
+    <MESSAGE value="1、全局异常处理&#10;2、mybatisplus 配置类&#10;3、redis配置类" />
+    <option name="LAST_COMMIT_MESSAGE" value="1、全局异常处理&#10;2、mybatisplus 配置类&#10;3、redis配置类" />
+    <option name="OPTIMIZE_IMPORTS_BEFORE_PROJECT_COMMIT" value="true" />
+    <option name="REFORMAT_BEFORE_PROJECT_COMMIT" value="true" />
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
+  </component>
+  <component name="ZooKeeperConfig">
+    <option name="host" value="" />
+    <option name="port" value="2181" />
+    <option name="charset" value="UTF-8" />
+    <option name="whitePaths" value="" />
+  </component>
+</project>
