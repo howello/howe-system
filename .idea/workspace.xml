@@ -4,8 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="70296667-0b5f-4a1a-bc34-7dc81153025c" name="变更" comment="1、全局异常处理&#10;2、mybatisplus 配置类&#10;3、redis配置类">
-      <change afterPath="$PROJECT_DIR$/.idea/.gitignore" afterDir="false" />
+    <list default="true" id="70296667-0b5f-4a1a-bc34-7dc81153025c" name="变更" comment="1、全局异常修改&#10;2、灵活配置开发&#10;3、全局唯一id工具开发&#10;4、redis工具开发">
       <change afterPath="$PROJECT_DIR$/.idea/dictionaries" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/.idea/encodings.xml" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
@@ -61,7 +60,7 @@
     </option>
   </component>
   <component name="Git.Settings">
-    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/howe-common" />
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
     <option name="ROOT_SYNC" value="DONT_SYNC" />
   </component>
   <component name="MarkdownSettingsMigration">
@@ -107,6 +106,8 @@
     "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "WebServerToolWindowFactoryState": "false",
+    "com.obroom.plugin.mybatislog.indexNum": "4",
+    "com.obroom.plugin.mybatislog.running": "true",
     "import_schema_mapping": "<schema-mapping>\n  <databases>\n    <list>\n      <schema-mapping-item>\n        <source-data-source-id>bcbd34d1-5bc5-42c7-984d-42787da8781b</source-data-source-id>\n        <source-path>schema/&quot;ggfw&quot;</source-path>\n        <target-data-source-id>bcbd34d1-5bc5-42c7-984d-42787da8781b</target-data-source-id>\n        <target-path>schema/&quot;howe&quot;</target-path>\n      </schema-mapping-item>\n    </list>\n  </databases>\n</schema-mapping>",
     "jdk.selected.JAVA_MODULE": "1.8",
     "last_opened_file_path": "E:/howe/ruo-yi-vue-blog",
@@ -220,7 +221,7 @@
       <workItem from="1668999884949" duration="57000" />
       <workItem from="1668999962401" duration="39000" />
       <workItem from="1669000015781" duration="4472000" />
-      <workItem from="1669078246386" duration="17492000" />
+      <workItem from="1669078246386" duration="17896000" />
     </task>
     <task id="LOCAL-00001" summary="第一次提交">
       <created>1667441835951</created>
@@ -257,7 +258,14 @@
       <option name="project" value="LOCAL" />
       <updated>1668582313422</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="1、全局异常修改&#10;2、灵活配置开发&#10;3、全局唯一id工具开发&#10;4、redis工具开发">
+      <created>1669111426800</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1669111426800</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -283,7 +291,8 @@
     <MESSAGE value="howe-admin-vue框架提交" />
     <MESSAGE value="1、error-page提交&#10;2、redirect提交&#10;3、login页面提交" />
     <MESSAGE value="1、全局异常处理&#10;2、mybatisplus 配置类&#10;3、redis配置类" />
-    <option name="LAST_COMMIT_MESSAGE" value="1、全局异常处理&#10;2、mybatisplus 配置类&#10;3、redis配置类" />
+    <MESSAGE value="1、全局异常修改&#10;2、灵活配置开发&#10;3、全局唯一id工具开发&#10;4、redis工具开发" />
+    <option name="LAST_COMMIT_MESSAGE" value="1、全局异常修改&#10;2、灵活配置开发&#10;3、全局唯一id工具开发&#10;4、redis工具开发" />
     <option name="OPTIMIZE_IMPORTS_BEFORE_PROJECT_COMMIT" value="true" />
     <option name="REFORMAT_BEFORE_PROJECT_COMMIT" value="true" />
   </component>
