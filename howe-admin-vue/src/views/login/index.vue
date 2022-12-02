@@ -1,7 +1,6 @@
 <template>
   <div class="login-container">
     <el-form ref="loginForm" :model="loginForm" :rules="loginRules" class="login-form" autocomplete="on" label-position="left">
-
       <div class="title-container">
         <h3 class="title">
           {{ $t('login.title') }}
@@ -47,34 +46,45 @@
           </span>
         </el-form-item>
       </el-tooltip>
-
-      <el-button :loading="loading" type="primary" style="width:100%;margin-bottom:30px;" @click.native.prevent="handleLogin">
-        {{ $t('login.logIn') }}
-      </el-button>
-
-      <div style="position:relative">
-        <div class="tips">
-          <span>{{ $t('login.username') }} : admin</span>
-          <span>{{ $t('login.password') }} : {{ $t('login.any') }}</span>
+      <el-form-item v-if="captchaOnOff" prop="code">
+        <span class="svg-container">
+          <svg-icon icon-class="validCode" />
+        </span>
+        <el-input
+          v-model="loginForm.code"
+          auto-complete="off"
+          placeholder="验证码"
+          style="width: 60%"
+          @keyup.enter.native="handleLogin"
+        />
+        <div class="login-code">
+          <el-image
+            :src="codeUrl"
+            fit="fill"
+            :style="{'width':this.point.width + 'px','height':this.point.height + 'px'}"
+            @click="getCode"
+          >
+            <div slot="error" class="image-slot">
+              <i class="el-icon-picture-outline" />
+            </div>
+          </el-image>
         </div>
-        <div class="tips">
-          <span style="margin-right:18px;">
-            {{ $t('login.username') }} : editor
-          </span>
-          <span>{{ $t('login.password') }} : {{ $t('login.any') }}</span>
-        </div>
+      </el-form-item>
 
+      <el-form-item>
+        <el-button :loading="loading" type="primary" style="width:100%;" @click.native.prevent="handleLogin">
+          {{ $t('login.logIn') }}
+        </el-button>
+      </el-form-item>
+      <el-form-item style="background: unset;border: unset">
+        <el-link type="danger" @click="toRegister">没有账号？立即注册</el-link>
         <el-button class="thirdparty-button" type="primary" @click="showDialog=true">
           {{ $t('login.thirdparty') }}
         </el-button>
-      </div>
+      </el-form-item>
     </el-form>
 
     <el-dialog :title="$t('login.thirdparty')" :visible.sync="showDialog">
-      {{ $t('login.thirdpartyTips') }}
-      <br>
-      <br>
-      <br>
       <social-sign />
     </el-dialog>
   </div>
@@ -84,6 +94,7 @@
 import { validUsername } from '@/utils/validate'
 import LangSelect from '@/components/LangSelect'
 import SocialSign from './components/SocialSignin'
+import { getValidCode } from '@/api/user'
 
 export default {
   name: 'Login',
@@ -103,20 +114,38 @@ export default {
         callback()
       }
     }
+    const validateCode = (rule, value, callback) => {
+      if (!this.captchaOnOff) {
+        callback()
+      } else if (value.length < 1 || value.length > 8) {
+        callback(new Error('验证码长度错误，长度需在1-8之间'))
+      } else {
+        callback()
+      }
+    }
     return {
       loginForm: {
         username: 'admin',
-        password: '111111'
+        password: 'admin123',
+        code: '',
+        uuid: ''
       },
       loginRules: {
         username: [{ required: true, trigger: 'blur', validator: validateUsername }],
-        password: [{ required: true, trigger: 'blur', validator: validatePassword }]
+        password: [{ required: true, trigger: 'blur', validator: validatePassword }],
+        code: [{ required: true, trigger: 'blur', validator: validateCode }]
       },
       passwordType: 'password',
       capsTooltip: false,
       loading: false,
       showDialog: false,
       redirect: undefined,
+      captchaOnOff: true,
+      point: {
+        height: 49,
+        width: 148
+      },
+      codeUrl: '',
       otherQuery: {}
     }
   },
@@ -136,6 +165,7 @@ export default {
     // window.addEventListener('storage', this.afterQRScan)
   },
   mounted() {
+    this.getCode()
     if (this.loginForm.username === '') {
       this.$refs.username.focus()
     } else if (this.loginForm.password === '') {
@@ -146,6 +176,19 @@ export default {
     // window.removeEventListener('storage', this.afterQRScan)
   },
   methods: {
+    getCode() {
+      getValidCode(this.point).then(res => {
+        if (res.code === 0) {
+          const data = res.data
+          this.captchaOnOff = data.captchaOnOff
+          this.codeUrl = data.codeImg
+          this.loginForm.uuid = data.uuid
+        }
+      })
+    },
+    toRegister() {
+
+    },
     checkCapslock(e) {
       const { key } = e
       this.capsTooltip = key && key.length === 1 && (key >= 'A' && key <= 'Z')
@@ -210,7 +253,7 @@ export default {
 
 <style lang="scss">
 /* 修复input 背景不协调 和光标变色 */
-/* Detail see https://github.com/PanJiaChen/vue-element-admin/pull/927 */
+/* Detail see https://github.com/PanJiaChen/pull/927 */
 
 $bg: #283443;
 $light_gray: #fff;
@@ -330,6 +373,17 @@ $light_gray: #eee;
     position: absolute;
     right: 0;
     bottom: 6px;
+  }
+
+  .login-code {
+    width: 33%;
+    height: 38px;
+    float: right;
+
+    el-image {
+      cursor: pointer;
+      vertical-align: middle;
+    }
   }
 
   @media only screen and (max-width: 470px) {
