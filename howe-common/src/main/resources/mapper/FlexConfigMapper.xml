@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.howe.common.dao.flexConfig.FlexConfigDAO">
+
+    <resultMap id="BaseResultMap" type="com.howe.common.dto.flexConfig.FlexConfigDTO">
+        <id property="ruleId" column="RULE_ID" jdbcType="VARCHAR"/>
+        <result property="enable" column="ENABLE" jdbcType="TINYINT"/>
+        <result property="crteTime" column="CRTE_TIME" jdbcType="TIMESTAMP"/>
+        <result property="crteName" column="CRTE_NAME" jdbcType="VARCHAR"/>
+        <result property="updtTime" column="UPDT_TIME" jdbcType="TIMESTAMP"/>
+        <result property="updtName" column="UPDT_NAME" jdbcType="VARCHAR"/>
+        <result property="bizTypeId" column="BIZ_TYPE_ID" jdbcType="VARCHAR"/>
+        <result property="bizTypeDesc" column="BIZ_TYPE_DESC" jdbcType="VARCHAR"/>
+        <result property="data" column="DATA" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+            RULE_ID
+                ,
+            ENABLE,
+            CRTE_TIME,
+            CRTE_NAME,
+            UPDT_TIME,
+            UPDT_NAME,
+            BIZ_TYPE_ID,
+            BIZ_TYPE_DESC,
+            DATA
+    </sql>
+
+    <select id="selectList" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from t_flex_config
+        <where>
+
+            <if test="ruleId != null and ruleId != ''">
+                and RULE_ID = #{ruleId,jdbcType=VARCHAR}
+            </if>
+            <if test="enable != null and enable != ''">
+                and ENABLE = #{enable,jdbcType=TINYINT}
+            </if>
+            <if test="crteTime != null">
+                and CRTE_TIME &gt;= #{crteTime,jdbcType=TIMESTAMP}
+            </if>
+            <if test="crteName != null and crteName != ''">
+                and CRTE_NAME = #{crteName,jdbcType=VARCHAR}
+            </if>
+            <if test="updtTime != null">
+                and UPDT_TIME &lt;= #{updtTime,jdbcType=TIMESTAMP}
+            </if>
+            <if test="updtName != null and updtName != ''">
+                and UPDT_NAME = #{updtName,jdbcType=VARCHAR}
+            </if>
+            <if test="bizTypeId != null and bizTypeId != ''">
+                and BIZ_TYPE_ID = #{bizTypeId,jdbcType=VARCHAR}
+            </if>
+        </where>
+    </select>
+
+</mapper>

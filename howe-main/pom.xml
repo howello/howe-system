@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>howe-system</artifactId>
+        <groupId>com.howe</groupId>
+        <version>0.0.1</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+    <artifactId>howe-main</artifactId>
+    <name>howe-main</name>
+    <description>服务入口</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.howe</groupId>
+            <artifactId>howe-admin</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.howe</groupId>
+            <artifactId>howe-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <optional>true</optional>
+        </dependency>
+    </dependencies>
+
+</project>

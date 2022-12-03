@@ -1,0 +1,73 @@
+server:
+  port: 9527
+spring:
+  application:
+    name: howe-main
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    name: defaultDataSource
+    password: root
+    url: jdbc:mysql://localhost:3306/howe?serverTimezone=UTC
+    username: root
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    password:
+    database: 0
+    lettuce:
+      pool:
+        max-idle: 8
+        min-idle: 1
+        max-active: 200
+        max-wait: 3s
+      shutdown-timeout: 60s
+  devtools:
+    restart:
+      enabled: true
+
+
+howe:
+  name: Howe系统
+  version: 0.0.1
+  mybatis:
+    maxLimit: 1000
+  token:
+    expireTime: 30
+    secret: 'abcdefghijklmnopqrstuvwxyz'
+    header: "token"
+    refresh-token-time: 20
+  premission:
+    permit-all-list:
+      - "/"
+      - "/*.html"
+      - "/**/*.html"
+      - "/**/*.css"
+      - "/**/*.js"
+      - "/profile/**"
+    anonymous-list:
+      - "/user/*"
+      - "/swagger-ui/*"
+      - "/swagger-resources/**"
+      - "/webjars/**"
+      - "/*/api-docs"
+      - "/druid/**"
+  captcha:
+    base-str: "123456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz"
+    length: 4
+    expire-time: 120
+
+
+
+
+
+swagger:
+  enable: true
+  pathMapping: /
+
+mybatis-plus:
+  configuration:
+    # 是否将sql打印到控制面板(该配置会将sql语句和查询的结果都打印到控制台)
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
