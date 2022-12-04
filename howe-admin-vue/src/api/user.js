@@ -29,3 +29,10 @@ export function getValidCode(params) {
     data: params
   })
 }
+
+export function getMenuList() {
+  return request({
+    url: '/menu/getMenuList',
+    method: 'post'
+  })
+}

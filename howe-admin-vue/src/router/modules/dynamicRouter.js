@@ -1,5 +1,6 @@
 /* Layout */
 import Layout from '@/layout'
+import { getMenuList } from '@/api/user'
 
 const dynamicRouter = {
   'test': getViews('test')
@@ -16,17 +17,17 @@ function getViews(path) {
 
 // 递归处理后端返回的路由数据
 function generate(arr) {
-  arr = arr.filter(item => item.menuStas === '1')
+  arr = arr.filter(item => item.status === '0')
   return arr.map(item => {
-    if (item.childList.length === 0) {
-      const path = item.menuUrl.replace('#', '')
+    if (!item.children || item.children.length === 0) {
+      const path = item.path.replace('#', '')
       return {
         path: path || '#',
         name: path,
         component: dynamicRouter[path],
         meta: {
           title: item.menuName,
-          icon: item.menuIcon
+          icon: item.icon
         }
       }
     } else {
@@ -36,9 +37,9 @@ function generate(arr) {
         path: '#/TAG/' + item.menuId,
         meta: {
           title: item.menuName,
-          icon: item.menuIcon
+          icon: item.icon
         },
-        children: generate(item.childList)
+        children: generate(item.children)
       }
     }
   })
@@ -46,14 +47,12 @@ function generate(arr) {
 
 // 从后端获取路由数据
 let menu = null
-export const getRoutes = async(comMenuName, path, fresh = false) => {
+export const getRoutes = async(path, fresh = false) => {
   if (menu === null || fresh || path === '/Home') {
-    // const res = await selectCwMenu({
-    //   cwMenuCodg: comMenuName
-    // })
-    // TODO selectMenu 获取菜单接口
-    const res = {}
+    const res = await getMenuList()
     menu = generate(res.data || [])
   }
   return menu
 }
+
+export default dynamicRouter

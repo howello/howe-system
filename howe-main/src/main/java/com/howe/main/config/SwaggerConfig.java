@@ -4,7 +4,6 @@ import com.howe.common.config.HoweConfig;
 import io.swagger.models.auth.In;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.actuate.autoconfigure.endpoint.web.CorsEndpointProperties;
 import org.springframework.boot.actuate.autoconfigure.endpoint.web.WebEndpointProperties;
 import org.springframework.boot.actuate.autoconfigure.web.server.ManagementPortType;
@@ -44,12 +43,6 @@ public class SwaggerConfig {
     @Autowired
     private HoweConfig howeConfig;
 
-    @Value("${swagger.enable}")
-    private boolean enable;
-
-    @Value("${swagger.pathMapping}")
-    private String pathMapping;
-
     /**
      * 所有接口
      *
@@ -72,12 +65,12 @@ public class SwaggerConfig {
 
     private Docket createDocket(String groupName, String basePackage) {
         Docket docket = new Docket(DocumentationType.OAS_30)
-                .enable(enable)
+                .enable(howeConfig.getSwagger().getEnable())
                 .groupName(groupName)
                 .apiInfo(setApiInfo())
                 .securitySchemes(securitySchemes())
                 .securityContexts(securityContexts())
-                .pathMapping(pathMapping);
+                .pathMapping(howeConfig.getSwagger().getPathMapping());
         if (StringUtils.isBlank(basePackage)) {
             docket.select()
                     .paths(PathSelectors.any())

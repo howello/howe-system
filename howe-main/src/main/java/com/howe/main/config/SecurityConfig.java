@@ -91,9 +91,9 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
      */
     @Override
     protected void configure(HttpSecurity httpSecurity) throws Exception {
-        HoweConfig.Premission premission = howeConfig.getPremission();
-        String[] permitAllList = premission.getPermitAllList().toArray(new String[0]);
-        String[] anonymousList = premission.getAnonymousList().toArray(new String[0]);
+        HoweConfig.Permission permission = howeConfig.getPermission();
+        String[] permitAllList = permission.getPermitAllList().toArray(new String[0]);
+        String[] anonymousList = permission.getAnonymousList().toArray(new String[0]);
         httpSecurity
                 // CSRF禁用，因为不使用session
                 .csrf().disable()

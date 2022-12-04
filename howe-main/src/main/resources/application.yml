@@ -39,7 +39,7 @@ howe:
     secret: 'abcdefghijklmnopqrstuvwxyz'
     header: "token"
     refresh-token-time: 20
-  premission:
+  permission:
     permit-all-list:
       - "/"
       - "/*.html"
@@ -47,6 +47,7 @@ howe:
       - "/**/*.css"
       - "/**/*.js"
       - "/profile/**"
+      - "/**/getMenuList"
     anonymous-list:
       - "/user/*"
       - "/swagger-ui/*"
@@ -58,14 +59,9 @@ howe:
     base-str: "123456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz"
     length: 4
     expire-time: 120
-
-
-
-
-
-swagger:
-  enable: true
-  pathMapping: /
+  swagger:
+    enable: true
+    pathMapping: /
 
 mybatis-plus:
   configuration:

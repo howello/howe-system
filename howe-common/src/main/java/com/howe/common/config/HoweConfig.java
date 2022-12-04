@@ -40,12 +40,14 @@ public class HoweConfig {
     /**
      * 权限配置项
      */
-    private Premission premission;
+    private Permission permission;
 
     /**
      * 验证码
      */
     private Captcha captcha;
+
+    private Swagger swagger;
 
     @Data
     public static class Token {
@@ -79,7 +81,7 @@ public class HoweConfig {
     }
 
     @Data
-    public static class Premission {
+    public static class Permission {
         /**
          * 允许所有
          */
@@ -108,5 +110,13 @@ public class HoweConfig {
          * 单位 秒
          */
         private Integer expireTime;
+    }
+
+    @Data
+    public static class Swagger {
+        private Boolean enable;
+
+        private String pathMapping;
+
     }
 }

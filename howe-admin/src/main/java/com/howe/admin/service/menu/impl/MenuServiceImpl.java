@@ -70,7 +70,12 @@ public class MenuServiceImpl extends ServiceImpl<MenuDAO, MenuDTO> implements Me
      */
     @Override
     public List<MenuDTO> getMenuListWithPermission() {
-        Long userId = userService.getUserId();
+        Long userId = null;
+        try {
+            userId = userService.getUserId();
+        } catch (Exception e) {
+            return null;
+        }
         List<MenuDTO> menuList = menuDAO.selectMenuListByUserId(userId);
         Map<Long, List<MenuDTO>> parentMap = menuList.stream()
                 .collect(Collectors.groupingBy(MenuDTO::getParentId));

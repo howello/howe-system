@@ -55,41 +55,50 @@ export default {
     // To fix https://github.com/PanJiaChen/vue-admin-template/issues/237
     // TODO: refactor with render function
     this.onlyOneChild = null
-    return {}
+    return {
+      items: 0
+    }
   },
   methods: {
     hasOneShowingChild(children = [], parent) {
-      const showingChildren = children.filter(item => {
-        if (item.hidden) {
-          return false
-        } else {
-          // Temp set(will be used if only has one showing child)
-          this.onlyOneChild = item
+      try {
+        const showingChildren = children.filter(item => {
+          if (item.hidden) {
+            return false
+          } else {
+            // Temp set(will be used if only has one showing child)
+            this.onlyOneChild = item
+            return true
+          }
+        })
+
+        // When there is only one child router, the child router is displayed by default
+        if (showingChildren.length === 1) {
           return true
         }
-      })
 
-      // When there is only one child router, the child router is displayed by default
-      if (showingChildren.length === 1) {
-        return true
+        // Show parent if there are no child router to display
+        if (showingChildren.length === 0) {
+          this.onlyOneChild = { ...parent, path: '', noShowingChildren: true }
+          return true
+        }
+      } catch (e) {
+        debugger
+        console.log(this.items)
       }
-
-      // Show parent if there are no child router to display
-      if (showingChildren.length === 0) {
-        this.onlyOneChild = { ...parent, path: '', noShowingChildren: true }
-        return true
-      }
-
+      this.items++
       return false
     },
     resolvePath(routePath) {
+      debugger
       if (isExternal(routePath)) {
         return routePath
       }
       if (isExternal(this.basePath)) {
         return this.basePath
       }
-      return path.resolve(this.basePath, routePath)
+      var s = path.resolve(this.basePath, routePath)
+      return s
     },
 
     generateTitle
