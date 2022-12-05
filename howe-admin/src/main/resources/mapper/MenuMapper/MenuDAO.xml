@@ -9,14 +9,12 @@
         <result column="parent_id" jdbcType="BIGINT" property="parentId"/>
         <result column="order_num" jdbcType="INTEGER" property="orderNum"/>
         <result column="path" jdbcType="VARCHAR" property="path"/>
-        <result column="component" jdbcType="VARCHAR" property="component"/>
         <result column="query" jdbcType="VARCHAR" property="query"/>
         <result column="is_frame" jdbcType="INTEGER" property="isFrame"/>
         <result column="is_cache" jdbcType="INTEGER" property="isCache"/>
         <result column="menu_type" jdbcType="CHAR" property="menuType"/>
         <result column="visible" jdbcType="CHAR" property="visible"/>
         <result column="status" jdbcType="CHAR" property="status"/>
-        <result column="perms" jdbcType="VARCHAR" property="perms"/>
         <result column="icon" jdbcType="VARCHAR" property="icon"/>
         <result column="create_by" jdbcType="VARCHAR" property="createBy"/>
         <result column="create_time" jdbcType="TIMESTAMP" property="createTime"/>
@@ -26,8 +24,8 @@
     </resultMap>
     <sql id="Base_Column_List">
         <!--@mbg.generated-->
-        menu_id, menu_name, parent_id, order_num, `path`, component, query, is_frame, is_cache,
-        menu_type, visible, `status`, perms, icon, create_by, create_time, update_by, update_time,
+        menu_id, menu_name, parent_id, order_num, `path`, query, is_frame, is_cache,
+        menu_type, visible, `status`, icon, create_by, create_time, update_by, update_time,
         remark
     </sql>
 
@@ -46,14 +44,12 @@
         m.parent_id,
         m.order_num,
         m.`path`,
-        m.component,
         m.query,
         m.is_frame,
         m.is_cache,
         m.menu_type,
         m.visible,
         m.`status`,
-        m.perms,
         m.icon,
         m.create_by,
         m.create_time,

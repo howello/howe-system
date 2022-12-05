@@ -22,11 +22,7 @@ import java.util.List;
  * <p>@Author lu
  * <p>@Date 2022/11/29 14:19 星期二
  * <p>@Version 1.0
- * <p>@Description TODO
- */
-
-/**
- * 菜单权限表
+ * <p>@Description 菜单权限表
  */
 @Schema
 @Data
@@ -80,14 +76,6 @@ public class MenuDTO extends BaseDTO {
     @Size(max = 200, message = "路由地址不能超过200个字符")
     private String path;
 
-    /**
-     * 组件路径
-     */
-    @TableField(value = "component")
-    @Schema(description = "组件路径")
-    @ApiModelProperty("组件路径")
-    @Size(min = 0, max = 200, message = "组件路径不能超过255个字符")
-    private String component;
 
     /**
      * 路由参数
@@ -137,15 +125,6 @@ public class MenuDTO extends BaseDTO {
     @Schema(description = "菜单状态（0正常 1停用）")
     @ApiModelProperty("菜单状态（0正常 1停用）")
     private String status;
-
-    /**
-     * 权限标识
-     */
-    @TableField(value = "perms")
-    @Schema(description = "权限标识")
-    @Size(min = 0, max = 100, message = "权限标识长度不能超过100个字符")
-    @ApiModelProperty("权限标识")
-    private String perms;
 
     /**
      * 菜单图标

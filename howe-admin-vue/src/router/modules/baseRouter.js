@@ -86,7 +86,7 @@ export const baseRouter = [
     //     meta: { title: 'profile', icon: 'user', noCache: true }
     //   }
     // ]
-  }
+  },
 ]
 
 export default baseRouter
