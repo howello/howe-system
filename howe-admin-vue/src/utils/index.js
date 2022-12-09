@@ -1,6 +1,18 @@
-/**
- * Created by PanJiaChen on 16/11/18.
- */
+import tab from '@/utils/tab'
+
+export default {
+  install(Vue) {
+    // 页签操作
+    Vue.prototype.$tab = tab
+  }
+}
+
+// 表单重置
+export function resetForm(refName) {
+  if (this.$refs[refName]) {
+    this.$refs[refName].resetFields();
+  }
+}
 
 /**
  * Parse the time to string
@@ -356,4 +368,20 @@ export function removeClass(ele, cls) {
     const reg = new RegExp('(\\s|^)' + cls + '(\\s|$)')
     ele.className = ele.className.replace(reg, ' ')
   }
+}
+
+// 数据合并
+export function mergeRecursive(source, target) {
+  for (var p in target) {
+    try {
+      if (target[p].constructor === Object) {
+        source[p] = mergeRecursive(source[p], target[p]);
+      } else {
+        source[p] = target[p];
+      }
+    } catch (e) {
+      source[p] = target[p];
+    }
+  }
+  return source;
 }

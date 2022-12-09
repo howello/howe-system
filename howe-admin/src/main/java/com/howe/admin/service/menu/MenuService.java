@@ -1,6 +1,7 @@
 package com.howe.admin.service.menu;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.github.pagehelper.PageInfo;
 import com.howe.common.dto.menu.MenuDTO;
 import com.howe.common.dto.role.UserDTO;
 
@@ -38,4 +39,11 @@ public interface MenuService extends IService<MenuDTO> {
      * @return
      */
     List<MenuDTO> getMenuListWithPermission();
+
+    /**
+     * 根据权限分页查询菜单列表
+     *
+     * @return
+     */
+    PageInfo<MenuDTO> getMenuPageWithPermission(MenuDTO menu);
 }

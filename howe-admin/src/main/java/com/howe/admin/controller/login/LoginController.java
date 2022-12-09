@@ -11,7 +11,7 @@ import com.howe.common.utils.config.FlexConfigUtils;
 import com.howe.common.utils.request.AjaxResult;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,13 +28,11 @@ import javax.validation.Valid;
 @RestController
 @RequestMapping("/user")
 @Api(tags = "登录相关")
+@RequiredArgsConstructor
 public class LoginController {
 
-    @Autowired
-    private LoginService loginService;
-
-    @Autowired
-    private FlexConfigUtils flexConfigUtils;
+    private final LoginService loginService;
+    private final FlexConfigUtils flexConfigUtils;
 
     /**
      * 登录

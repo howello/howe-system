@@ -19,22 +19,22 @@
 </template>
 
 <script>
-import { mapGetters } from 'vuex'
+import {mapGetters} from 'vuex'
 import Logo from './Logo'
 import SidebarItem from './SidebarItem'
 import variables from '@/styles/variables.scss'
 
 export default {
-  components: { SidebarItem, Logo },
+  components: {SidebarItem, Logo},
   // 深度监听路由参数，触发菜单刷新
-  // watch: {
-  //   "$router.options": {
-  //     handler() {
-  //       this.routes = this.$router.options.routes;
-  //     },
-  //     deep: true,
-  //   },
-  // },
+  watch: {
+    "$router.options": {
+      handler() {
+        this.routes = this.$router.options.routes;
+      },
+      deep: true,
+    },
+  },
   data() {
     return {
       routes: []

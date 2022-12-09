@@ -11,7 +11,8 @@ export function login(data) {
 export function getInfo() {
   return request({
     url: '/user/info',
-    method: 'get'
+    method: 'get',
+    isToken: true
   })
 }
 
@@ -27,12 +28,5 @@ export function getValidCode(params) {
     url: '/user/getValidCode',
     method: 'post',
     data: params
-  })
-}
-
-export function getMenuList() {
-  return request({
-    url: '/menu/getMenuList',
-    method: 'post'
   })
 }

@@ -1,5 +1,6 @@
 package com.howe.common.dto;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 
@@ -42,6 +43,18 @@ public class BaseDTO implements Serializable {
      * 备注
      */
     private String remark;
+
+    /**
+     * 页码
+     */
+    @TableField(exist = false)
+    private Integer pageNum;
+
+    /**
+     * 分页大小
+     */
+    @TableField(exist = false)
+    private Integer pageSize;
 
 
     public static final String COL_CREATE_BY = "create_by";

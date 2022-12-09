@@ -1,9 +1,9 @@
-import router, { dynamicMenu } from './router'
+import router, {dynamicMenu} from './router'
 import store from './store'
-import { Message } from 'element-ui'
+import {Message} from 'element-ui'
 import NProgress from 'nprogress' // progress bar
 import 'nprogress/nprogress.css' // progress bar style
-import { getToken } from '@/utils/auth' // get token from cookie
+import {getToken} from '@/utils/auth' // get token from cookie
 import getPageTitle from '@/utils/get-page-title'
 
 NProgress.configure({ showSpinner: false }) // NProgress Configuration
@@ -13,17 +13,6 @@ const whiteList = ['/login', '/auth-redirect', '/register'] // no redirect white
 router.beforeEach(async(to, from, next) => {
   // start progress bar
   NProgress.start()
-  // 进入权限目录 需要获取动态菜单
-  if (!whiteList.includes(to.path.toString().toLowerCase())) {
-    const dynamic = await dynamicMenu(to.path)
-    if (dynamic) {
-      // hack方法 确保addRoutes已完成
-      next({
-        ...to,
-        replace: true
-      })
-    }
-  }
 
   // set page title
   document.title = getPageTitle(to.meta.title)
@@ -43,9 +32,8 @@ router.beforeEach(async(to, from, next) => {
         next()
       } else {
         try {
-          const { roles } = await store.dispatch('user/getInfo')
-
-          // hack method to ensure that addRoutes is complete
+          const {roles} = await store.dispatch('user/getInfo')
+          const dynamic = await dynamicMenu(to.path)
           // set the replace: true, so the navigation will not leave a history record
           next({ ...to, replace: true })
         } catch (error) {

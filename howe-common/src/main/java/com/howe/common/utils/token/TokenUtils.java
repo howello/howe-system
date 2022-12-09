@@ -18,8 +18,8 @@ import com.howe.common.utils.servlet.ServletUtils;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.servlet.http.HttpServletRequest;
@@ -35,13 +35,12 @@ import java.util.concurrent.TimeUnit;
  * <p>@Description TODO
  */
 @Component
+@RequiredArgsConstructor
 public class TokenUtils {
 
-    @Autowired
-    private HoweConfig howeConfig;
+    private final HoweConfig howeConfig;
 
-    @Autowired
-    private RedisUtils redisUtils;
+    private final RedisUtils redisUtils;
 
 
     /**

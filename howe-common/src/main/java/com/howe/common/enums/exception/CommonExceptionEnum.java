@@ -28,9 +28,10 @@ public enum CommonExceptionEnum implements BaseExceptionEnum {
     QUERY_ACCOUNT_INFO_ERROR(1009, "获取用户账户异常"),
     QUERY_DEPT_ID_INFO_ERROR(1010, "获取部门ID异常"),
     QUERY_USER_ID_INFO_ERROR(1011, "获取用户ID异常"),
-
     TOKEN_ILLEGAL(1012, "Token已过期，请重新登录"),
 
+    DIC_TYPE_HAS_DISTRIBUTION(1013, "字典类型已分配，不可删除"),
+    NUMBER_FORMAT_ERROR(1014, "数据转换异常"),
     END(1999, "END");
 
     /**

@@ -32,7 +32,6 @@ public class LoginDTO {
     /**
      * 验证码
      */
-    @NotBlank(message = "验证码不能为空")
     @ApiModelProperty("验证码")
     private String code;
 

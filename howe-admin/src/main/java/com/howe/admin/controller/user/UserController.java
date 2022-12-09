@@ -6,7 +6,7 @@ import com.howe.common.utils.request.AjaxResult;
 import com.howe.common.utils.token.TokenUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,12 +20,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/user")
 @RestController
 @Api(tags = "用户相关")
+@RequiredArgsConstructor
 public class UserController {
-    @Autowired
-    private TokenUtils tokenUtils;
+    private final TokenUtils tokenUtils;
 
-    @Autowired
-    private UserService userService;
+    private final UserService userService;
 
     @GetMapping("/info")
     @ApiOperation(value = "查询用户信息", httpMethod = "GET")

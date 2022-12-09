@@ -3,10 +3,12 @@ package com.howe.main.handler;
 import cn.hutool.core.util.RandomUtil;
 import com.howe.common.enums.exception.CommonExceptionEnum;
 import com.howe.common.exception.BaseException;
+import com.howe.common.exception.child.CommonException;
 import com.howe.common.utils.request.AjaxResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.validation.BindException;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -67,7 +69,28 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(value = MethodArgumentNotValidException.class)
     @ResponseBody
-    public AjaxResult myExceptionHandle(MethodArgumentNotValidException e) {
+    public AjaxResult methodArgExceptionHandle(MethodArgumentNotValidException e) {
+        BindingResult result = e.getBindingResult();
+        StringJoiner sj = new StringJoiner(",");
+        if (result.hasErrors()) {
+            List<FieldError> fieldErrors = result.getFieldErrors();
+            for (FieldError error : fieldErrors) {
+                log.error("field:{}, msg:{}", error.getField(), error.getDefaultMessage(), e);
+                sj.add(error.getDefaultMessage());
+            }
+        }
+        return AjaxResult.error(sj.toString());
+    }
+
+    /**
+     * 处理@Valid的异常
+     *
+     * @param e
+     * @return
+     */
+    @ExceptionHandler(value = BindException.class)
+    @ResponseBody
+    public AjaxResult bindExceptionHandle(BindException e) {
         BindingResult result = e.getBindingResult();
         StringJoiner sj = new StringJoiner(",");
         if (result.hasErrors()) {
@@ -91,5 +114,14 @@ public class GlobalExceptionHandler {
     public AjaxResult signatureException(SignatureException e) {
         e.printStackTrace();
         return AjaxResult.error(CommonExceptionEnum.TOKEN_ILLEGAL);
+    }
+
+    @ExceptionHandler(value = NumberFormatException.class)
+    @ResponseBody
+    public AjaxResult numberException(NumberFormatException e) {
+        e.printStackTrace();
+        return AjaxResult.error(CommonExceptionEnum.NUMBER_FORMAT_ERROR.getCode(),
+                CommonException.assembleMsg(CommonExceptionEnum.NUMBER_FORMAT_ERROR,
+                        e.getMessage()));
     }
 }

@@ -1,13 +1,15 @@
 import Vue from 'vue'
+import App from './App'
 
 import Cookies from 'js-cookie'
 
 import 'normalize.css/normalize.css' // a modern alternative to CSS resets
 import Element from 'element-ui'
+import 'element-ui/lib/theme-chalk/index.css';
 import './styles/element-variables.scss'
+import {download} from '@/utils/request'
 
 import '@/styles/index.scss' // global css
-import App from './App'
 import store from './store'
 import router from './router'
 
@@ -16,6 +18,29 @@ import './icons' // icon
 import './permission' // permission control
 import './utils/error-log' // error log
 import * as filters from './filters' // global filters
+// 自定义表格工具组件
+import RightToolbar from "@/components/RightToolbar"
+// 字典标签组件
+import DictTag from '@/components/DictTag'
+// 字典数据组件
+import DictData from '@/components/DictData'
+import {parseTime, resetForm} from '@/utils'
+
+// 全局方法挂载
+// Vue.prototype.getDicts = getDicts
+// Vue.prototype.getConfigKey = getConfigKey
+Vue.prototype.parseTime = parseTime
+Vue.prototype.resetForm = resetForm
+// Vue.prototype.addDateRange = addDateRange
+// Vue.prototype.selectDictLabel = selectDictLabel
+// Vue.prototype.selectDictLabels = selectDictLabels
+Vue.prototype.download = download
+// Vue.prototype.handleTree = handleTree
+
+Vue.component('RightToolbar', RightToolbar)
+Vue.component('DictTag', DictTag)
+DictData.install()
+
 Vue.use(Element, {
   size: Cookies.get('size') || 'medium', // set element-ui default size
   i18n: (key, value) => i18n.t(key, value)

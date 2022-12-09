@@ -1,11 +1,12 @@
-package com.howe.admin.controller;
+package com.howe.admin.controller.menu;
 
+import com.github.pagehelper.PageInfo;
 import com.howe.admin.service.menu.MenuService;
 import com.howe.common.dto.menu.MenuDTO;
 import com.howe.common.utils.request.AjaxResult;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,14 +24,21 @@ import java.util.List;
 @RequestMapping("/menu")
 @Validated
 @Api(tags = "菜单按钮")
+@RequiredArgsConstructor
 public class MenuController {
-    @Autowired
-    private MenuService menuService;
+    private final MenuService menuService;
 
     @PostMapping("/getMenuList")
-    @ApiOperation(value = "获取菜单列表", httpMethod = "POST")
+    @ApiOperation(value = "获取菜单列表", httpMethod = "post")
     public AjaxResult<List<MenuDTO>> getMenuList() {
         List<MenuDTO> menuList = menuService.getMenuListWithPermission();
+        return AjaxResult.success(menuList);
+    }
+
+    @PostMapping("/getMenuPage")
+    @ApiOperation(value = "获取菜单列表", httpMethod = "post")
+    public AjaxResult<PageInfo<MenuDTO>> getMenuPage(MenuDTO menu) {
+        PageInfo<MenuDTO> menuList = menuService.getMenuPageWithPermission(menu);
         return AjaxResult.success(menuList);
     }
 }

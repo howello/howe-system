@@ -1,9 +1,11 @@
 /* Layout */
 import Layout from '@/layout'
-import {getMenuList} from '@/api/user'
+import {getMenuList} from '@/api/menu'
 
 const dynamicRouter = {
-  '/add-menu': getViews('menu/admin-menu/add-menu/index'),
+  '/setting/menu': getViews('system-setting/menu/index'),
+  '/setting/dic': getViews('system-setting/dict/index'),
+  '/setting/dic/data': getViews('system-setting/dict/data')
 }
 
 // 生成路由懒加载组件地址
@@ -27,25 +29,27 @@ function getParentView() {
 function generate(arr, isTopParent = true) {
   arr = arr.filter(item => item.status === '0')
   return arr.map(item => {
+    const path = item.path.replace('#', '')
     if (!item.children || item.children.length === 0) {
-      const path = item.path.replace('#', '')
       return {
         path: path || '#',
         name: path,
         component: dynamicRouter[path],
         meta: {
           title: item.menuName,
-          icon: item.icon
+          icon: item.icon,
+          hidden: item.visible === '1'
         }
       }
     } else {
       return {
         component: isTopParent ? Layout : getParentView(),
         // 展开菜单加入标记 防止同时折叠
-        path: '/' + item.menuId,
+        path: path,
         meta: {
           title: item.menuName,
-          icon: item.icon
+          icon: item.icon,
+          hidden: item.visible === '1'
         },
         children: generate(item.children, false)
       }

@@ -1,6 +1,8 @@
 package com.howe.admin.service.menu.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.github.pagehelper.PageHelper;
+import com.github.pagehelper.PageInfo;
 import com.howe.admin.dao.menu.MenuDAO;
 import com.howe.admin.service.auth.UserService;
 import com.howe.admin.service.menu.MenuService;
@@ -70,7 +72,7 @@ public class MenuServiceImpl extends ServiceImpl<MenuDAO, MenuDTO> implements Me
      */
     @Override
     public List<MenuDTO> getMenuListWithPermission() {
-        Long userId = null;
+        Long userId;
         try {
             userId = userService.getUserId();
         } catch (Exception e) {
@@ -85,5 +87,17 @@ public class MenuServiceImpl extends ServiceImpl<MenuDAO, MenuDTO> implements Me
                 .filter(m -> m.getMenuId() != 0L)
                 .collect(Collectors.toList());
         return menuList;
+    }
+
+    /**
+     * 根据权限分页查询菜单列表
+     *
+     * @return
+     */
+    @Override
+    public PageInfo<MenuDTO> getMenuPageWithPermission(MenuDTO menu) {
+        PageHelper.startPage(menu.getPageNum(), menu.getPageSize());
+        PageInfo<MenuDTO> pageInfo = new PageInfo<>(this.getMenuListWithPermission());
+        return pageInfo;
     }
 }

@@ -10,7 +10,7 @@ import java.util.List;
  * <p>@Author lu
  * <p>@Date 2022/11/29 14:19 星期二
  * <p>@Version 1.0
- * <p>@Description TODO
+ * <p>@Description 菜单DAO
  */
 @Mapper
 public interface MenuDAO extends BaseMapper<MenuDTO> {

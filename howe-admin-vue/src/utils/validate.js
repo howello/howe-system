@@ -85,3 +85,12 @@ export function isArray(arg) {
   }
   return Array.isArray(arg)
 }
+
+export function isJson(data) {
+  try {
+    JSON.parse(data);
+    return false;
+  } catch (error) {
+    return true;
+  }
+}
