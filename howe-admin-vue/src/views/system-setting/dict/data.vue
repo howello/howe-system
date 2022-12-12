@@ -36,7 +36,7 @@
     </el-form>
 
     <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
+      <el-col :span="9">
         <el-button
           type="primary"
           plain
@@ -45,8 +45,6 @@
           @click="handleAdd"
         >新增
         </el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button
           type="success"
           plain
@@ -56,8 +54,6 @@
           @click="handleUpdate"
         >修改
         </el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button
           type="danger"
           plain
@@ -67,8 +63,6 @@
           @click="handleDelete"
         >删除
         </el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button
           type="warning"
           plain
@@ -77,8 +71,6 @@
           @click="handleExport"
         >导出
         </el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button
           type="warning"
           plain

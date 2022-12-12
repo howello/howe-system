@@ -56,7 +56,7 @@ service.interceptors.request.use(
           fullscreen: true
         })
       }
-      loadingUrls.add(config.baseURL + config.url)
+      loadingUrls.add(config.url)
     }
     return config
   },
@@ -85,9 +85,9 @@ service.interceptors.response.use(
    * You can also judge the status by HTTP Status Code
    */
   response => {
-    if (loadingUrls.has(response.config.url)) {
-      loadingUrls.delete(response.config.url)
-
+    let url = response.config.url
+    if (loadingUrls.has(url)) {
+      loadingUrls.delete(url)
       // 使用宏任务检查是否关闭，避免微任务内重复打开
       setTimeout(() => {
         if (loadingUrls.size === 0) {

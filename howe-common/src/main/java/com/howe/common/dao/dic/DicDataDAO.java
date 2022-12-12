@@ -4,8 +4,6 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.howe.common.dto.dic.DicDataDTO;
 import org.apache.ibatis.annotations.Mapper;
 
-import java.util.List;
-
 /**
  * <p>@Author lu
  * <p>@Date 2022/12/5 17:06 星期一
@@ -14,5 +12,4 @@ import java.util.List;
  */
 @Mapper
 public interface DicDataDAO extends BaseMapper<DicDataDTO> {
-    List<DicDataDTO> selectList(DicDataDTO dicData);
 }

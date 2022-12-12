@@ -1,6 +1,6 @@
 <template>
   <div class="top-right-btn" :style="style">
-    <el-row>
+    <el-col :span="8">
       <el-tooltip class="item" effect="dark" :content="showSearch ? '隐藏搜索' : '显示搜索'" placement="top" v-if="search">
         <el-button size="mini" circle icon="el-icon-search" @click="toggleSearch()" />
       </el-tooltip>
@@ -10,7 +10,7 @@
       <el-tooltip class="item" effect="dark" content="显隐列" placement="top" v-if="columns">
         <el-button size="mini" circle icon="el-icon-menu" @click="showColumn()" />
       </el-tooltip>
-    </el-row>
+    </el-col>
     <el-dialog :title="title" :visible.sync="open" append-to-body>
       <el-transfer
         :titles="['显示', '隐藏']"

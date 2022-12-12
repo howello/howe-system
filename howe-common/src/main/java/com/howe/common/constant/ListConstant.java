@@ -16,6 +16,7 @@ public class ListConstant {
      * 基础类型列表
      */
     public static final List<String> PRIMITIVE_LIST = Arrays.asList(
+            "String",
             "boolean", "Boolean",
             "int", "Integer",
             "char", "Char",

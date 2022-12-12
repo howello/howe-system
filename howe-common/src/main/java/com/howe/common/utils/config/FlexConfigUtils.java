@@ -6,7 +6,6 @@ import cn.hutool.core.util.ReflectUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.howe.common.constant.ListConstant;
 import com.howe.common.dao.flexConfig.FlexConfigDAO;
 import com.howe.common.dto.flexConfig.ConfigDataDTO;
 import com.howe.common.dto.flexConfig.FlexConfigDTO;
@@ -14,6 +13,7 @@ import com.howe.common.enums.exception.CommonExceptionEnum;
 import com.howe.common.enums.flexConfig.FlexConfigBizTypeEnum;
 import com.howe.common.enums.redis.RedisKeyPrefixEnum;
 import com.howe.common.exception.child.CommonException;
+import com.howe.common.utils.CommonUtils;
 import com.howe.common.utils.id.IdGeneratorUtil;
 import com.howe.common.utils.redis.RedisUtils;
 import lombok.SneakyThrows;
@@ -255,9 +255,10 @@ public class FlexConfigUtils {
                     s.contains(" volatile ") || s.contains(" transient ")) {
                 continue;
             }
-            if (fieldValue == null || isPrimitive(field.getType())) {
+
+            if (fieldValue instanceof String && StringUtils.isBlank((String) fieldValue)) {
                 fillDefault(source, target, field, name);
-            } else if (fieldValue instanceof String && StringUtils.isBlank((String) fieldValue)) {
+            } else if (fieldValue == null || CommonUtils.isPrimitive(field.getType())) {
                 fillDefault(source, target, field, name);
             } else if (fieldValue instanceof Collection && CollectionUtils.isEmpty((Collection<?>) fieldValue)) {
                 fillDefault(source, target, field, name);
@@ -287,14 +288,4 @@ public class FlexConfigUtils {
         field.set(target, defaultValue);
     }
 
-    /**
-     * 校验是否为基本类型
-     *
-     * @param type
-     * @return
-     */
-    private boolean isPrimitive(Class<?> type) {
-        String typeName = type.getSimpleName();
-        return ListConstant.PRIMITIVE_LIST.contains(typeName);
-    }
 }

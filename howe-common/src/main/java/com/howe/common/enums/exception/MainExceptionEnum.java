@@ -14,6 +14,7 @@ public enum MainExceptionEnum implements BaseExceptionEnum {
     START(3001, "start"),
 
     AUTH_FAILED(3002, "认证失败，无法访问系统资源"),
+    TYPE_NOT_SUPPORTED(3003, "类型不支持"),
 
     END(3999, "END");
 

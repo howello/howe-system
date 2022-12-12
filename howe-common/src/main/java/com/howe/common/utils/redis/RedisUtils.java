@@ -3,6 +3,7 @@ package com.howe.common.utils.redis;
 import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.howe.common.enums.redis.RedisKeyPrefixEnum;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -416,6 +417,17 @@ public class RedisUtils {
     }
 
 
+    public Long sSet(RedisKeyPrefixEnum prefix, String key, Set set) {
+        key = buildKey(prefix, key);
+        try {
+            return redisTemplate.opsForSet().add(key, set);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ERROR_CODE;
+        }
+    }
+
+
     public Long sSetAndTime(RedisKeyPrefixEnum prefix, String key, long time, TimeUnit timeUnit, Object... values) {
         key = buildKey(prefix, key);
         try {
@@ -454,6 +466,58 @@ public class RedisUtils {
 
     // ===============================list=================================
 
+    /**
+     * 放入整个list
+     *
+     * @param prefix
+     * @param key
+     * @param list
+     */
+    public void setList(RedisKeyPrefixEnum prefix, String key, List list) {
+        key = buildKey(prefix, key);
+        redisTemplate.opsForList().rightPushAll(key, list);
+    }
+
+    /**
+     * list里面单独加一条
+     *
+     * @param prefix
+     * @param key
+     * @param obj
+     */
+    public void setList(RedisKeyPrefixEnum prefix, String key, Object obj) {
+        key = buildKey(prefix, key);
+        redisTemplate.opsForList().rightPush(key, obj);
+    }
+
+    /**
+     * 获取list
+     *
+     * @param prefix
+     * @param key
+     * @return
+     */
+    public List getList(RedisKeyPrefixEnum prefix, String key) {
+        key = buildKey(prefix, key);
+        return redisTemplate.opsForList().range(key, 0, -1);
+    }
+
+    /**
+     * 获取指定对象的list
+     *
+     * @param prefix
+     * @param key
+     * @param clazz
+     * @param <T>
+     * @return
+     */
+    public <T> List<T> getListObject(RedisKeyPrefixEnum prefix, String key, Class<T> clazz) {
+        key = buildKey(prefix, key);
+        List<Object> objList = redisTemplate.opsForList().range(key, 0, -1);
+        return CollectionUtils.isNotEmpty(objList) ? objList.stream()
+                .map(o -> JSONObject.toJavaObject((JSONObject) o, clazz))
+                .collect(Collectors.toList()) : null;
+    }
 
     public List<String> lGet(RedisKeyPrefixEnum prefix, String key, long start, long end) {
         key = buildKey(prefix, key);

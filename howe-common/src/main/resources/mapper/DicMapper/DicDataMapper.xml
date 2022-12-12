@@ -24,25 +24,4 @@
         dict_code, dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default,
         `status`, create_by, create_time, update_by, update_time, remark
     </sql>
-
-    <select id="selectList" resultMap="BaseResultMap">
-        select
-        <include refid="Base_Column_List"/>
-        from sys_dict_data
-        <where>
-            <if test="dictType != null and dictType != ''">
-                AND dict_type = #{dictType}
-            </if>
-            <if test="dictLabel != null and dictLabel != ''">
-                AND dict_label like concat('%', #{dictLabel}, '%')
-            </if>
-            <if test="dictValue != null and dictValue != ''">
-                AND dict_label = #{dictValue}
-            </if>
-            <if test="status != null and status != ''">
-                AND status = #{status}
-            </if>
-        </where>
-        order by dict_sort
-    </select>
 </mapper>

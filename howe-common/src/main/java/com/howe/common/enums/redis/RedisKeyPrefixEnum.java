@@ -25,6 +25,7 @@ public enum RedisKeyPrefixEnum implements Serializable {
     VERIFICATION_CODE("verification_code", "验证码"),
 
     TOKEN_INFO("token_info", "Token信息"),
+    DIC_DATA_INFO("dic_data_info", "字典"),
 
     END("end", "结尾");
 

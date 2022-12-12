@@ -3,6 +3,9 @@ server:
 spring:
   application:
     name: howe-main
+  jackson:
+    time-zone: GMT+8
+    date-format: yyyy-MM-dd HH:mm:ss
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher
@@ -10,7 +13,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     name: defaultDataSource
     password: root
-    url: jdbc:mysql://localhost:3306/howe?serverTimezone=UTC
+    url: jdbc:mysql://localhost:3306/howe?connectTimeout=1000&socketTimeout=3000&autoReconnect=true&useSSL=false&useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
     username: root
   redis:
     host: 127.0.0.1

@@ -3,7 +3,7 @@ package com.howe.admin.controller.user;
 import com.howe.admin.service.auth.UserService;
 import com.howe.common.dto.role.UserDTO;
 import com.howe.common.utils.request.AjaxResult;
-import com.howe.common.utils.token.TokenUtils;
+import com.howe.common.utils.token.UserInfoUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
@@ -22,13 +22,13 @@ import org.springframework.web.bind.annotation.RestController;
 @Api(tags = "用户相关")
 @RequiredArgsConstructor
 public class UserController {
-    private final TokenUtils tokenUtils;
+    private final UserInfoUtils userInfoUtils;
 
     private final UserService userService;
 
     @GetMapping("/info")
     @ApiOperation(value = "查询用户信息", httpMethod = "GET")
     public AjaxResult<UserDTO> getUserInfo() {
-        return AjaxResult.success(userService.getUserInfo());
+        return AjaxResult.success(userInfoUtils.getUserInfo());
     }
 }

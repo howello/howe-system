@@ -41,7 +41,7 @@
     </el-form>
 
     <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
+      <el-col :span="9">
         <el-button
           type="primary"
           plain
@@ -50,8 +50,6 @@
           @click="handleAdd"
         >新增
         </el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button
           type="success"
           plain
@@ -61,8 +59,6 @@
           @click="handleUpdate"
         >修改
         </el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button
           type="danger"
           plain
@@ -72,8 +68,6 @@
           @click="handleDelete"
         >删除
         </el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button
           type="warning"
           plain
@@ -82,8 +76,6 @@
           @click="handleExport"
         >导出
         </el-button>
-      </el-col>
-      <el-col :span="1.5">
         <el-button
           type="danger"
           plain
@@ -93,7 +85,9 @@
         >刷新缓存
         </el-button>
       </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
+      <el-col :span="8">
+        <right-toolbar :showSearch.sync="showSearch" @queryTable="getList" />
+      </el-col>
     </el-row>
 
     <el-table v-loading="loading" :data="typeList" @selection-change="handleSelectionChange">
@@ -284,7 +278,6 @@ export default {
     },
     /** 修改按钮操作 */
     handleUpdate(row) {
-      debugger
       this.reset();
       const dictId = row.dictId || this.ids
       getDicTypeById(dictId).then(response => {
@@ -315,7 +308,7 @@ export default {
     },
     /** 删除按钮操作 */
     handleDelete(row) {
-      const dictIds = row.dictId || this.ids;
+      const dictIds = row.dictId ? [row.dictId] : this.ids;
       delDicType(dictIds)
         .then(res => {
           this.getList();

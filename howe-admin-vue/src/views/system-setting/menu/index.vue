@@ -64,8 +64,7 @@
         </template>
       </el-table-column>
       <el-table-column prop="orderNum" label="排序" width="60"></el-table-column>
-      <el-table-column prop="perms" label="权限标识" :show-overflow-tooltip="true"></el-table-column>
-      <el-table-column prop="component" label="组件路径" :show-overflow-tooltip="true"></el-table-column>
+      <el-table-column prop="path" label="路径" :show-overflow-tooltip="true"></el-table-column>
       <el-table-column prop="status" label="状态" width="80">
         <template slot-scope="scope">
           <dict-tag :options="dict.type.sys_normal_disable" :value="scope.row.status" />
@@ -83,7 +82,6 @@
             type="text"
             icon="el-icon-edit"
             @click="handleUpdate(scope.row)"
-            v-hasPermi="['system:menu:edit']"
           >修改
           </el-button>
           <el-button
@@ -91,7 +89,6 @@
             type="text"
             icon="el-icon-plus"
             @click="handleAdd(scope.row)"
-            v-hasPermi="['system:menu:add']"
           >新增
           </el-button>
           <el-button
@@ -99,7 +96,6 @@
             type="text"
             icon="el-icon-delete"
             @click="handleDelete(scope.row)"
-            v-hasPermi="['system:menu:remove']"
           >删除
           </el-button>
         </template>
@@ -341,7 +337,7 @@ export default {
     getList() {
       this.loading = true;
       getMenuList(this.queryParams).then(response => {
-        this.menuList = response.data.list;
+        this.menuList = response.data
         this.loading = false;
       });
     },

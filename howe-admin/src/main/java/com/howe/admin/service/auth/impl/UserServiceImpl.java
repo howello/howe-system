@@ -4,14 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.howe.admin.dao.auth.UserDAO;
 import com.howe.admin.service.auth.UserService;
-import com.howe.common.dto.login.LoginUserDTO;
 import com.howe.common.dto.role.UserDTO;
-import com.howe.common.enums.exception.CommonExceptionEnum;
-import com.howe.common.exception.child.CommonException;
-import com.howe.common.utils.token.SecurityUtils;
-import lombok.SneakyThrows;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.collections4.CollectionUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -23,9 +18,9 @@ import java.util.List;
  * <p>@Description TODO
  */
 @Service
+@RequiredArgsConstructor
 public class UserServiceImpl extends ServiceImpl<UserDAO, UserDTO> implements UserService {
-    @Autowired
-    private UserDAO userDAO;
+    private final UserDAO userDAO;
 
 
     /**
@@ -68,54 +63,5 @@ public class UserServiceImpl extends ServiceImpl<UserDAO, UserDTO> implements Us
     @Override
     public Boolean register(UserDTO userDTO) {
         return userDAO.insert(userDTO) > 0;
-    }
-
-    /**
-     * 查询当前登录用户信息
-     *
-     * @return
-     */
-    @Override
-    public UserDTO getUserInfo() {
-        return this.getLoginUser().getUser();
-    }
-
-
-    /**
-     * 用户ID
-     **/
-    @Override
-    public Long getUserId() {
-        return getLoginUser().getUserId();
-    }
-
-    /**
-     * 获取部门ID
-     **/
-    @Override
-    public Long getDeptId() {
-        return getLoginUser().getDeptId();
-    }
-
-    /**
-     * 获取用户账户
-     **/
-    @Override
-    public String getUsername() {
-        return getLoginUser().getUsername();
-    }
-
-    /**
-     * 获取用户
-     **/
-    @Override
-    @SneakyThrows
-    public LoginUserDTO getLoginUser() {
-        Object principal = SecurityUtils.getAuthentication().getPrincipal();
-        if (principal instanceof LoginUserDTO) {
-            return (LoginUserDTO) principal;
-        } else {
-            throw new CommonException(CommonExceptionEnum.QUERY_USER_INFO_ERROR);
-        }
     }
 }

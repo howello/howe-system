@@ -30,7 +30,7 @@ public class MybatisUtils {
      * @return
      */
     @SneakyThrows
-    public static <T> QueryWrapper<T> assembleNotNullWhere(T t) {
+    public static <T> QueryWrapper<T> assembleQueryWrapper(T t) {
         QueryWrapper<T> qw = new QueryWrapper<>();
         Field[] fields = ReflectUtil.getFields(t.getClass());
         for (Field field : fields) {

@@ -1,16 +1,23 @@
 package com.howe.common.utils.dic;
 
+import cn.hutool.core.date.DateTime;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
+import com.howe.common.annotation.Cache;
 import com.howe.common.dao.dic.DicDataDAO;
 import com.howe.common.dao.dic.DictTypeDAO;
 import com.howe.common.dto.dic.DicDataDTO;
 import com.howe.common.dto.dic.DictTypeDTO;
+import com.howe.common.dto.role.UserDTO;
 import com.howe.common.enums.StatusEnum;
 import com.howe.common.enums.exception.CommonExceptionEnum;
+import com.howe.common.enums.redis.RedisKeyPrefixEnum;
+import com.howe.common.enums.redis.RedisTypeEnum;
 import com.howe.common.exception.child.CommonException;
 import com.howe.common.utils.mybatis.MybatisUtils;
+import com.howe.common.utils.redis.RedisUtils;
+import com.howe.common.utils.token.UserInfoUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.apache.commons.collections4.CollectionUtils;
@@ -19,6 +26,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * <p>@Author lu
@@ -34,6 +42,11 @@ public class DictionaryUtils {
 
     private final DictTypeDAO dictTypeDAO;
 
+    private final UserInfoUtils userInfoUtils;
+
+    private final RedisUtils redisUtils;
+
+
     /**
      * 根据条件查询字典列表
      *
@@ -41,7 +54,8 @@ public class DictionaryUtils {
      * @return
      */
     public List<DicDataDTO> getDicList(DicDataDTO dicData) {
-        return dicDataDAO.selectList(dicData);
+        QueryWrapper<DicDataDTO> qw = MybatisUtils.assembleQueryWrapper(dicData);
+        return dicDataDAO.selectList(qw);
     }
 
     /**
@@ -82,6 +96,12 @@ public class DictionaryUtils {
      * @return
      */
     @SneakyThrows
+    @Cache(prefix = RedisKeyPrefixEnum.DIC_DATA_INFO,
+            key = "dicType",
+            redisType = RedisTypeEnum.LIST,
+            clazz = DicDataDTO.class,
+            time = 1,
+            timeUnit = TimeUnit.DAYS)
     public List<DicDataDTO> getDicDataListByType(String dicType) {
         if (StringUtils.isBlank(dicType)) {
             throw new CommonException("字典类型不可为空！");
@@ -97,19 +117,14 @@ public class DictionaryUtils {
      * @param dicId
      * @return
      */
+    @Cache(prefix = RedisKeyPrefixEnum.DIC_DATA_INFO,
+            key = "dicId",
+            redisType = RedisTypeEnum.OBJECT,
+            clazz = DicDataDTO.class,
+            time = 1,
+            timeUnit = TimeUnit.DAYS)
     public DicDataDTO getDicById(Long dicId) {
         return dicDataDAO.selectById(dicId);
-    }
-
-    /**
-     * 根据Id数组获取字典数据列表
-     *
-     * @param dicIds
-     * @return
-     */
-    public DicDataDTO getDicListById(Long dicId) {
-        DicDataDTO dicById = this.getDicById(dicId);
-        return dicById;
     }
 
     /**
@@ -129,6 +144,7 @@ public class DictionaryUtils {
      * @return
      */
     public int updateDicDate(DicDataDTO dicDataDTO) {
+        this.refreshCache();
         return dicDataDAO.updateById(dicDataDTO);
     }
 
@@ -139,6 +155,7 @@ public class DictionaryUtils {
      * @return
      */
     public int delDicData(Long[] dictCodes) {
+        this.refreshCache();
         return dicDataDAO.deleteBatchIds(Arrays.asList(dictCodes));
     }
 
@@ -149,7 +166,7 @@ public class DictionaryUtils {
      * @return
      */
     public List<DictTypeDTO> getDicTypeList(DictTypeDTO dictType) {
-        QueryWrapper<DictTypeDTO> qw = MybatisUtils.assembleNotNullWhere(dictType);
+        QueryWrapper<DictTypeDTO> qw = MybatisUtils.assembleQueryWrapper(dictType);
         return dictTypeDAO.selectList(qw);
     }
 
@@ -161,7 +178,8 @@ public class DictionaryUtils {
      */
     public PageInfo<DictTypeDTO> getDicTypePage(DictTypeDTO dictType) {
         PageHelper.startPage(dictType.getPageNum(), dictType.getPageSize());
-        return new PageInfo<>(this.getDicTypeList(dictType));
+        List<DictTypeDTO> dicTypeList = this.getDicTypeList(dictType);
+        return new PageInfo<>(dicTypeList);
     }
 
     /**
@@ -170,6 +188,12 @@ public class DictionaryUtils {
      * @param dicTypeId
      * @return
      */
+    @Cache(prefix = RedisKeyPrefixEnum.DIC_DATA_INFO,
+            key = "dicTypeId",
+            redisType = RedisTypeEnum.OBJECT,
+            clazz = DictTypeDTO.class,
+            time = 1,
+            timeUnit = TimeUnit.DAYS)
     public DictTypeDTO getDicTypeById(Long dicTypeId) {
         return dictTypeDAO.selectById(dicTypeId);
     }
@@ -181,6 +205,7 @@ public class DictionaryUtils {
      * @return
      */
     public int updateType(DictTypeDTO dictType) {
+        this.refreshCache();
         return dictTypeDAO.updateById(dictType);
     }
 
@@ -191,6 +216,13 @@ public class DictionaryUtils {
      * @return
      */
     public int saveDicType(DictTypeDTO dictType) {
+        DateTime now = DateTime.now();
+        UserDTO userInfo = userInfoUtils.getUserInfo();
+        String userName = userInfo.getUserName();
+        dictType.setCreateBy(userName);
+        dictType.setCreateTime(now);
+        dictType.setUpdateBy(userName);
+        dictType.setUpdateTime(now);
         return dictTypeDAO.insert(dictType);
     }
 
@@ -206,13 +238,15 @@ public class DictionaryUtils {
         DicDataDTO dicDataDTO = new DicDataDTO();
         for (Long dicTypeId : dicTypeIds) {
             DictTypeDTO dictTypeDTO = dictTypeDAO.selectById(dicTypeId);
-            dictTypeDTO.setDictType(dictTypeDTO.getDictType());
-            List<DicDataDTO> dicDataList = dicDataDAO.selectList(dicDataDTO);
+            dicDataDTO.setDictType(dictTypeDTO.getDictType());
+            QueryWrapper<DicDataDTO> qw = MybatisUtils.assembleQueryWrapper(dicDataDTO);
+            List<DicDataDTO> dicDataList = dicDataDAO.selectList(qw);
             if (CollectionUtils.isNotEmpty(dicDataList)) {
                 throw new CommonException(CommonExceptionEnum.DIC_TYPE_HAS_DISTRIBUTION);
             }
             dictTypeDAO.deleteById(dicTypeId);
         }
+        this.refreshCache();
         return dicTypeIds.length;
     }
 
@@ -223,6 +257,7 @@ public class DictionaryUtils {
      * @return
      */
     public Boolean refreshCache() {
+        redisUtils.deleteKeys(RedisKeyPrefixEnum.DIC_DATA_INFO);
         return true;
     }
 }

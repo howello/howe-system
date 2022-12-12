@@ -8,8 +8,9 @@ import com.howe.admin.service.auth.UserService;
 import com.howe.admin.service.menu.MenuService;
 import com.howe.common.dto.menu.MenuDTO;
 import com.howe.common.dto.role.UserDTO;
+import com.howe.common.utils.token.UserInfoUtils;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -22,13 +23,13 @@ import java.util.stream.Collectors;
  * <p>@Description TODO
  */
 @Service
+@RequiredArgsConstructor
 public class MenuServiceImpl extends ServiceImpl<MenuDAO, MenuDTO> implements MenuService {
-    @Autowired
-    private UserService userService;
+    private final UserService userService;
 
-    @Autowired
-    private MenuDAO menuDAO;
+    private final MenuDAO menuDAO;
 
+    private final UserInfoUtils userInfoUtils;
 
     /**
      * 获取用户对应的菜单
@@ -74,7 +75,7 @@ public class MenuServiceImpl extends ServiceImpl<MenuDAO, MenuDTO> implements Me
     public List<MenuDTO> getMenuListWithPermission() {
         Long userId;
         try {
-            userId = userService.getUserId();
+            userId = userInfoUtils.getUserId();
         } catch (Exception e) {
             return null;
         }
