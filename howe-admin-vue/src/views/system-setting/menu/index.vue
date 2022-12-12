@@ -33,7 +33,6 @@
           icon="el-icon-plus"
           size="mini"
           @click="handleAdd"
-          v-hasPermi="['system:menu:add']"
         >新增
         </el-button>
       </el-col>
@@ -285,7 +284,7 @@
 import treeSelect from "@riophae/vue-treeselect";
 import "@riophae/vue-treeselect/dist/vue-treeselect.css";
 import IconSelect from "@/components/IconSelect";
-import {getMenuPage} from '@/api/menu'
+import {getMenuList} from '@/api/menu'
 
 export default {
   name: "Menu",
@@ -341,7 +340,7 @@ export default {
     /** 查询菜单列表 */
     getList() {
       this.loading = true;
-      getMenuPage(this.queryParams).then(response => {
+      getMenuList(this.queryParams).then(response => {
         this.menuList = response.data.list;
         this.loading = false;
       });
@@ -359,7 +358,7 @@ export default {
     },
     /** 查询菜单下拉树结构 */
     getTreeselect() {
-      listMenu().then(response => {
+      getMenuList().then(response => {
         this.menuOptions = [];
         const menu = {menuId: 0, menuName: '主类目', children: []};
         menu.children = this.handleTree(response.data, "menuId");
