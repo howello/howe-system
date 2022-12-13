@@ -60,7 +60,7 @@ export default {
   methods: {
     hasOneShowingChild(children = [], parent) {
       const showingChildren = children.filter(item => {
-        if (item.meta.hidden) {
+        if (item.hidden) {
           return false
         } else {
           // Temp set(will be used if only has one showing child)

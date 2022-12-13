@@ -1,6 +1,5 @@
 package com.howe.admin.controller.menu;
 
-import com.github.pagehelper.PageInfo;
 import com.howe.admin.service.menu.MenuService;
 import com.howe.common.dto.menu.MenuDTO;
 import com.howe.common.utils.request.AjaxResult;
@@ -8,9 +7,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -28,17 +25,45 @@ import java.util.List;
 public class MenuController {
     private final MenuService menuService;
 
-    @PostMapping("/getMenuList")
-    @ApiOperation(value = "获取菜单列表", httpMethod = "post")
-    public AjaxResult<List<MenuDTO>> getMenuList() {
+    @PostMapping("/getMenuListWithPermit")
+    @ApiOperation(value = "根据权限获取菜单列表", httpMethod = "post")
+    public AjaxResult<List<MenuDTO>> getMenuListWithPermit() {
         List<MenuDTO> menuList = menuService.getMenuListWithPermission();
         return AjaxResult.success(menuList);
     }
 
-    @PostMapping("/getMenuPage")
-    @ApiOperation(value = "获取菜单列表", httpMethod = "post")
-    public AjaxResult<PageInfo<MenuDTO>> getMenuPage(MenuDTO menu) {
-        PageInfo<MenuDTO> menuList = menuService.getMenuPageWithPermission(menu);
+    @GetMapping("/getMenuList")
+    @ApiOperation(value = "获取菜单列表", httpMethod = "get")
+    public AjaxResult<List<MenuDTO>> getMenuList(MenuDTO menu) {
+        List<MenuDTO> menuList = menuService.getMenuList(menu);
         return AjaxResult.success(menuList);
+    }
+
+    @GetMapping("/getMenu")
+    @ApiOperation(value = "获取菜单", httpMethod = "get")
+    public AjaxResult<MenuDTO> getMenu(@RequestParam("menuId") Long menuId) {
+        MenuDTO menuDTO = menuService.getById(menuId);
+        return AjaxResult.success(menuDTO);
+    }
+
+    @PostMapping("/updateMenu")
+    @ApiOperation(value = "更新菜单", httpMethod = "post")
+    public AjaxResult<Boolean> updateMenu(@RequestBody MenuDTO menu) {
+        boolean b = menuService.saveOrUpdate(menu);
+        return AjaxResult.success(b);
+    }
+
+    @PostMapping("/saveMenu")
+    @ApiOperation(value = "保存菜单", httpMethod = "post")
+    public AjaxResult<Boolean> saveMenu(@RequestBody MenuDTO menu) {
+        boolean save = menuService.save(menu);
+        return AjaxResult.success(save);
+    }
+
+    @DeleteMapping("/delMenu")
+    @ApiOperation(value = "删除菜单", httpMethod = "delete")
+    public AjaxResult<Boolean> delMenu(Long menuId) {
+        boolean b = menuService.removeById(menuId);
+        return AjaxResult.success(b);
     }
 }

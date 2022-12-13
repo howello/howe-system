@@ -137,6 +137,7 @@ public class MenuDTO extends BaseDTO {
     /**
      * 子菜单
      */
+    @TableField(exist = false)
     private List<MenuDTO> children = new ArrayList<>();
 
     public static final String COL_MENU_ID = "menu_id";

@@ -21,6 +21,7 @@ public enum AdminExceptionEnum implements BaseExceptionEnum {
     NOT_EXIST(2007, "账号不存在"),
     DISABLE_REGISTER(2008, "当前系统没有开启注册功能!"),
     USER_EXISTS(2009, "注册用户已存在!"),
+    THERE_ARE_SUBMENUS(2010, "存在子菜单，不可删除!"),
 
 
     END(2999, "END");

@@ -1,6 +1,6 @@
 /* Layout */
 import Layout from '@/layout'
-import {getMenuList} from '@/api/menu'
+import {getMenuListWithPermit} from '@/api/menu'
 
 const dynamicRouter = {
   '/setting/menu': getViews('system-setting/menu/index'),
@@ -35,10 +35,10 @@ function generate(arr, isTopParent = true) {
         path: path || '#',
         name: path,
         component: dynamicRouter[path],
+        hidden: item.visible === '1',
         meta: {
           title: item.menuName,
           icon: item.icon,
-          hidden: item.visible === '1'
         }
       }
     } else {
@@ -46,10 +46,10 @@ function generate(arr, isTopParent = true) {
         component: isTopParent ? Layout : getParentView(),
         // 展开菜单加入标记 防止同时折叠
         path: path,
+        hidden: item.visible === '1',
         meta: {
           title: item.menuName,
           icon: item.icon,
-          hidden: item.visible === '1'
         },
         children: generate(item.children, false)
       }
@@ -61,7 +61,7 @@ function generate(arr, isTopParent = true) {
 let menu = null
 export const getRoutes = async (path, fresh = false) => {
   if (menu === null || fresh || path === '/Home') {
-    const res = await getMenuList()
+    const res = await getMenuListWithPermit()
     menu = generate(res.data || [])
   }
   return menu
