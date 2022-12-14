@@ -75,7 +75,7 @@ public class DicController {
 
     @DeleteMapping("/delDicData")
     @ApiOperation(value = "删除字典数据", httpMethod = "DELETE")
-    public AjaxResult<Integer> delDicData(Long[] dictCodes) {
+    public AjaxResult<Integer> delDicData(@RequestBody @Valid @NotNull Long[] dictCodes) {
         int i = dictionaryUtils.delDicData(dictCodes);
         return AjaxResult.success(i);
     }

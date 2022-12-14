@@ -1,38 +1,68 @@
 import request from '@/utils/request'
 
-export function getRoutes() {
+export function getRoleList(params) {
   return request({
-    url: '/routes',
-    method: 'get'
+    url: '/role/getRoleList',
+    method: 'get',
+    params,
+    loading: true
   })
 }
 
-export function getRoles() {
+export function getRolePage(params) {
   return request({
-    url: '/roles',
-    method: 'get'
+    url: '/role/getRolePage',
+    method: 'get',
+    params,
+    loading: true
+  })
+}
+
+export function getRole(params) {
+  return request({
+    url: '/role/getRole',
+    method: 'get',
+    params: {roleId: params},
+    loading: true
+  })
+}
+
+export function changeRoleStatus(data) {
+  return request({
+    url: '/role/changeRoleStatus',
+    method: 'post',
+    data,
+    loading: true,
+    confirmBefore: true
   })
 }
 
 export function addRole(data) {
   return request({
-    url: '/role',
+    url: '/role/addRole',
     method: 'post',
-    data
+    data,
+    loading: true,
+    confirmBefore: true
   })
 }
 
-export function updateRole(id, data) {
+export function updateRole(data) {
   return request({
-    url: `/role/${id}`,
+    url: `/role/updateRole`,
     method: 'put',
-    data
+    data,
+    loading: true,
+    confirmBefore: true
   })
 }
 
-export function deleteRole(id) {
+export function deleteRole(data) {
   return request({
-    url: `/role/${id}`,
-    method: 'delete'
+    url: `/role/delRole`,
+    method: 'DELETE',
+    data,
+    loading: true,
+    confirmBefore: true
   })
 }

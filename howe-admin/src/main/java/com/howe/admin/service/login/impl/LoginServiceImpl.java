@@ -96,7 +96,7 @@ public class LoginServiceImpl implements LoginService {
         List<RoleDTO> roleDTOS = roleService.selectRoleListByUserId(user.getUserId());
         if (CollectionUtils.isNotEmpty(roleDTOS)) {
             user.setRoles(roleDTOS);
-            user.setRoleIds(roleDTOS.stream().map(RoleDTO::getRoleId).toArray(Long[]::new));
+            user.setRoleIds(roleDTOS.stream().map(RoleDTO::getRoleId).toArray(String[]::new));
             user.setRoleId(roleDTOS.get(0).getRoleId());
             loginUser.setUser(user);
         }

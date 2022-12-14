@@ -36,8 +36,8 @@ public class IdGeneratorUtil {
      * <p>第1位 ： 符号位 永远为0</p>
      * <p>后面33位 ： 时间戳，秒级。从1970年开始，可以用到2242年。</p>
      * <p>后面10位 ： 第一个随机数，总长10位，[0,1024)</p>
-     * <p>后面10位 ： 第二个随机数，总长4位，[0,16)</p>
-     * <p>后面10位 ： redis自增数据，总长16位，就是说每秒最多可生成65536个不同的id。</p>
+     * <p>后面4位 ： 第二个随机数，总长4位，[0,16)</p>
+     * <p>后面16位 ： redis自增数据，总长16位，就是说每秒最多可生成65536个不同的id。</p>
      *
      * <p>加上前面两个随机数，id重复及机率几乎为0。</p>
      * <p>即使调时间+清redis缓存二者同时进行，id重复的机率也很小。</p>
@@ -55,6 +55,11 @@ public class IdGeneratorUtil {
         long rand1 = RandomUtil.randomLong(RAND1_LIMIT);
         long rand2 = RandomUtil.randomLong(RAND2_LIMIT);
         return timeStamp << TIME_BITS | rand1 << RAND1_BITS | rand2 << RAND2_BITS | incr;
+    }
+
+    public String nextStr() {
+        long next = this.next();
+        return String.valueOf(next);
     }
 
     /**

@@ -14,7 +14,6 @@ import java.util.List;
  */
 @Mapper
 public interface MenuDAO extends BaseMapper<MenuDTO> {
-    List<String> selectMenuPermsByUserId(Long userId);
 
     List<MenuDTO> selectMenuListByUserId(Long userId);
 }

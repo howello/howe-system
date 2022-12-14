@@ -15,15 +15,13 @@ import lombok.NoArgsConstructor;
 import org.springframework.security.access.AccessDecisionManager;
 import org.springframework.security.core.GrantedAuthority;
 
+import java.util.List;
+
 /**
  * <p>@Author lu
  * <p>@Date 2022/12/1 18:19 星期四
  * <p>@Version 1.0
- * <p>@Description TODO
- */
-
-/**
- * 角色信息表
+ * <p>@Description 角色信息表
  */
 @ApiModel(value = "角色信息表")
 @Schema
@@ -35,13 +33,17 @@ import org.springframework.security.core.GrantedAuthority;
 public class RoleDTO extends BaseDTO implements GrantedAuthority {
     private static final long serialVersionUID = -6196154825918661330L;
 
+    public RoleDTO(String roleId) {
+        this.roleId = roleId;
+    }
+
     /**
      * 角色ID
      */
     @TableId(value = "role_id", type = IdType.INPUT)
     @ApiModelProperty(value = "角色ID")
     @Schema(description = "角色ID")
-    private Long roleId;
+    private String roleId;
 
     /**
      * 角色名称
@@ -83,13 +85,6 @@ public class RoleDTO extends BaseDTO implements GrantedAuthority {
     @Schema(description = "菜单树选择项是否关联显示")
     private Boolean menuCheckStrictly;
 
-    /**
-     * 部门树选择项是否关联显示
-     */
-    @TableField(value = "dept_check_strictly")
-    @ApiModelProperty(value = "部门树选择项是否关联显示")
-    @Schema(description = "部门树选择项是否关联显示")
-    private Boolean deptCheckStrictly;
 
     /**
      * 角色状态（0正常 1停用）
@@ -106,6 +101,9 @@ public class RoleDTO extends BaseDTO implements GrantedAuthority {
     @ApiModelProperty(value = "删除标志（0代表存在 2代表删除）")
     @Schema(description = "删除标志（0代表存在 2代表删除）")
     private String delFlag;
+
+    @TableField(exist = false)
+    private List<String> menuIds;
 
     public static final String COL_ROLE_ID = "role_id";
 

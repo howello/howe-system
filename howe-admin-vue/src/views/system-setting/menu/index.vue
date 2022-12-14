@@ -167,8 +167,22 @@
                 是否外链
               </span>
               <el-radio-group v-model="form.isFrame">
-                <el-radio label="0">是</el-radio>
-                <el-radio label="1">否</el-radio>
+                <el-radio :label="0">是</el-radio>
+                <el-radio :label="1">否</el-radio>
+              </el-radio-group>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12" v-if="form.menuType === 'C'">
+            <el-form-item prop="isCache">
+              <span slot="label">
+                <el-tooltip content="选择是则会被`keep-alive`缓存，需要匹配组件的`name`和地址保持一致" placement="top">
+                <i class="el-icon-question"></i>
+                </el-tooltip>
+                是否缓存
+              </span>
+              <el-radio-group v-model="form.isCache">
+                <el-radio :label="0">缓存</el-radio>
+                <el-radio :label="1">不缓存</el-radio>
               </el-radio-group>
             </el-form-item>
           </el-col>
@@ -192,20 +206,6 @@
                 </el-tooltip>
                 路由参数
               </span>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12" v-if="form.menuType === 'C'">
-            <el-form-item prop="isCache">
-              <span slot="label">
-                <el-tooltip content="选择是则会被`keep-alive`缓存，需要匹配组件的`name`和地址保持一致" placement="top">
-                <i class="el-icon-question"></i>
-                </el-tooltip>
-                是否缓存
-              </span>
-              <el-radio-group v-model="form.isCache">
-                <el-radio label="0">缓存</el-radio>
-                <el-radio label="1">不缓存</el-radio>
-              </el-radio-group>
             </el-form-item>
           </el-col>
           <el-col :span="12" v-if="form.menuType != 'F'">
@@ -351,12 +351,13 @@ export default {
         parentId: 0,
         menuName: undefined,
         icon: undefined,
-        menuType: "M",
+        menuType: "C",
         orderNum: undefined,
-        isFrame: "1",
-        isCache: "0",
+        isFrame: 1,
+        isCache: 0,
         visible: "0",
-        status: "0"
+        status: "0",
+        path: "#/"
       };
       this.resetForm("form");
     },

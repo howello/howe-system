@@ -3,13 +3,14 @@ package com.howe.admin.service.menu.impl;
 import cn.hutool.core.date.DateTime;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.howe.admin.dao.auth.RoleMenuDAO;
 import com.howe.admin.dao.menu.MenuDAO;
-import com.howe.admin.service.auth.UserService;
 import com.howe.admin.service.menu.MenuService;
 import com.howe.common.dto.menu.MenuDTO;
 import com.howe.common.dto.role.UserDTO;
 import com.howe.common.enums.exception.AdminExceptionEnum;
 import com.howe.common.exception.child.AdminException;
+import com.howe.common.utils.id.IdGeneratorUtil;
 import com.howe.common.utils.mybatis.MybatisUtils;
 import com.howe.common.utils.token.UserInfoUtils;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +20,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import java.io.Serializable;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -31,46 +33,13 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class MenuServiceImpl extends ServiceImpl<MenuDAO, MenuDTO> implements MenuService {
-    private final UserService userService;
-
     private final MenuDAO menuDAO;
 
     private final UserInfoUtils userInfoUtils;
 
-    /**
-     * 获取用户对应的菜单
-     *
-     * @param userDTO
-     * @return
-     */
-    @Override
-    public Set<String> getMenuPermission(UserDTO userDTO) {
-        Set<String> perms = new HashSet<>();
-        if (userDTO.isAdmin()) {
-            perms.add("*:*:*");
-        } else {
-            perms.addAll(this.selectMenuPermsByUserId(userDTO.getUserId()));
-        }
-        return perms;
-    }
+    private final IdGeneratorUtil idGeneratorUtil;
 
-    /**
-     * 根据用户ID查询权限
-     *
-     * @param userId 用户ID
-     * @return 权限列表
-     */
-    @Override
-    public Set<String> selectMenuPermsByUserId(Long userId) {
-        List<String> perms = menuDAO.selectMenuPermsByUserId(userId);
-        Set<String> permsSet = new HashSet<>();
-        for (String perm : perms) {
-            if (StringUtils.isNotEmpty(perm)) {
-                permsSet.addAll(Arrays.asList(perm.trim().split(",")));
-            }
-        }
-        return permsSet;
-    }
+    private final RoleMenuDAO roleMenuDAO;
 
     /**
      * 根据权限获取菜单列表
@@ -103,6 +72,22 @@ public class MenuServiceImpl extends ServiceImpl<MenuDAO, MenuDTO> implements Me
     }
 
     /**
+     * 根据角色id获取菜单列表
+     *
+     * @param roleId
+     * @return
+     */
+    @SneakyThrows
+    @Override
+    public List<MenuDTO> getMenuListByRoleId(String roleId) {
+        if (StringUtils.isBlank(roleId)) {
+            throw new AdminException(AdminExceptionEnum.PARAMETER_INVALID);
+        }
+        List<MenuDTO> roleMenuList = roleMenuDAO.selectMenuListByRoleId(roleId);
+        return roleMenuList;
+    }
+
+    /**
      * 插入一条记录（选择字段，策略插入）
      *
      * @param menu 实体对象
@@ -112,6 +97,7 @@ public class MenuServiceImpl extends ServiceImpl<MenuDAO, MenuDTO> implements Me
         UserDTO userInfo = userInfoUtils.getUserInfo();
         String userName = userInfo.getUserName();
         DateTime now = DateTime.now();
+        menu.setMenuId(idGeneratorUtil.nextStr());
         menu.setCreateBy(userName);
         menu.setCreateTime(now);
         menu.setUpdateBy(userName);
@@ -128,7 +114,7 @@ public class MenuServiceImpl extends ServiceImpl<MenuDAO, MenuDTO> implements Me
     @Override
     public boolean removeById(Serializable id) {
         MenuDTO menuDTO = new MenuDTO();
-        menuDTO.setParentId((Long) id);
+        menuDTO.setParentId(String.valueOf(id));
         QueryWrapper<MenuDTO> qw = MybatisUtils.assembleQueryWrapper(menuDTO);
         List<MenuDTO> menuDTOList = menuDAO.selectList(qw);
         if (CollectionUtils.isNotEmpty(menuDTOList)) {
@@ -144,12 +130,12 @@ public class MenuServiceImpl extends ServiceImpl<MenuDAO, MenuDTO> implements Me
      * @return
      */
     private List<MenuDTO> formTree(List<MenuDTO> menuList) {
-        Map<Long, List<MenuDTO>> parentMap = menuList.stream()
+        Map<String, List<MenuDTO>> parentMap = menuList.stream()
                 .collect(Collectors.groupingBy(MenuDTO::getParentId));
         return menuList.stream()
                 .peek(m -> m.setChildren(parentMap.getOrDefault(m.getMenuId(), null)))
-                .filter(m -> m.getParentId() == 0L)
-                .filter(m -> m.getMenuId() != 0L)
+                .filter(MenuDTO::isTopMenu)
+                .filter(m -> StringUtils.isNotBlank(m.getMenuId()))
                 .collect(Collectors.toList());
     }
 }

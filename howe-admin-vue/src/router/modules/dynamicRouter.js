@@ -5,7 +5,8 @@ import {getMenuListWithPermit} from '@/api/menu'
 const dynamicRouter = {
   '/setting/menu': getViews('system-setting/menu/index'),
   '/setting/dic': getViews('system-setting/dict/index'),
-  '/setting/dic/data': getViews('system-setting/dict/data')
+  '/setting/dic/data': getViews('system-setting/dict/data'),
+  '/setting/role': getViews('system-setting/role/index')
 }
 
 // 生成路由懒加载组件地址

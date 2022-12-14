@@ -4,7 +4,7 @@
     <resultMap id="BaseResultMap" type="com.howe.common.dto.menu.MenuDTO">
         <!--@mbg.generated-->
         <!--@Table sys_menu-->
-        <id column="menu_id" jdbcType="BIGINT" property="menuId"/>
+        <id column="menu_id" jdbcType="VARCHAR" property="menuId"/>
         <result column="menu_name" jdbcType="VARCHAR" property="menuName"/>
         <result column="parent_id" jdbcType="BIGINT" property="parentId"/>
         <result column="order_num" jdbcType="INTEGER" property="orderNum"/>
@@ -28,15 +28,6 @@
         menu_type, visible, `status`, icon, create_by, create_time, update_by, update_time,
         remark
     </sql>
-
-    <select id="selectMenuPermsByUserId" parameterType="Long" resultType="String">
-        select distinct m.perms
-        from sys_menu m
-        left join sys_role_menu rm on m.menu_id = rm.menu_id
-        left join sys_user_role ur on rm.role_id = ur.role_id
-        left join sys_role r on r.role_id = ur.role_id
-        where m.status = '0' and r.status = '0' and ur.user_id = #{userId}
-    </select>
 
     <select id="selectMenuListByUserId" resultMap="BaseResultMap">
         select m.menu_id,

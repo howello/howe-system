@@ -23,10 +23,9 @@ import java.util.Set;
 public class LoginUserDTO implements UserDetails {
     private static final long serialVersionUID = 6902553257776542661L;
 
-    public LoginUserDTO(Long userId, Long deptId, Set<String> permissions, UserDTO user) {
+    public LoginUserDTO(Long userId, Long deptId, UserDTO user) {
         this.userId = userId;
         this.deptId = deptId;
-        this.permissions = permissions;
         this.user = user;
     }
 

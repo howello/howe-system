@@ -38,7 +38,7 @@ public class MenuDTO extends BaseDTO {
     @TableId(value = "menu_id", type = IdType.INPUT)
     @Schema(description = "菜单ID")
     @ApiModelProperty("菜单ID")
-    private Long menuId;
+    private String menuId;
 
     /**
      * 菜单名称
@@ -56,7 +56,7 @@ public class MenuDTO extends BaseDTO {
     @TableField(value = "parent_id")
     @Schema(description = "父菜单ID")
     @ApiModelProperty("父菜单ID")
-    private Long parentId;
+    private String parentId;
 
     /**
      * 显示顺序
@@ -169,6 +169,6 @@ public class MenuDTO extends BaseDTO {
     public static final String COL_ICON = "icon";
 
     public boolean isTopMenu() {
-        return this.getParentId() == 0L;
+        return "0".equals(this.getParentId());
     }
 }

@@ -14,8 +14,6 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
-import java.util.Set;
-
 /**
  * <p>@Author lu
  * <p>@Date 2022/11/29 9:29 星期二
@@ -63,9 +61,7 @@ public class UserSecurityServiceImpl implements UserDetailsService {
         if (UserStatusEnum.DELETE.getCode().equals(status)) {
             thr(AdminExceptionEnum.USER_DELETED, username);
         }
-
-        Set<String> userMenu = menuService.getMenuPermission(user);
-        return new LoginUserDTO(user.getUserId(), user.getDeptId(), userMenu, user);
+        return new LoginUserDTO(user.getUserId(), user.getDeptId(), user);
     }
 
     private void thr(AdminExceptionEnum adminExceptionEnum, String username) throws AdminException {

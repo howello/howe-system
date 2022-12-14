@@ -17,6 +17,14 @@ export function getMenuList(params) {
   })
 }
 
+export function getMenuListByRoleId(params) {
+  return request({
+    url: '/menu/getMenuListByRoleId',
+    method: 'get',
+    params: {roleId: params}
+  })
+}
+
 export function getMenu(params) {
   return request({
     url: '/menu/getMenu',

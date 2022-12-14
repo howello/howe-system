@@ -2,10 +2,8 @@ package com.howe.admin.service.menu;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.howe.common.dto.menu.MenuDTO;
-import com.howe.common.dto.role.UserDTO;
 
 import java.util.List;
-import java.util.Set;
 
 /**
  * <p>@Author lu
@@ -14,23 +12,6 @@ import java.util.Set;
  * <p>@Description TODO
  */
 public interface MenuService extends IService<MenuDTO> {
-
-
-    /**
-     * 获取用户对应的菜单
-     *
-     * @param userDTO
-     * @return
-     */
-    Set<String> getMenuPermission(UserDTO userDTO);
-
-    /**
-     * 根据用户ID查询权限
-     *
-     * @param userId 用户ID
-     * @return 权限列表
-     */
-    Set<String> selectMenuPermsByUserId(Long userId);
 
     /**
      * 根据权限获取菜单列表
@@ -46,4 +27,12 @@ public interface MenuService extends IService<MenuDTO> {
      * @return
      */
     List<MenuDTO> getMenuList(MenuDTO menuDTO);
+
+    /**
+     * 根据角色id获取菜单列表
+     *
+     * @param roleId
+     * @return
+     */
+    List<MenuDTO> getMenuListByRoleId(String roleId);
 }

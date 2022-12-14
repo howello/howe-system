@@ -1,4 +1,4 @@
-package com.howe.admin.dao;
+package com.howe.admin.dao.auth;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.howe.common.dto.role.RoleDTO;

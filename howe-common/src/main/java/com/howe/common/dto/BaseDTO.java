@@ -48,13 +48,13 @@ public class BaseDTO implements Serializable {
      * 页码
      */
     @TableField(exist = false)
-    private Integer pageNum;
+    private Integer pageNum = 1;
 
     /**
      * 分页大小
      */
     @TableField(exist = false)
-    private Integer pageSize;
+    private Integer pageSize = 10;
 
 
     public static final String COL_CREATE_BY = "create_by";

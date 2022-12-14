@@ -127,7 +127,7 @@ public class UserDTO extends BaseDTO {
      * 角色组
      */
     @TableField(exist = false)
-    private Long[] roleIds;
+    private String[] roleIds;
 
     /**
      * 岗位组
@@ -139,7 +139,7 @@ public class UserDTO extends BaseDTO {
      * 角色ID
      */
     @TableField(exist = false)
-    private Long roleId;
+    private String roleId;
 
     public static final String COL_USER_ID = "user_id";
 

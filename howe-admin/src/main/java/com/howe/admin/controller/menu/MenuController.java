@@ -32,6 +32,13 @@ public class MenuController {
         return AjaxResult.success(menuList);
     }
 
+    @GetMapping("/getMenuListByRoleId")
+    @ApiOperation(value = "根据角色id获取菜单列表")
+    public AjaxResult<List<MenuDTO>> getMenuListByRoleId(String roleId) {
+        List<MenuDTO> menuList = menuService.getMenuListByRoleId(roleId);
+        return AjaxResult.success(menuList);
+    }
+
     @GetMapping("/getMenuList")
     @ApiOperation(value = "获取菜单列表", httpMethod = "get")
     public AjaxResult<List<MenuDTO>> getMenuList(MenuDTO menu) {
@@ -41,7 +48,7 @@ public class MenuController {
 
     @GetMapping("/getMenu")
     @ApiOperation(value = "获取菜单", httpMethod = "get")
-    public AjaxResult<MenuDTO> getMenu(@RequestParam("menuId") Long menuId) {
+    public AjaxResult<MenuDTO> getMenu(@RequestParam("menuId") String menuId) {
         MenuDTO menuDTO = menuService.getById(menuId);
         return AjaxResult.success(menuDTO);
     }
@@ -62,7 +69,7 @@ public class MenuController {
 
     @DeleteMapping("/delMenu")
     @ApiOperation(value = "删除菜单", httpMethod = "delete")
-    public AjaxResult<Boolean> delMenu(Long menuId) {
+    public AjaxResult<Boolean> delMenu(String menuId) {
         boolean b = menuService.removeById(menuId);
         return AjaxResult.success(b);
     }
