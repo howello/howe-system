@@ -19,8 +19,8 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Service;
 
 import java.io.Serializable;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.Collection;
+import java.util.List;
 
 /**
  * <p>@Author lu
@@ -39,49 +39,6 @@ public class RoleServiceImpl extends ServiceImpl<RoleDAO, RoleDTO> implements Ro
     private final IdGeneratorUtil idGeneratorUtil;
 
     private final UserInfoUtils userInfoUtils;
-
-    /**
-     * 获取用户的角色
-     *
-     * @param user
-     * @return
-     */
-    @Override
-    public Set<String> getRolePermission(UserDTO user) {
-        Set<String> roles = new HashSet<>();
-        if (user.isAdmin()) {
-            roles.add("admin");
-        } else {
-            roles.addAll(this.selectRolePermissionByUserId(user.getUserId()));
-        }
-        return roles;
-    }
-
-    /**
-     * @param userId
-     * @return
-     */
-    @Override
-    public Set<String> selectRolePermissionByUserId(Long userId) {
-        List<RoleDTO> roleList = roleDAO.selectRoleListByUserId(userId);
-        Set<String> rolePerm = roleList.stream()
-                .filter(Objects::nonNull)
-                .map(role -> role.getRoleKey().trim().split(","))
-                .flatMap(Arrays::stream)
-                .collect(Collectors.toSet());
-        return rolePerm;
-    }
-
-    /**
-     * 根据用户id查询权限列表
-     *
-     * @param userId
-     * @return
-     */
-    @Override
-    public List<RoleDTO> selectRoleListByUserId(Long userId) {
-        return roleDAO.selectRoleListByUserId(userId);
-    }
 
     /**
      * 获取全部权限

@@ -29,15 +29,8 @@ public class UserInfoUtils {
     /**
      * 用户ID
      **/
-    public Long getUserId() {
+    public String getUserId() {
         return getLoginUser().getUserId();
-    }
-
-    /**
-     * 获取部门ID
-     **/
-    public Long getDeptId() {
-        return getLoginUser().getDeptId();
     }
 
     /**

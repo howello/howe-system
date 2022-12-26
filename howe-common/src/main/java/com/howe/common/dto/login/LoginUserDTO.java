@@ -23,21 +23,15 @@ import java.util.Set;
 public class LoginUserDTO implements UserDetails {
     private static final long serialVersionUID = 6902553257776542661L;
 
-    public LoginUserDTO(Long userId, Long deptId, UserDTO user) {
+    public LoginUserDTO(String userId, UserDTO user) {
         this.userId = userId;
-        this.deptId = deptId;
         this.user = user;
     }
 
     /**
      * 用户ID
      */
-    private Long userId;
-
-    /**
-     * 部门ID
-     */
-    private Long deptId;
+    private String userId;
 
     /**
      * 用户唯一标识

@@ -15,6 +15,7 @@ import com.howe.common.enums.exception.CommonExceptionEnum;
 import com.howe.common.enums.redis.RedisKeyPrefixEnum;
 import com.howe.common.enums.redis.RedisTypeEnum;
 import com.howe.common.exception.child.CommonException;
+import com.howe.common.utils.id.IdGeneratorUtil;
 import com.howe.common.utils.mybatis.MybatisUtils;
 import com.howe.common.utils.redis.RedisUtils;
 import com.howe.common.utils.token.UserInfoUtils;
@@ -45,6 +46,8 @@ public class DictionaryUtils {
     private final UserInfoUtils userInfoUtils;
 
     private final RedisUtils redisUtils;
+
+    private final IdGeneratorUtil idGeneratorUtil;
 
 
     /**
@@ -123,7 +126,7 @@ public class DictionaryUtils {
             clazz = DicDataDTO.class,
             time = 1,
             timeUnit = TimeUnit.DAYS)
-    public DicDataDTO getDicById(Long dicId) {
+    public DicDataDTO getDicById(String dicId) {
         return dicDataDAO.selectById(dicId);
     }
 
@@ -134,6 +137,8 @@ public class DictionaryUtils {
      * @return
      */
     public int saveDicData(DicDataDTO dicDataDTO) {
+        String id = idGeneratorUtil.nextStr();
+        dicDataDTO.setDictCode(id);
         return dicDataDAO.insert(dicDataDTO);
     }
 
@@ -154,7 +159,7 @@ public class DictionaryUtils {
      * @param dictCodes
      * @return
      */
-    public int delDicData(Long[] dictCodes) {
+    public int delDicData(String[] dictCodes) {
         this.refreshCache();
         return dicDataDAO.deleteBatchIds(Arrays.asList(dictCodes));
     }
@@ -194,7 +199,7 @@ public class DictionaryUtils {
             clazz = DictTypeDTO.class,
             time = 1,
             timeUnit = TimeUnit.DAYS)
-    public DictTypeDTO getDicTypeById(Long dicTypeId) {
+    public DictTypeDTO getDicTypeById(String dicTypeId) {
         return dictTypeDAO.selectById(dicTypeId);
     }
 
@@ -216,9 +221,11 @@ public class DictionaryUtils {
      * @return
      */
     public int saveDicType(DictTypeDTO dictType) {
+        String id = idGeneratorUtil.nextStr();
         DateTime now = DateTime.now();
         UserDTO userInfo = userInfoUtils.getUserInfo();
         String userName = userInfo.getUserName();
+        dictType.setDictId(id);
         dictType.setCreateBy(userName);
         dictType.setCreateTime(now);
         dictType.setUpdateBy(userName);
@@ -234,9 +241,9 @@ public class DictionaryUtils {
      * @return
      */
     @SneakyThrows
-    public int delDicType(Long[] dicTypeIds) {
+    public int delDicType(String[] dicTypeIds) {
         DicDataDTO dicDataDTO = new DicDataDTO();
-        for (Long dicTypeId : dicTypeIds) {
+        for (String dicTypeId : dicTypeIds) {
             DictTypeDTO dictTypeDTO = dictTypeDAO.selectById(dicTypeId);
             dicDataDTO.setDictType(dictTypeDTO.getDictType());
             QueryWrapper<DicDataDTO> qw = MybatisUtils.assembleQueryWrapper(dicDataDTO);

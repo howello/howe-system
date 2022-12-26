@@ -13,7 +13,6 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-import javax.validation.constraints.NotNull;
 import java.io.Serializable;
 
 /**
@@ -36,8 +35,7 @@ public class DicDataDTO extends BaseDTO implements Serializable {
     @TableId(value = "dict_code", type = IdType.INPUT)
     @ApiModelProperty(value = "字典编码")
     @Schema(description = "字典编码")
-    @NotNull(message = "字典编码不能为空")
-    private Long dictCode;
+    private String dictCode;
 
     /**
      * 字典排序

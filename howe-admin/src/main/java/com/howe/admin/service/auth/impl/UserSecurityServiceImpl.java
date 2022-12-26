@@ -61,7 +61,7 @@ public class UserSecurityServiceImpl implements UserDetailsService {
         if (UserStatusEnum.DELETE.getCode().equals(status)) {
             thr(AdminExceptionEnum.USER_DELETED, username);
         }
-        return new LoginUserDTO(user.getUserId(), user.getDeptId(), user);
+        return new LoginUserDTO(user.getUserId(), user);
     }
 
     private void thr(AdminExceptionEnum adminExceptionEnum, String username) throws AdminException {

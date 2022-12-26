@@ -30,7 +30,7 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @TableName(value = "sys_menu")
-@ApiModel("菜单")
+@ApiModel("菜单DTO")
 public class MenuDTO extends BaseDTO {
     /**
      * 菜单ID

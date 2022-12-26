@@ -55,7 +55,7 @@ public class DicController {
 
     @GetMapping("/getDicDataByDictCode")
     @ApiOperation(value = "根据code获取字典数据", httpMethod = "GET")
-    public AjaxResult<DicDataDTO> getDicDataByDictCode(Long dicCode) {
+    public AjaxResult<DicDataDTO> getDicDataByDictCode(String dicCode) {
         return AjaxResult.success(dictionaryUtils.getDicById(dicCode));
     }
 
@@ -75,7 +75,7 @@ public class DicController {
 
     @DeleteMapping("/delDicData")
     @ApiOperation(value = "删除字典数据", httpMethod = "DELETE")
-    public AjaxResult<Integer> delDicData(@RequestBody @Valid @NotNull Long[] dictCodes) {
+    public AjaxResult<Integer> delDicData(@RequestBody @Valid @NotNull String[] dictCodes) {
         int i = dictionaryUtils.delDicData(dictCodes);
         return AjaxResult.success(i);
     }
@@ -98,7 +98,7 @@ public class DicController {
 
     @GetMapping("/getDicTypeById")
     @ApiOperation(value = "根据id获取字典类型", httpMethod = "GET")
-    public AjaxResult<DictTypeDTO> getDicTypeById(Long dicTypeId) {
+    public AjaxResult<DictTypeDTO> getDicTypeById(String dicTypeId) {
         DictTypeDTO dictTypeDTO = dictionaryUtils.getDicTypeById(dicTypeId);
         return AjaxResult.success(dictTypeDTO);
     }
@@ -119,7 +119,7 @@ public class DicController {
 
     @DeleteMapping("/delDicType")
     @ApiOperation(value = "删除字典类型", httpMethod = "DELETE")
-    public AjaxResult<Integer> delDicType(@RequestBody @Valid @NotNull Long[] dicTypeIds) {
+    public AjaxResult<Integer> delDicType(@RequestBody @Valid @NotNull String[] dicTypeIds) {
         int i = dictionaryUtils.delDicType(dicTypeIds);
         return AjaxResult.success(i);
     }

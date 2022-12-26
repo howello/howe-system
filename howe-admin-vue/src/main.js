@@ -26,6 +26,10 @@ import DictTag from '@/components/DictTag'
 import DictData from '@/components/DictData'
 import {parseTime, resetForm} from '@/utils'
 import tab from '@/utils/tab'
+import JsonSchemaEditor from 'json-schema-editor-vue'
+import 'json-schema-editor-vue/lib/json-schema-editor-vue.css'
+import VueForm from '@lljj/vue-json-schema-form';
+
 
 // 全局方法挂载
 Vue.prototype.parseTime = parseTime
@@ -35,12 +39,14 @@ Vue.prototype.$tab = tab
 
 Vue.component('RightToolbar', RightToolbar)
 Vue.component('DictTag', DictTag)
+Vue.component('VueForm', VueForm);
 DictData.install()
 
 Vue.use(Element, {
   size: Cookies.get('size') || 'medium', // set element-ui default size
   i18n: (key, value) => i18n.t(key, value)
 })
+Vue.use(JsonSchemaEditor)
 
 // register global utility filters
 Object.keys(filters).forEach(key => {

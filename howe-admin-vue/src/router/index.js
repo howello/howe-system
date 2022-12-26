@@ -2,7 +2,7 @@ import Vue from 'vue'
 import Router from 'vue-router'
 /* Layout */
 import baseRouter from '@/router/modules/baseRouter'
-import { getRoutes } from '@/router/modules/dynamicRouter'
+import {getRoutes} from '@/router/modules/dynamicRouter'
 
 Vue.use(Router)
 
@@ -40,7 +40,7 @@ export const constantRoutes = baseRouter
 
 const createRouter = () => new Router({
   // mode: 'history', // require service support
-  scrollBehavior: () => ({ y: 0 }),
+  scrollBehavior: () => ({y: 0}),
   routes: constantRoutes
 })
 

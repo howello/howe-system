@@ -1,12 +1,15 @@
 /* Layout */
 import Layout from '@/layout'
 import {getMenuListWithPermit} from '@/api/menu'
+import store from '@/store'
 
 const dynamicRouter = {
   '/setting/menu': getViews('system-setting/menu/index'),
   '/setting/dic': getViews('system-setting/dict/index'),
   '/setting/dic/data': getViews('system-setting/dict/data'),
-  '/setting/role': getViews('system-setting/role/index')
+  '/setting/role': getViews('system-setting/role/index'),
+  '/setting/user': getViews('system-setting/user/index'),
+  '/setting/config': getViews('system-setting/config/index')
 }
 
 // 生成路由懒加载组件地址
@@ -65,6 +68,7 @@ export const getRoutes = async (path, fresh = false) => {
     const res = await getMenuListWithPermit()
     menu = generate(res.data || [])
   }
+  await store.dispatch("user/setRouter")
   return menu
 }
 

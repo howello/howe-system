@@ -32,42 +32,42 @@ public class RoleController {
     private final RoleService roleService;
 
     @GetMapping("/getRoleList")
-    @ApiOperation(value = "获取权限列表", httpMethod = "get")
+    @ApiOperation(value = "获取权限列表", httpMethod = "GET")
     public AjaxResult<List<RoleDTO>> getRoleList(RoleDTO role) {
         List<RoleDTO> roleList = roleService.getRoleList(role);
         return AjaxResult.success(roleList);
     }
 
     @GetMapping("/getRolePage")
-    @ApiOperation(value = "分页获取权限", httpMethod = "get")
+    @ApiOperation(value = "分页获取权限", httpMethod = "GET")
     public AjaxResult<PageInfo<RoleDTO>> getRolePage(RoleDTO role) {
         PageInfo<RoleDTO> page = roleService.getRolePage(role);
         return AjaxResult.success(page);
     }
 
     @GetMapping("/getRole")
-    @ApiOperation(value = "获取权限", httpMethod = "get")
+    @ApiOperation(value = "获取权限", httpMethod = "GET")
     public AjaxResult<RoleDTO> getRole(String roleId) {
         RoleDTO role = roleService.getById(roleId);
         return AjaxResult.success(role);
     }
 
     @PostMapping("/changeRoleStatus")
-    @ApiOperation(value = "改变角色状态", httpMethod = "post")
+    @ApiOperation(value = "改变角色状态", httpMethod = "POST")
     public AjaxResult<Boolean> changeRoleStatus(@RequestBody RoleDTO roleDTO) {
         boolean b = roleService.updateById(roleDTO);
         return AjaxResult.success(b);
     }
 
     @PostMapping("/addRole")
-    @ApiOperation(value = "添加一个角色", httpMethod = "post")
+    @ApiOperation(value = "添加一个角色", httpMethod = "POST")
     public AjaxResult<Boolean> addRole(@RequestBody RoleDTO role) {
         boolean save = roleService.save(role);
         return AjaxResult.success(save);
     }
 
     @PutMapping("/updateRole")
-    @ApiOperation(value = "更新角色信息", httpMethod = "put")
+    @ApiOperation(value = "更新角色信息", httpMethod = "PUT")
     public AjaxResult<Boolean> updateRole(@RequestBody RoleDTO role) {
         boolean b = roleService.updateById(role);
         return AjaxResult.success(b);
@@ -75,7 +75,7 @@ public class RoleController {
 
     @SneakyThrows
     @DeleteMapping("/delRole")
-    @ApiOperation(value = "删除角色信息", httpMethod = "delete")
+    @ApiOperation(value = "删除角色信息", httpMethod = "DELETE")
     public AjaxResult<Boolean> delRole(@RequestBody @Valid @NotNull String[] roleId) {
         if (ArrayUtil.isEmpty(roleId)) {
             throw new AdminException(AdminExceptionEnum.PARAMETER_INVALID);

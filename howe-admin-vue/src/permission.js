@@ -6,11 +6,11 @@ import 'nprogress/nprogress.css' // progress bar style
 import {getToken} from '@/utils/auth' // get token from cookie
 import getPageTitle from '@/utils/get-page-title'
 
-NProgress.configure({ showSpinner: false }) // NProgress Configuration
+NProgress.configure({showSpinner: false}) // NProgress Configuration
 
 const whiteList = ['/login', '/auth-redirect', '/register'] // no redirect whitelist
 
-router.beforeEach(async(to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   // start progress bar
   NProgress.start()
 
@@ -19,31 +19,27 @@ router.beforeEach(async(to, from, next) => {
 
   // determine whether the user has logged in
   const hasToken = getToken()
-
   if (hasToken) {
     if (to.path === '/login') {
       // if is logged in, redirect to the home page
-      next({ path: '/' })
+      next({path: '/'})
       NProgress.done() // hack: https://github.com/PanJiaChen/pull/2939
     } else {
-      // determine whether the user has obtained his permission roles through getInfo
-      const hasRoles = store.getters.roles && store.getters.roles.length > 0
-      if (hasRoles) {
-        next()
-      } else {
-        try {
-          const {roles} = await store.dispatch('user/getInfo')
-          const dynamic = await dynamicMenu(to.path)
+      try {
+        if (store.getters.router) {
+          next()
+        } else {
+          await dynamicMenu(to.path)
           // set the replace: true, so the navigation will not leave a history record
-          next({ ...to, replace: true })
-        } catch (error) {
-          console.log(error)
-          // remove token and go to login page to re-login
-          await store.dispatch('user/resetToken')
-          Message.error(error || 'Has Error')
-          next(`/login?redirect=${to.path}`)
-          NProgress.done()
+          next({...to, replace: true})
         }
+      } catch (error) {
+        console.log(error)
+        // remove token and go to login page to re-login
+        await store.dispatch('user/resetToken')
+        Message.error(error || 'Has Error')
+        next(`/login?redirect=${to.path}`)
+        NProgress.done()
       }
     }
   } else {

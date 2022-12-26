@@ -4,12 +4,11 @@
     <resultMap id="BaseResultMap" type="com.howe.common.dto.role.UserDTO">
         <!--@mbg.generated-->
         <!--@Table sys_user-->
-        <id column="user_id" jdbcType="BIGINT" property="userId"/>
-        <result column="dept_id" jdbcType="BIGINT" property="deptId"/>
+        <id column="user_id" jdbcType="VARCHAR" property="userId"/>
         <result column="user_name" jdbcType="VARCHAR" property="userName"/>
         <result column="nick_name" jdbcType="VARCHAR" property="nickName"/>
         <result column="email" jdbcType="VARCHAR" property="email"/>
-        <result column="phonenumber" jdbcType="VARCHAR" property="phonenumber"/>
+        <result column="phone_number" jdbcType="VARCHAR" property="phoneNumber"/>
         <result column="sex" jdbcType="CHAR" property="sex"/>
         <result column="avatar" jdbcType="VARCHAR" property="avatar"/>
         <result column="password" jdbcType="VARCHAR" property="password"/>
@@ -24,7 +23,7 @@
     </resultMap>
     <sql id="Base_Column_List">
         <!--@mbg.generated-->
-        user_id, dept_id, user_name, nick_name, email, phonenumber, sex, avatar,
+        user_id, user_name, nick_name, email, phone_number, sex, avatar,
         `password`, `status`, login_ip, login_date, create_by, create_time, update_by,
         update_time, remark
     </sql>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.common.dao.flexConfig.ConfigDAO">
+    <resultMap id="BaseResultMap" type="com.howe.common.dto.flexConfig.ConfigDTO">
+        <!--@mbg.generated-->
+        <!--@Table t_flex_config-->
+        <id column="RULE_ID" jdbcType="VARCHAR" property="ruleId"/>
+        <result column="ENABLE" jdbcType="VARCHAR" property="enable"/>
+        <result column="BIZ_TYPE_ID" jdbcType="VARCHAR" property="bizTypeId"/>
+        <result column="BIZ_TYPE_DESC" jdbcType="VARCHAR" property="bizTypeDesc"/>
+        <result column="DATA" jdbcType="VARCHAR" property="data"/>
+        <result column="schema" jdbcType="VARCHAR" property="schema"/>
+        <result column="create_time" jdbcType="TIMESTAMP" property="createTime"/>
+        <result column="create_by" jdbcType="VARCHAR" property="createBy"/>
+        <result column="update_time" jdbcType="TIMESTAMP" property="updateTime"/>
+        <result column="update_by" jdbcType="VARCHAR" property="updateBy"/>
+        <result column="remark" jdbcType="VARCHAR" property="remark"/>
+    </resultMap>
+    <sql id="Base_Column_List">
+        <!--@mbg.generated-->
+        RULE_ID, `ENABLE`, BIZ_TYPE_ID, BIZ_TYPE_DESC, `DATA`,`schema`, create_time, create_by, update_time,
+        update_by, remark
+    </sql>
+</mapper>

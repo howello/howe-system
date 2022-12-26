@@ -1,6 +1,15 @@
 package com.howe.common.utils.convert;
 
+import cn.hutool.core.util.StrUtil;
+import com.alibaba.fastjson.JSONObject;
 import org.apache.commons.lang3.StringUtils;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * <p>@Author lu
@@ -9,6 +18,52 @@ import org.apache.commons.lang3.StringUtils;
  * <p>@Description TODO
  */
 public class ConvertUtils {
+    /**
+     * enum转list方法
+     *
+     * @param clazz
+     * @param <T>
+     * @return
+     */
+    public static <T> List<JSONObject> enumToList(Class<T> clazz) {
+        if (!clazz.isEnum()) {
+            return Collections.EMPTY_LIST;
+        }
+        Field[] fields = clazz.getDeclaredFields();
+        List<Method> methodList = Arrays.stream(fields)
+                .filter(field -> {
+                    String modifier = Modifier.toString(field.getModifiers());
+                    return modifier.contains("private") && !modifier.contains("static") && !modifier.contains("final");
+                })
+                .map(field -> {
+                    try {
+                        String getMethodName = StrUtil.upperFirstAndAddPre(field.getName(), "get");
+                        return clazz.getMethod(getMethodName);
+                    } catch (NoSuchMethodException e) {
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
+        Object[] enumConstants = clazz.getEnumConstants();
+        List<JSONObject> retList = new ArrayList<>();
+        for (Object enumConstant : enumConstants) {
+            JSONObject json = new JSONObject();
+            for (Method method : methodList) {
+                String name = method.getName();
+                String lowerFirst = StrUtil.removePreAndLowerFirst(name, "get");
+                try {
+                    json.put(lowerFirst, method.invoke(enumConstant));
+                } catch (IllegalAccessException | InvocationTargetException e) {
+                    continue;
+                }
+            }
+            retList.add(json);
+        }
+        return retList;
+    }
+
 
     /**
      * Obj转换为string，

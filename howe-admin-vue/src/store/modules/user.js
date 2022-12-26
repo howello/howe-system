@@ -7,7 +7,7 @@ const state = {
   name: '',
   avatar: '',
   introduction: '',
-  roles: []
+  router: false
 }
 
 const mutations = {
@@ -23,14 +23,14 @@ const mutations = {
   SET_AVATAR: (state, avatar) => {
     state.avatar = avatar
   },
-  SET_ROLES: (state, roles) => {
-    state.roles = roles
+  SET_ROUTER: (state, router) => {
+    state.router = router
   }
 }
 
 const actions = {
   // user login
-  login({ commit }, userInfo) {
+  login({commit}, userInfo) {
     return new Promise((resolve, reject) => {
       login(userInfo).then(response => {
         var token = response.data
@@ -44,21 +44,13 @@ const actions = {
   },
 
   // get user info
-  getInfo({ commit }) {
+  getInfo({commit}) {
     return new Promise((resolve, reject) => {
       getInfo().then(response => {
-        const { data } = response
+        const {data} = response
         if (!data) {
           reject('Verification failed, please Login again.')
         }
-
-        const { roles, username, avatar, nickName } = data
-        // roles must be a non-empty array
-        if (!roles || roles.length <= 0) {
-          reject('getInfo: roles must be a non-null array!')
-        }
-
-        commit('SET_ROLES', roles)
         commit('SET_NAME', username)
         commit('SET_AVATAR', avatar)
         commit('SET_NICK_NAME', nickName)
@@ -70,17 +62,16 @@ const actions = {
   },
 
   // user logout
-  logout({ commit, state, dispatch }) {
+  logout({commit, state, dispatch}) {
     return new Promise((resolve, reject) => {
       logout(state.token).then(() => {
         commit('SET_TOKEN', '')
-        commit('SET_ROLES', [])
         removeToken()
         resetRouter()
 
         // reset visited views and cached views
         // to fixed https://github.com/PanJiaChen/issues/2485
-        dispatch('tagsView/delAllViews', null, { root: true })
+        dispatch('tagsView/delAllViews', null, {root: true})
 
         resolve()
       }).catch(error => {
@@ -90,13 +81,20 @@ const actions = {
   },
 
   // remove token
-  resetToken({ commit }) {
+  resetToken({commit}) {
     return new Promise(resolve => {
       commit('SET_TOKEN', '')
-      commit('SET_ROLES', [])
       removeToken()
       resolve()
     })
+  },
+
+  setRouter({commit}) {
+    return new Promise(resolve => {
+      commit('SET_ROUTER', true)
+      resolve()
+    })
+
   }
 }
 

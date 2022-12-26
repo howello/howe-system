@@ -35,7 +35,7 @@ public class DictTypeDTO extends BaseDTO implements Serializable {
     @TableId(value = "dict_id", type = IdType.INPUT)
     @ApiModelProperty(value = "字典主键")
     @Schema(description = "字典主键")
-    private Long dictId;
+    private String dictId;
 
     /**
      * 字典名称

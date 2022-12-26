@@ -8,7 +8,6 @@ import com.howe.common.dto.login.LoginDTO;
 import com.howe.common.dto.login.LoginUserDTO;
 import com.howe.common.dto.login.RegisterUserDTO;
 import com.howe.common.dto.login.ValidCodeDTO;
-import com.howe.common.dto.role.RoleDTO;
 import com.howe.common.dto.role.UserDTO;
 import com.howe.common.enums.exception.AdminExceptionEnum;
 import com.howe.common.enums.exception.CommonExceptionEnum;
@@ -21,7 +20,6 @@ import com.howe.common.utils.id.IdGeneratorUtil;
 import com.howe.common.utils.token.SecurityUtils;
 import com.howe.common.utils.token.TokenUtils;
 import lombok.SneakyThrows;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,7 +30,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import java.util.List;
 
 /**
  * <p>@Author lu
@@ -92,14 +89,6 @@ public class LoginServiceImpl implements LoginService {
             }
         }
         LoginUserDTO loginUser = (LoginUserDTO) authentication.getPrincipal();
-        UserDTO user = loginUser.getUser();
-        List<RoleDTO> roleDTOS = roleService.selectRoleListByUserId(user.getUserId());
-        if (CollectionUtils.isNotEmpty(roleDTOS)) {
-            user.setRoles(roleDTOS);
-            user.setRoleIds(roleDTOS.stream().map(RoleDTO::getRoleId).toArray(String[]::new));
-            user.setRoleId(roleDTOS.get(0).getRoleId());
-            loginUser.setUser(user);
-        }
         return tokenUtils.createToken(loginUser);
     }
 

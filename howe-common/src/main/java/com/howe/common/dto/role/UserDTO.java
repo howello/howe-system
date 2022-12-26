@@ -8,6 +8,7 @@ import com.howe.common.dto.BaseDTO;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.apache.commons.lang3.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -30,14 +31,7 @@ public class UserDTO extends BaseDTO {
      */
     @TableId(value = "user_id", type = IdType.INPUT)
     @ApiModelProperty("用户ID")
-    private Long userId;
-
-    /**
-     * 部门ID
-     */
-    @TableField(value = "dept_id")
-    @ApiModelProperty("部门ID")
-    private Long deptId;
+    private String userId;
 
     /**
      * 用户账号
@@ -63,9 +57,9 @@ public class UserDTO extends BaseDTO {
     /**
      * 手机号码
      */
-    @TableField(value = "phonenumber")
+    @TableField(value = "phone_number")
     @ApiModelProperty("手机号码")
-    private String phonenumber;
+    private String phoneNumber;
 
     /**
      * 用户性别（0男 1女 2未知）
@@ -112,12 +106,6 @@ public class UserDTO extends BaseDTO {
     private LocalDateTime loginDate;
 
     /**
-     * 部门对象
-     */
-    @TableField(exist = false)
-    private DeptDTO dept;
-
-    /**
      * 角色对象
      */
     @TableField(exist = false)
@@ -153,7 +141,7 @@ public class UserDTO extends BaseDTO {
 
     public static final String COL_EMAIL = "email";
 
-    public static final String COL_PHONENUMBER = "phonenumber";
+    public static final String COL_PHONE_NUMBER = "phone_number";
 
     public static final String COL_SEX = "sex";
 
@@ -170,6 +158,6 @@ public class UserDTO extends BaseDTO {
     public static final String COL_LOGIN_DATE = "login_date";
 
     public Boolean isAdmin() {
-        return this.userId != null && 1L == this.userId;
+        return StringUtils.isNotBlank(this.userId) && "1".equals(this.userId);
     }
 }

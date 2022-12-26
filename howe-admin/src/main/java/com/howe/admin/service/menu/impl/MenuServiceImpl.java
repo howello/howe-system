@@ -7,6 +7,7 @@ import com.howe.admin.dao.auth.RoleMenuDAO;
 import com.howe.admin.dao.menu.MenuDAO;
 import com.howe.admin.service.menu.MenuService;
 import com.howe.common.dto.menu.MenuDTO;
+import com.howe.common.dto.role.RoleMenuDTO;
 import com.howe.common.dto.role.UserDTO;
 import com.howe.common.enums.exception.AdminExceptionEnum;
 import com.howe.common.exception.child.AdminException;
@@ -20,6 +21,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import java.io.Serializable;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -48,7 +50,7 @@ public class MenuServiceImpl extends ServiceImpl<MenuDAO, MenuDTO> implements Me
      */
     @Override
     public List<MenuDTO> getMenuListWithPermission() {
-        Long userId;
+        String userId;
         try {
             userId = userInfoUtils.getUserId();
         } catch (Exception e) {
@@ -97,11 +99,14 @@ public class MenuServiceImpl extends ServiceImpl<MenuDAO, MenuDTO> implements Me
         UserDTO userInfo = userInfoUtils.getUserInfo();
         String userName = userInfo.getUserName();
         DateTime now = DateTime.now();
-        menu.setMenuId(idGeneratorUtil.nextStr());
+        String id = idGeneratorUtil.nextStr();
+        menu.setMenuId(id);
         menu.setCreateBy(userName);
         menu.setCreateTime(now);
         menu.setUpdateBy(userName);
         menu.setUpdateTime(now);
+        RoleMenuDTO roleMenu = new RoleMenuDTO("1", id);
+        roleMenuDAO.insert(roleMenu);
         return super.save(menu);
     }
 
@@ -120,6 +125,10 @@ public class MenuServiceImpl extends ServiceImpl<MenuDAO, MenuDTO> implements Me
         if (CollectionUtils.isNotEmpty(menuDTOList)) {
             throw new AdminException(AdminExceptionEnum.THERE_ARE_SUBMENUS);
         }
+
+        QueryWrapper<RoleMenuDTO> roleMenuQw = new QueryWrapper<>();
+        roleMenuQw.eq(RoleMenuDTO.COL_MENU_ID, id);
+        roleMenuDAO.delete(roleMenuQw);
         return super.removeById(id);
     }
 
@@ -131,6 +140,7 @@ public class MenuServiceImpl extends ServiceImpl<MenuDAO, MenuDTO> implements Me
      */
     private List<MenuDTO> formTree(List<MenuDTO> menuList) {
         Map<String, List<MenuDTO>> parentMap = menuList.stream()
+                .sorted(Comparator.comparingInt(MenuDTO::getOrderNum))
                 .collect(Collectors.groupingBy(MenuDTO::getParentId));
         return menuList.stream()
                 .peek(m -> m.setChildren(parentMap.getOrDefault(m.getMenuId(), null)))

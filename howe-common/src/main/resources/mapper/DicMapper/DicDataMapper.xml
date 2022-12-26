@@ -4,7 +4,7 @@
     <resultMap id="BaseResultMap" type="com.howe.common.dto.dic.DicDataDTO">
         <!--@mbg.generated-->
         <!--@Table sys_dict_data-->
-        <id column="dict_code" jdbcType="BIGINT" property="dictCode"/>
+        <id column="dict_code" jdbcType="VARCHAR" property="dictCode"/>
         <result column="dict_sort" jdbcType="INTEGER" property="dictSort"/>
         <result column="dict_label" jdbcType="VARCHAR" property="dictLabel"/>
         <result column="dict_value" jdbcType="VARCHAR" property="dictValue"/>
