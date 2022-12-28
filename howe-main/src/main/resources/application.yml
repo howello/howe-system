@@ -52,7 +52,7 @@ howe:
       - "/profile/**"
       - "/**/getMenuList"
     anonymous-list:
-      - "/user/*"
+      - "/login/*"
       - "/swagger-ui/*"
       - "/swagger-resources/**"
       - "/webjars/**"

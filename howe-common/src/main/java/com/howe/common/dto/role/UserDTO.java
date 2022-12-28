@@ -11,7 +11,6 @@ import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 /**
  * <p>@Author lu
@@ -104,30 +103,6 @@ public class UserDTO extends BaseDTO {
     @TableField(value = "login_date")
     @ApiModelProperty("最后登录时间")
     private LocalDateTime loginDate;
-
-    /**
-     * 角色对象
-     */
-    @TableField(exist = false)
-    private List<RoleDTO> roles;
-
-    /**
-     * 角色组
-     */
-    @TableField(exist = false)
-    private String[] roleIds;
-
-    /**
-     * 岗位组
-     */
-    @TableField(exist = false)
-    private Long[] postIds;
-
-    /**
-     * 角色ID
-     */
-    @TableField(exist = false)
-    private String roleId;
 
     public static final String COL_USER_ID = "user_id";
 

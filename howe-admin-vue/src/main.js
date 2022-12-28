@@ -29,6 +29,8 @@ import tab from '@/utils/tab'
 import JsonSchemaEditor from 'json-schema-editor-vue'
 import 'json-schema-editor-vue/lib/json-schema-editor-vue.css'
 import VueForm from '@lljj/vue-json-schema-form';
+import mavonEditor from 'mavon-editor'
+import 'mavon-editor/dist/css/index.css'
 
 
 // 全局方法挂载
@@ -47,6 +49,7 @@ Vue.use(Element, {
   i18n: (key, value) => i18n.t(key, value)
 })
 Vue.use(JsonSchemaEditor)
+Vue.use(mavonEditor)
 
 // register global utility filters
 Object.keys(filters).forEach(key => {

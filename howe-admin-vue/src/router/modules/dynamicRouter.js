@@ -9,7 +9,8 @@ const dynamicRouter = {
   '/setting/dic/data': getViews('system-setting/dict/data'),
   '/setting/role': getViews('system-setting/role/index'),
   '/setting/user': getViews('system-setting/user/index'),
-  '/setting/config': getViews('system-setting/config/index')
+  '/setting/config': getViews('system-setting/config/index'),
+  '/setting/notice': getViews('system-setting/notice/index')
 }
 
 // 生成路由懒加载组件地址

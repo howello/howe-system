@@ -26,7 +26,7 @@ import javax.validation.Valid;
  * <p>@Description
  */
 @RestController
-@RequestMapping("/user")
+@RequestMapping("/login")
 @Api(tags = "登录相关")
 @RequiredArgsConstructor
 public class LoginController {

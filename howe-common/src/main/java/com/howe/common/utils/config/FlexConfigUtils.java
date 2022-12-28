@@ -272,6 +272,10 @@ public class FlexConfigUtils {
             throw new CommonException(CommonExceptionEnum.BIZ_TYPE_ID_NULL);
         }
 
+        if (StringUtils.isBlank(key)) {
+            key = "default";
+        }
+
         T config = redisUtils.getObject(RedisKeyPrefixEnum.FLEX_CONFIG, bizTypeId + key, clazz);
         if (config == null) {
             ConfigDTO configOne = this.getConfigOne(bizTypeId);
