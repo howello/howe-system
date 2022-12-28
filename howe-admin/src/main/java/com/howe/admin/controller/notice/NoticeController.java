@@ -64,8 +64,8 @@ public class NoticeController {
 
     @DeleteMapping("/delNotice")
     @ApiOperation(value = "删除通知", httpMethod = "DELETE")
-    public AjaxResult<List<NoticeDTO>> delNotice(@RequestBody String noticeIds) {
-        List<NoticeDTO> noticeDTOList = noticeService.delNotice(noticeIds);
-        return AjaxResult.success(noticeDTOList);
+    public AjaxResult<Boolean> delNotice(@RequestBody String[] noticeIds) {
+        boolean b = noticeService.delNotice(noticeIds);
+        return AjaxResult.success(b);
     }
 }

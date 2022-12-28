@@ -99,8 +99,7 @@ public class NoticeServiceImpl extends ServiceImpl<NoticeDAO, NoticeDTO> impleme
      * @return
      */
     @Override
-    public List<NoticeDTO> delNotice(String noticeIds) {
-        List<NoticeDTO> noticeList = noticeDAO.selectBatchIds(Arrays.asList(noticeIds));
-        return noticeList;
+    public boolean delNotice(String[] noticeIds) {
+        return noticeDAO.deleteBatchIds(Arrays.asList(noticeIds)) > 0;
     }
 }

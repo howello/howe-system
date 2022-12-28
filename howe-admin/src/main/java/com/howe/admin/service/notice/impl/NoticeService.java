@@ -54,5 +54,5 @@ public interface NoticeService extends IService<NoticeDTO> {
      * @param noticeIds
      * @return
      */
-    List<NoticeDTO> delNotice(String noticeIds);
+    boolean delNotice(String[] noticeIds);
 }
