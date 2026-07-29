@@ -1,0 +1,40 @@
+services: # 容器服务定义
+  app: # 后端应用服务
+    build: # 后端构建配置
+      context: ./server # 构建上下文目录
+      dockerfile: Dockerfile # 构建文件路径
+    image: ${PROJECT_NAME}-app:latest # 镜像名称
+    container_name: ${PROJECT_NAME}-app # 后端容器名称（Nginx 反代按此名解析）
+    restart: unless-stopped # 容器重启策略
+    env_file: # 从 .env 注入业务环境变量
+      - .env
+    environment: # 部署固定项（覆盖 .env 中同名键）
+      TZ: ${TZ} # 应用时区
+      SERVER_PORT: ${APP_PORT} # 服务端口
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE} # 激活配置环境
+    ports: # 后端端口映射（默认仅本机访问）
+      - "${BIND_HOST}:${APP_PORT}:${APP_PORT}"
+    volumes: # 后端日志与外部配置挂载
+      - ./server/logs:/app/logs
+      # 外部配置目录：优先级高于 jar 内打包的 application.yml，改后重启容器即生效
+      - ./server/config:/app/config
+    user: "0:0" # 以 root 运行避免日志目录权限问题（生产环境建议用命名卷）
+
+  web: # 前端应用服务
+    build: # 前端构建配置
+      context: ./admin-ui # 构建上下文目录
+      dockerfile: Dockerfile # 构建文件路径
+      args: # 构建期变量：VITE_* 会被烘进静态产物，改后需 --build 重建
+        VITE_APP_TITLE: ${VITE_APP_TITLE}
+    image: ${PROJECT_NAME}-web:latest # 镜像名称
+    container_name: ${PROJECT_NAME}-web # 前端容器名称
+    restart: unless-stopped # 容器重启策略
+    environment: # Nginx 模板渲染变量
+      TZ: ${TZ} # 容器时区
+      WEB_PORT: ${WEB_PORT} # 前端监听端口
+      APP_UPSTREAM: ${PROJECT_NAME}-app:${APP_PORT} # 后端上游地址
+      NGINX_ENVSUBST_FILTER: "^(WEB_PORT|APP_UPSTREAM)$$" # 只替换这两个变量，保护 $uri/$host
+    ports: # 前端端口映射（默认仅本机访问）
+      - "${BIND_HOST}:${WEB_PORT}:${WEB_PORT}"
+    depends_on: # 前端依赖后端
+      - app

@@ -1,0 +1,37 @@
+server {
+    listen ${WEB_PORT};
+    server_name _;
+
+    # 使用镜像构建阶段生成的静态产物
+    root /app/dist;
+    index index.html;
+
+    client_max_body_size 20m;
+
+    # 前端静态资源与 Vue Router history 模式
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 同源 API 反代到后端容器；末尾斜杠会剥掉 /api 前缀
+    location /api/ {
+        proxy_pass http://${APP_UPSTREAM}/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+
+    # 数据源监控页（仍走后端，前缀需保留，故 proxy_pass 带同名路径）
+    location /druid/ {
+        proxy_pass http://${APP_UPSTREAM}/druid/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

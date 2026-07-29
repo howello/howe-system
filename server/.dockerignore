@@ -1,0 +1,11 @@
+**/target
+**/.git
+**/logs
+# 外部配置目录：仅运行期由 compose 挂载，不应烘进镜像
+config
+.env
+*.log
+.idea
+.m2-repo
+*.iml
+.DS_Store

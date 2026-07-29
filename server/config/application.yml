@@ -1,0 +1,50 @@
+# ============================================================
+# 外部配置覆盖文件
+# ============================================================
+# 由 docker-compose 挂载到容器 /app/config/，以 Spring Boot 的
+# additional-location 方式加载：jar 内的 application.yml 仍是基线，
+# 这里只写需要覆盖的键，未写的键沿用 jar 内默认值。
+#
+# 与 .env 的分工：
+#   .env  —— 单值开关（端口、密码、日志级别等），已有占位符接线
+#   本文件 —— .env 覆盖不到的结构化配置（列表、嵌套块、白名单等）
+#
+# 改完执行 docker compose restart app 即生效，无需重建镜像。
+# 注意：本文件会覆盖生产配置，提交前确认不含敏感明文。
+# ============================================================
+
+# 如需覆盖同 profile 的数据源配置，在此目录另建 application-druid.yml
+
+# ---- 以下为常用可覆盖项示例，按需取消注释 ----
+
+# ruoyi:
+#   # 文件上传根路径（容器内路径，需同步 compose 挂载卷）
+#   profile: /app/uploadPath
+#   # 是否开启获取真实 ip 地址
+#   addressEnabled: false
+
+# server:
+#   tomcat:
+#     threads:
+#       max: 800
+#       min-spare: 100
+
+# spring:
+#   servlet:
+#     multipart:
+#       max-file-size: 10MB
+#       max-request-size: 20MB
+#   devtools:
+#     restart:
+#       # 生产环境应关闭热部署
+#       enabled: false
+
+# # 防盗链：allowed-domains 是列表型配置，适合在此覆盖
+# referer:
+#   enabled: false
+#   allowed-domains: localhost,127.0.0.1
+
+# xss:
+#   enabled: true
+#   excludes: /system/notice
+#   urlPatterns: /system/*,/monitor/*,/tool/*

@@ -1,0 +1,78 @@
+######################################################################
+# 前端
+# 说明：不含中间 `/` 的规则本身就在任意层级匹配，无需 `**/` 前缀；
+# 只有含中间 `/` 的规则（如 tests/**/coverage/）才需要 `**/` 解除根锚定
+
+.DS_Store
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+selenium-debug.log
+**/tests/**/coverage/
+**/tests/e2e/reports
+.astro/
+# Editor directories and files
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.local
+# package-lock.json 必须入库：admin-ui/Dockerfile 的 COPY package.json package-lock.json ./
+# 依赖它存在，忽略掉会导致 fresh clone 后镜像构建失败
+yarn.lock
+auto-imports.d.ts
+
+######################################################################
+# Build Tools
+
+.gradle
+/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+######################################################################
+# IDE
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### JRebel ###
+rebel.xml
+
+### NetBeans ###
+nbproject/private/
+server/build/*
+nbbuild/
+nbdist/
+.nb-gradle/
+
+######################################################################
+# Others
+*.log
+*.xml.versionsBackup
+*.swp
+
+!*/build/*.java
+!*/build/*.html
+!*/build/*.xml
+
+######################################################################
+# Docker & Environment
+.env
+server/logs/
