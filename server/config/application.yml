@@ -17,7 +17,7 @@
 
 # ---- 以下为常用可覆盖项示例，按需取消注释 ----
 
-# ruoyi:
+# howe:
 #   # 文件上传根路径（容器内路径，需同步 compose 挂载卷）
 #   profile: /app/uploadPath
 #   # 是否开启获取真实 ip 地址

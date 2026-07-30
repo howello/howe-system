@@ -1,5 +1,5 @@
 {
-  "name": "ruoyi",
+  "name": "howe",
   "version": "3.9.2",
   "description": "若依管理系统",
   "author": "若依",
@@ -10,10 +10,6 @@
     "build:prod": "vite build",
     "build:stage": "vite build --mode staging",
     "preview": "vite preview"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://gitee.com/y_project/RuoYi-Vue.git"
   },
   "dependencies": {
     "@element-plus/icons-vue": "2.3.2",

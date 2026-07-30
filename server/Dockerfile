@@ -4,12 +4,12 @@ WORKDIR /build
 
 # 先只复制 POM 预热依赖，源码变更时可复用此层缓存
 COPY pom.xml .
-COPY ruoyi-common/pom.xml ruoyi-common/
-COPY ruoyi-framework/pom.xml ruoyi-framework/
-COPY ruoyi-system/pom.xml ruoyi-system/
-COPY ruoyi-quartz/pom.xml ruoyi-quartz/
-COPY ruoyi-generator/pom.xml ruoyi-generator/
-COPY ruoyi-admin/pom.xml ruoyi-admin/
+COPY module-common/pom.xml module-common/
+COPY module-framework/pom.xml module-framework/
+COPY module-system/pom.xml module-system/
+COPY module-quartz/pom.xml module-quartz/
+COPY module-generator/pom.xml module-generator/
+COPY module-admin/pom.xml module-admin/
 RUN mvn -B dependency:go-offline -q || true
 
 COPY . .
@@ -29,7 +29,7 @@ ENV LOG_PATH=/app/logs
 # 外部同名键覆盖它；optional: 前缀保证目录缺失时不至于启动失败
 ENV CONFIG_LOCATION=optional:file:/app/config/
 
-COPY --from=builder /build/ruoyi-admin/target/ruoyi-admin.jar app.jar
+COPY --from=builder /build/module-admin/target/module-admin.jar app.jar
 
 # 预创建日志目录并归属 app 用户：logback 以非 root 运行时需要写权限
 RUN mkdir -p /app/logs && chown -R app:app /app

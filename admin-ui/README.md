@@ -4,22 +4,22 @@
 <h1 align="center" style="margin: 30px 0 30px; font-weight: bold;">RuoYi v3.9.2</h1>
 <h4 align="center">基于SpringBoot+Vue3前后端分离的Java快速开发框架</h4>
 <p align="center">
-	<a href="https://gitee.com/y_project/RuoYi-Vue/stargazers"><img src="https://gitee.com/y_project/RuoYi-Vue/badge/star.svg?theme=dark"></a>
-	<a href="https://gitee.com/y_project/RuoYi-Vue"><img src="https://img.shields.io/badge/RuoYi-v3.9.2-brightgreen.svg"></a>
-	<a href="https://gitee.com/y_project/RuoYi-Vue/blob/master/LICENSE"><img src="https://img.shields.io/github/license/mashape/apistatus.svg"></a>
+	<a href="https://gitee.com/y_project/module-Vue/stargazers"><img src="https://gitee.com/y_project/module-Vue/badge/star.svg?theme=dark"></a>
+	<a href="https://gitee.com/y_project/module-Vue"><img src="https://img.shields.io/badge/module-v3.9.2-brightgreen.svg"></a>
+	<a href="https://gitee.com/y_project/module-Vue/blob/master/LICENSE"><img src="https://img.shields.io/github/license/mashape/apistatus.svg"></a>
 </p>
 
 ## 平台简介
 
 * 本仓库为前端技术栈 [TypeScript](https://www.typescriptlang.org) + [Vue3](https://v3.cn.vuejs.org) + [Element Plus](https://element-plus.org/zh-CN) + [Vite](https://cn.vitejs.dev) 版本。
-* 配套后端代码仓库地址[RuoYi-Vue](https://gitee.com/y_project/RuoYi-Vue) 或 [RuoYi-Vue-fast](https://gitcode.com/yangzongzhuan/RuoYi-Vue-fast) 版本。
-* 阿里云折扣场：[点我进入](http://aly.ruoyi.vip)，腾讯云秒杀场：[点我进入](http://txy.ruoyi.vip)&nbsp;&nbsp;
+* 配套后端代码仓库地址[module-Vue](https://gitee.com/y_project/module-Vue) 或 [module-Vue-fast](https://gitcode.com/yangzongzhuan/module-Vue-fast) 版本。
+* 阿里云折扣场：[点我进入](http://aly.wyantao.com)，腾讯云秒杀场：[点我进入](http://txy.wyantao.com)&nbsp;&nbsp;
 
 # 版本对比
 
-RuoYi-Vue 前端项目的三个主要演进版本，方便你直观对比其技术栈差异（并行开发维护）。
+module-Vue 前端项目的三个主要演进版本，方便你直观对比其技术栈差异（并行开发维护）。
 
-| 项目名称      | **RuoYi-Vue** | **RuoYi-Vue3** | **RuoYi-Vue3-TypeScript**   |
+| 项目名称      | **module-Vue** | **module-Vue3** | **module-Vue3-TypeScript**   |
 | :---          | :---          | :---           | :---                        |
 | **前端框架**  | Vue 2        | Vue 3          | Vue 3                       |
 | **脚本语言**  | JavaScript   | JavaScript     | TypeScript                  |
@@ -28,19 +28,19 @@ RuoYi-Vue 前端项目的三个主要演进版本，方便你直观对比其技�
 | **状态管理**  | Vuex         | Pinia          | Pinia                       |
 | **路由管理**  | Vue Router 3 | Vue Router 4   | Vue Router 4                |
 | **核心特点**  | 1. 技术栈经典稳定<br>2. 社区资料丰富<br>3. 当前维护重心已转移 | 1. 现代前端技术栈<br>2. 开发体验与性能更优<br>3. 官方主推的活跃版本 | 1. 类型加持，减少沟通成本<br>2. 开发时有提示，效率更高<br>3. 多人协作企业级开发项目 |
-| **仓库地址**  | [RuoYi-Vue](https://gitee.com/y_project/RuoYi-Vue) | [RuoYi-Vue3](https://gitcode.com/yangzongzhuan/RuoYi-Vue3) | [RuoYi-Vue3-TypeScript](https://gitcode.com/yangzongzhuan/RuoYi-Vue3/tree/typescript) |
+| **仓库地址**  | [module-Vue](https://gitee.com/y_project/module-Vue) | [module-Vue3](https://gitcode.com/yangzongzhuan/module-Vue3) | [module-Vue3-TypeScript](https://gitcode.com/yangzongzhuan/module-Vue3/tree/typescript) |
 
 ## 前端运行
 
 ```bash
 # 克隆项目
-git clone https://gitcode.com/yangzongzhuan/RuoYi-Vue3.git
+git clone https://gitcode.com/yangzongzhuan/module-Vue3.git
 
 # 切换typescript分支
 git checkout typescript
 
 # 进入项目目录
-cd RuoYi-Vue3
+cd module-Vue3
 
 # 安装依赖
 yarn --registry=https://registry.npmmirror.com
@@ -79,8 +79,8 @@ yarn dev
 - admin/admin123  
 - 陆陆续续收到一些打赏，为了更好的体验已用于演示服务器升级。谢谢各位小伙伴。
 
-演示地址：http://vue.ruoyi.vip  
-文档地址：http://doc.ruoyi.vip
+演示地址：http://vue.wyantao.com  
+文档地址：http://doc.wyantao.com
 
 ## 演示图
 
