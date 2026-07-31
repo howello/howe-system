@@ -6,8 +6,10 @@ howe:
   version: 3.9.2
   # 版权年份
   copyrightYear: 2026
-  # 文件路径 示例（ Windows配置D:/howe/uploadPath，Linux配置 /home/howe/uploadPath）
-  profile: D:/howe/uploadPath
+  # 本地文件路径：仅在存储类型为 local 时用于存放上传文件，以及通用下载接口的取件目录
+  # 示例（ Windows配置D:/howe/uploadPath，Linux/容器配置 /app/uploadPath）
+  # 存储类型、R2 凭据、博客 GitHub 配置都在「系统管理 > 参数设置」里维护，不写在这里
+  profile: ${PROFILE_PATH:D:/howe/uploadPath}
   # 获取ip地址开关
   addressEnabled: false
   # 验证码类型 math 数字计算 char 字符验证

@@ -54,6 +54,12 @@
             <artifactId>module-generator</artifactId>
         </dependency>
 
+        <!-- 博客模块-->
+        <dependency>
+            <groupId>com.howe</groupId>
+            <artifactId>module-blog</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>

@@ -12,6 +12,15 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "howe")
 public class YmlConfig
 {
+    /** 导入文件的业务目录（对象存储相对目录） */
+    public static final String IMPORT_DIR = "import";
+
+    /** 头像的业务目录（对象存储相对目录） */
+    public static final String AVATAR_DIR = "avatar";
+
+    /** 通用上传的业务目录（对象存储相对目录） */
+    public static final String UPLOAD_DIR = "upload";
+
     /** 项目名称 */
     private String name;
 
@@ -93,7 +102,7 @@ public class YmlConfig
      */
     public static String getImportPath()
     {
-        return getProfile() + "/import";
+        return getProfile() + "/" + IMPORT_DIR;
     }
 
     /**
@@ -101,7 +110,7 @@ public class YmlConfig
      */
     public static String getAvatarPath()
     {
-        return getProfile() + "/avatar";
+        return getProfile() + "/" + AVATAR_DIR;
     }
 
     /**
@@ -117,6 +126,6 @@ public class YmlConfig
      */
     public static String getUploadPath()
     {
-        return getProfile() + "/upload";
+        return getProfile() + "/" + UPLOAD_DIR;
     }
 }

@@ -1,6 +1,6 @@
 /**
  * 通用css样式布局处理
- * Copyright (c) 2019 ruoyi
+ * Copyright (c) 2019 howe
  */
 
 /** 基础通用 **/
@@ -121,7 +121,7 @@
   position: static !important;
   margin: 10px 0 0 0;
   padding: 0 !important;
-  
+
   .el-pagination {
     position: static;
   }
@@ -359,14 +359,14 @@
   margin: 0;
   padding: 0;
 }
-.code-action .el-button { 
-  height: 24px; 
-  font-size: 12px; 
-  padding: 4px 8px; 
+.code-action .el-button {
+  height: 24px;
+  font-size: 12px;
+  padding: 4px 8px;
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid #dcdcdc;
 }
-.code-action .el-button:hover { 
+.code-action .el-button:hover {
   background: #ffffff;
   border-color: #409EFF;
 }

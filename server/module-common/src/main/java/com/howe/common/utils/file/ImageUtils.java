@@ -1,12 +1,10 @@
 package com.howe.common.utils.file;
 
 import java.io.ByteArrayInputStream;
-import java.io.FileInputStream;
 import java.io.InputStream;
-import java.net.URL;
-import java.net.URLConnection;
-import java.util.Arrays;
-import org.apache.poi.util.IOUtils;
+import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.io.IoUtil;
+import cn.hutool.http.HttpRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.howe.common.config.YmlConfig;
@@ -22,12 +20,15 @@ public class ImageUtils
 {
     private static final Logger log = LoggerFactory.getLogger(ImageUtils.class);
 
+    /** 网络图片读取超时（毫秒） */
+    private static final int READ_TIMEOUT = 60000;
+
     public static byte[] getImage(String imagePath)
     {
         InputStream is = getFile(imagePath);
         try
         {
-            return IOUtils.toByteArray(is);
+            return IoUtil.readBytes(is);
         }
         catch (Exception e)
         {
@@ -36,7 +37,7 @@ public class ImageUtils
         }
         finally
         {
-            IOUtils.closeQuietly(is);
+            IoUtil.close(is);
         }
     }
 
@@ -45,7 +46,6 @@ public class ImageUtils
         try
         {
             byte[] result = readFile(imagePath);
-            result = Arrays.copyOf(result, result.length);
             return new ByteArrayInputStream(result);
         }
         catch (Exception e)
@@ -58,41 +58,32 @@ public class ImageUtils
     /**
      * 读取文件为字节数据
      *
+     * <p>
+     * 切到对象存储后，上传返回的是图床外链，会走 http 分支；只有存储类型为 local 时
+     * 才是 /profile 相对路径，走本地磁盘分支。
+     * </p>
+     *
      * @param url 地址
      * @return 字节数据
      */
     public static byte[] readFile(String url)
     {
-        InputStream in = null;
         try
         {
-            if (url.startsWith("http"))
+            if (StringUtils.startsWithIgnoreCase(url, "http"))
             {
                 // 网络地址
-                URL urlObj = new URL(url);
-                URLConnection urlConnection = urlObj.openConnection();
-                urlConnection.setConnectTimeout(30 * 1000);
-                urlConnection.setReadTimeout(60 * 1000);
-                urlConnection.setDoInput(true);
-                in = urlConnection.getInputStream();
+                return HttpRequest.get(url).timeout(READ_TIMEOUT).execute().bodyBytes();
             }
-            else
-            {
-                // 本机地址
-                String localPath = YmlConfig.getProfile();
-                String downloadPath = localPath + StringUtils.substringAfter(url, Constants.RESOURCE_PREFIX);
-                in = new FileInputStream(downloadPath);
-            }
-            return IOUtils.toByteArray(in);
+            // 本机地址
+            String localPath = YmlConfig.getProfile();
+            String downloadPath = localPath + StringUtils.substringAfter(url, Constants.RESOURCE_PREFIX);
+            return FileUtil.readBytes(downloadPath);
         }
         catch (Exception e)
         {
             log.error("获取文件路径异常 {}", e);
             return null;
-        }
-        finally
-        {
-            IOUtils.closeQuietly(in);
         }
     }
 }

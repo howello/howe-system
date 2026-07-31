@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.blog.mapper.BlogArticleMapper">
+
+    <resultMap type="BlogArticle" id="BlogArticleResult">
+        <result property="articleId"      column="article_id"      />
+        <result property="slug"           column="slug"            />
+        <result property="title"          column="title"           />
+        <result property="filePath"       column="file_path"       />
+        <result property="gitSha"         column="git_sha"         />
+        <result property="publishDate"    column="publish_date"    />
+        <result property="categories"     column="categories"      />
+        <result property="tags"           column="tags"            />
+        <result property="cover"          column="cover"           />
+        <result property="recommend"      column="recommend"       />
+        <result property="hide"           column="hide"            />
+        <result property="isTop"          column="is_top"          />
+        <result property="summary"        column="summary"         />
+        <result property="wordCount"      column="word_count"      />
+        <result property="lastSyncTime"   column="last_sync_time"  />
+        <result property="createBy"       column="create_by"       />
+        <result property="createTime"     column="create_time"     />
+        <result property="updateBy"       column="update_by"       />
+        <result property="updateTime"     column="update_time"     />
+        <result property="remark"         column="remark"          />
+    </resultMap>
+
+    <sql id="selectBlogArticleVo">
+        select article_id, slug, title, file_path, git_sha, publish_date, categories, tags, cover,
+               recommend, hide, is_top, summary, word_count, last_sync_time,
+               create_by, create_time, update_by, update_time, remark
+        from blog_article
+    </sql>
+
+    <select id="selectBlogArticleList" parameterType="BlogArticle" resultMap="BlogArticleResult">
+        <include refid="selectBlogArticleVo"/>
+        <where>
+            <if test="title != null and title != ''">
+                AND title like concat('%', #{title}, '%')
+            </if>
+            <if test="slug != null and slug != ''">
+                AND slug like concat('%', #{slug}, '%')
+            </if>
+            <if test="categories != null and categories != ''">
+                AND categories like concat('%', #{categories}, '%')
+            </if>
+            <if test="tags != null and tags != ''">
+                AND tags like concat('%', #{tags}, '%')
+            </if>
+            <if test="recommend != null and recommend != ''">
+                AND recommend = #{recommend}
+            </if>
+            <if test="hide != null and hide != ''">
+                AND hide = #{hide}
+            </if>
+            <if test="isTop != null and isTop != ''">
+                AND is_top = #{isTop}
+            </if>
+            <if test="params.beginTime != null and params.beginTime != ''"><!-- 发布日期起 -->
+                AND date_format(publish_date,'%y%m%d') &gt;= date_format(#{params.beginTime},'%y%m%d')
+            </if>
+            <if test="params.endTime != null and params.endTime != ''"><!-- 发布日期止 -->
+                AND date_format(publish_date,'%y%m%d') &lt;= date_format(#{params.endTime},'%y%m%d')
+            </if>
+        </where>
+        order by is_top desc, publish_date desc, article_id desc
+    </select>
+
+    <select id="selectBlogArticleById" parameterType="Long" resultMap="BlogArticleResult">
+        <include refid="selectBlogArticleVo"/>
+        where article_id = #{articleId}
+    </select>
+
+    <select id="selectBlogArticleBySlug" parameterType="String" resultMap="BlogArticleResult">
+        <include refid="selectBlogArticleVo"/>
+        where slug = #{slug}
+    </select>
+
+    <select id="selectBlogArticleByFilePath" parameterType="String" resultMap="BlogArticleResult">
+        <include refid="selectBlogArticleVo"/>
+        where file_path = #{filePath}
+    </select>
+
+    <select id="selectAllFilePaths" resultType="String">
+        select file_path from blog_article
+    </select>
+
+    <insert id="insertBlogArticle" parameterType="BlogArticle" useGeneratedKeys="true" keyProperty="articleId">
+        insert into blog_article (
+            slug,
+            title,
+            file_path,
+            <if test="gitSha != null">git_sha,</if>
+            <if test="publishDate != null">publish_date,</if>
+            <if test="categories != null">categories,</if>
+            <if test="tags != null">tags,</if>
+            <if test="cover != null">cover,</if>
+            <if test="recommend != null and recommend != ''">recommend,</if>
+            <if test="hide != null and hide != ''">hide,</if>
+            <if test="isTop != null and isTop != ''">is_top,</if>
+            <if test="summary != null">summary,</if>
+            <if test="wordCount != null">word_count,</if>
+            <if test="lastSyncTime != null">last_sync_time,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            create_time
+        )values(
+            #{slug},
+            #{title},
+            #{filePath},
+            <if test="gitSha != null">#{gitSha},</if>
+            <if test="publishDate != null">#{publishDate},</if>
+            <if test="categories != null">#{categories},</if>
+            <if test="tags != null">#{tags},</if>
+            <if test="cover != null">#{cover},</if>
+            <if test="recommend != null and recommend != ''">#{recommend},</if>
+            <if test="hide != null and hide != ''">#{hide},</if>
+            <if test="isTop != null and isTop != ''">#{isTop},</if>
+            <if test="summary != null">#{summary},</if>
+            <if test="wordCount != null">#{wordCount},</if>
+            <if test="lastSyncTime != null">#{lastSyncTime},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            sysdate()
+        )
+    </insert>
+
+    <update id="updateBlogArticle" parameterType="BlogArticle">
+        update blog_article
+        <set>
+            <if test="slug != null and slug != ''">slug = #{slug},</if>
+            <if test="title != null and title != ''">title = #{title},</if>
+            <if test="filePath != null and filePath != ''">file_path = #{filePath},</if>
+            <if test="gitSha != null">git_sha = #{gitSha},</if>
+            <if test="publishDate != null">publish_date = #{publishDate},</if>
+            <if test="categories != null">categories = #{categories},</if>
+            <if test="tags != null">tags = #{tags},</if>
+            <if test="cover != null">cover = #{cover},</if>
+            <if test="recommend != null and recommend != ''">recommend = #{recommend},</if>
+            <if test="hide != null and hide != ''">hide = #{hide},</if>
+            <if test="isTop != null and isTop != ''">is_top = #{isTop},</if>
+            <if test="summary != null">summary = #{summary},</if>
+            <if test="wordCount != null">word_count = #{wordCount},</if>
+            <if test="lastSyncTime != null">last_sync_time = #{lastSyncTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </set>
+        where article_id = #{articleId}
+    </update>
+
+    <delete id="deleteBlogArticleById" parameterType="Long">
+        delete from blog_article where article_id = #{articleId}
+    </delete>
+
+    <delete id="deleteBlogArticleByIds" parameterType="Long">
+        delete from blog_article where article_id in
+        <foreach item="articleId" collection="array" open="(" separator="," close=")">
+            #{articleId}
+        </foreach>
+    </delete>
+
+    <delete id="deleteBlogArticleByFilePath" parameterType="String">
+        delete from blog_article where file_path = #{filePath}
+    </delete>
+
+</mapper>

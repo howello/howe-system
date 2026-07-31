@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.blog.mapper.BlogDraftMapper">
+
+    <resultMap type="BlogDraft" id="BlogDraftResult">
+        <result property="draftId"        column="draft_id"        />
+        <result property="title"          column="title"           />
+        <result property="slug"           column="slug"            />
+        <result property="content"        column="content"         />
+        <result property="categories"     column="categories"      />
+        <result property="tags"           column="tags"            />
+        <result property="cover"          column="cover"           />
+        <result property="publishDate"    column="publish_date"    />
+        <result property="recommend"      column="recommend"       />
+        <result property="hide"           column="hide"            />
+        <result property="isTop"          column="is_top"          />
+        <result property="status"         column="status"          />
+        <result property="publishedPath"  column="published_path"  />
+        <result property="publishTime"    column="publish_time"    />
+        <result property="createBy"       column="create_by"       />
+        <result property="createTime"     column="create_time"     />
+        <result property="updateBy"       column="update_by"       />
+        <result property="updateTime"     column="update_time"     />
+        <result property="remark"         column="remark"          />
+    </resultMap>
+
+    <!-- 列表不取 content：草稿正文可能很长，列表页用不到 -->
+    <sql id="selectBlogDraftVo">
+        select draft_id, title, slug, categories, tags, cover, publish_date,
+               recommend, hide, is_top, status, published_path, publish_time,
+               create_by, create_time, update_by, update_time, remark
+        from blog_draft
+    </sql>
+
+    <select id="selectBlogDraftList" parameterType="BlogDraft" resultMap="BlogDraftResult">
+        <include refid="selectBlogDraftVo"/>
+        <where>
+            <if test="title != null and title != ''">
+                AND title like concat('%', #{title}, '%')
+            </if>
+            <if test="slug != null and slug != ''">
+                AND slug like concat('%', #{slug}, '%')
+            </if>
+            <if test="categories != null and categories != ''">
+                AND categories like concat('%', #{categories}, '%')
+            </if>
+            <if test="tags != null and tags != ''">
+                AND tags like concat('%', #{tags}, '%')
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="params.beginTime != null and params.beginTime != ''"><!-- 创建时间起 -->
+                AND date_format(create_time,'%y%m%d') &gt;= date_format(#{params.beginTime},'%y%m%d')
+            </if>
+            <if test="params.endTime != null and params.endTime != ''"><!-- 创建时间止 -->
+                AND date_format(create_time,'%y%m%d') &lt;= date_format(#{params.endTime},'%y%m%d')
+            </if>
+        </where>
+        order by draft_id desc
+    </select>
+
+    <select id="selectBlogDraftById" parameterType="Long" resultMap="BlogDraftResult">
+        select draft_id, title, slug, content, categories, tags, cover, publish_date,
+               recommend, hide, is_top, status, published_path, publish_time,
+               create_by, create_time, update_by, update_time, remark
+        from blog_draft
+        where draft_id = #{draftId}
+    </select>
+
+    <insert id="insertBlogDraft" parameterType="BlogDraft" useGeneratedKeys="true" keyProperty="draftId">
+        insert into blog_draft (
+            title,
+            <if test="slug != null">slug,</if>
+            <if test="content != null">content,</if>
+            <if test="categories != null">categories,</if>
+            <if test="tags != null">tags,</if>
+            <if test="cover != null">cover,</if>
+            <if test="publishDate != null">publish_date,</if>
+            <if test="recommend != null and recommend != ''">recommend,</if>
+            <if test="hide != null and hide != ''">hide,</if>
+            <if test="isTop != null and isTop != ''">is_top,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="publishedPath != null">published_path,</if>
+            <if test="publishTime != null">publish_time,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            create_time
+        )values(
+            #{title},
+            <if test="slug != null">#{slug},</if>
+            <if test="content != null">#{content},</if>
+            <if test="categories != null">#{categories},</if>
+            <if test="tags != null">#{tags},</if>
+            <if test="cover != null">#{cover},</if>
+            <if test="publishDate != null">#{publishDate},</if>
+            <if test="recommend != null and recommend != ''">#{recommend},</if>
+            <if test="hide != null and hide != ''">#{hide},</if>
+            <if test="isTop != null and isTop != ''">#{isTop},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="publishedPath != null">#{publishedPath},</if>
+            <if test="publishTime != null">#{publishTime},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            sysdate()
+        )
+    </insert>
+
+    <update id="updateBlogDraft" parameterType="BlogDraft">
+        update blog_draft
+        <set>
+            <if test="title != null and title != ''">title = #{title},</if>
+            <if test="slug != null">slug = #{slug},</if>
+            <if test="content != null">content = #{content},</if>
+            <if test="categories != null">categories = #{categories},</if>
+            <if test="tags != null">tags = #{tags},</if>
+            <if test="cover != null">cover = #{cover},</if>
+            <if test="publishDate != null">publish_date = #{publishDate},</if>
+            <if test="recommend != null and recommend != ''">recommend = #{recommend},</if>
+            <if test="hide != null and hide != ''">hide = #{hide},</if>
+            <if test="isTop != null and isTop != ''">is_top = #{isTop},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="publishedPath != null">published_path = #{publishedPath},</if>
+            <if test="publishTime != null">publish_time = #{publishTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </set>
+        where draft_id = #{draftId}
+    </update>
+
+    <delete id="deleteBlogDraftById" parameterType="Long">
+        delete from blog_draft where draft_id = #{draftId}
+    </delete>
+
+    <delete id="deleteBlogDraftByIds" parameterType="Long">
+        delete from blog_draft where draft_id in
+        <foreach item="draftId" collection="array" open="(" separator="," close=")">
+            #{draftId}
+        </foreach>
+    </delete>
+
+</mapper>

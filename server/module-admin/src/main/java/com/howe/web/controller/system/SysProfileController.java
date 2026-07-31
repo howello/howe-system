@@ -17,11 +17,11 @@ import com.howe.common.core.domain.AjaxResult;
 import com.howe.common.core.domain.entity.SysUser;
 import com.howe.common.core.domain.model.LoginUser;
 import com.howe.common.enums.BusinessType;
+import com.howe.common.storage.StorageService;
 import com.howe.common.utils.DateUtils;
 import com.howe.common.utils.SecurityUtils;
 import com.howe.common.utils.StringUtils;
 import com.howe.common.utils.file.FileUploadUtils;
-import com.howe.common.utils.file.FileUtils;
 import com.howe.common.utils.file.MimeTypeUtils;
 import com.howe.framework.web.service.TokenService;
 import com.howe.system.service.ISysUserService;
@@ -40,6 +40,9 @@ public class SysProfileController extends BaseController
 
     @Autowired
     private TokenService tokenService;
+
+    @Autowired
+    private StorageService storageService;
 
     /**
      * 个人信息
@@ -128,13 +131,14 @@ public class SysProfileController extends BaseController
         if (!file.isEmpty())
         {
             LoginUser loginUser = getLoginUser();
-            String avatar = FileUploadUtils.upload(YmlConfig.getAvatarPath(), file, MimeTypeUtils.IMAGE_EXTENSION, true);
+            String avatar = FileUploadUtils.uploadTo(YmlConfig.AVATAR_DIR, file, MimeTypeUtils.IMAGE_EXTENSION, true);
             if (userService.updateUserAvatar(loginUser.getUserId(), avatar))
             {
                 String oldAvatar = loginUser.getUser().getAvatar();
                 if (StringUtils.isNotEmpty(oldAvatar))
                 {
-                    FileUtils.deleteFile(YmlConfig.getProfile() + FileUtils.stripPrefix(oldAvatar));
+                    // 交由存储层清理旧头像：R2 走 DeleteObject，本地磁盘走文件删除
+                    storageService.remove(oldAvatar);
                 }
                 AjaxResult ajax = AjaxResult.success();
                 ajax.put("imgUrl", avatar);

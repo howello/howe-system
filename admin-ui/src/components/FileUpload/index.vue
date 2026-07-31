@@ -29,7 +29,7 @@
     <!-- 文件列表 -->
     <transition-group ref="uploadFileList" class="upload-file-list el-upload-list el-upload-list--text" name="el-fade-in-linear" tag="ul">
       <li :key="file.uid" class="el-upload-list__item ele-upload-list__item-content" v-for="(file, index) in fileList">
-        <el-link :href="`${baseUrl}${file.url}`" underline="never" target="_blank">
+        <el-link :href="resolveFileUrl(file.url)" underline="never" target="_blank">
           <span class="el-icon-document"> {{ getFileName(file.name) }} </span>
         </el-link>
         <div class="ele-upload-list__item-content-action">
@@ -42,6 +42,7 @@
 
 <script setup lang="ts">
 import { getToken } from "@/utils/auth"
+import { resolveFileUrl } from "@/utils/commonUtils"
 import Sortable from 'sortablejs'
 import type { UploadFileResult } from '@/types/api/common'
 

@@ -1,12 +1,12 @@
 {
   "name": "howe",
   "version": "3.9.2",
-  "description": "若依管理系统",
-  "author": "若依",
+  "description": "后台管理系统",
+  "author": "Howe",
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "admin - dev": "vite",
     "build:prod": "vite build",
     "build:stage": "vite build --mode staging",
     "preview": "vite preview"
@@ -24,6 +24,7 @@
     "js-beautify": "1.15.4",
     "js-cookie": "3.0.5",
     "jsencrypt": "3.3.2",
+    "md-editor-v3": "^6.5.5",
     "nprogress": "0.2.0",
     "pinia": "3.0.4",
     "vue": "3.5.26",

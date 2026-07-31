@@ -1,7 +1,9 @@
 /**
  * 通用js方法封装处理
- * Copyright (c) 2019 ruoyi
+ * Copyright (c) 2019 howe
  */
+
+import { isExternal } from '@/utils/validate'
 
 // 日期格式化
 export function parseTime(time: any, pattern?: string): string | null {
@@ -227,4 +229,17 @@ export function getNormalPath(p: string): string {
 // 验证是否为blob格式
 export function blobValidate(data: Blob): boolean {
   return data.type !== 'application/json'
+}
+
+// 拼接可访问的文件地址
+// 存储切到对象存储后，后端返回的是图床完整 URL；只有存储类型为 local 时才是
+// /profile 开头的相对路径，需要补上接口前缀。外链原样返回，避免拼成 /dev-api/https://...
+export function resolveFileUrl(path: string): string {
+  if (!path) {
+    return path
+  }
+  if (isExternal(path)) {
+    return path
+  }
+  return import.meta.env.VITE_APP_BASE_API + path
 }

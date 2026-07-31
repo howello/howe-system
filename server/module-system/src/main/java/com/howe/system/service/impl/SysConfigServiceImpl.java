@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.howe.common.constant.CacheConstants;
 import com.howe.common.constant.UserConstants;
+import com.howe.common.config.ConfigProvider;
 import com.howe.common.core.redis.RedisCache;
 import com.howe.common.core.text.Convert;
 import com.howe.common.exception.ServiceException;
@@ -21,7 +22,7 @@ import com.howe.system.service.ISysConfigService;
  * @author howe
  */
 @Service
-public class SysConfigServiceImpl implements ISysConfigService
+public class SysConfigServiceImpl implements ISysConfigService, ConfigProvider
 {
     @Autowired
     private SysConfigMapper configMapper;
@@ -36,6 +37,18 @@ public class SysConfigServiceImpl implements ISysConfigService
     public void init()
     {
         loadingConfigCache();
+    }
+
+    /**
+     * 供 module-common 的底层工具类读取参数配置
+     *
+     * @param configKey 参数键名
+     * @return 参数值
+     */
+    @Override
+    public String getConfigValue(String configKey)
+    {
+        return selectConfigByKey(configKey);
     }
 
     /**

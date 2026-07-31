@@ -25,5 +25,9 @@ export * from "./monitor/logininfor";
 export * from "./monitor/operlog";
 export * from "./monitor/online";
 
+// 博客模块
+export * from "./blog/article";
+export * from "./blog/draft";
+
 // 代码生成模块
 export * from "./tool/gen";
