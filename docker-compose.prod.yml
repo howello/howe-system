@@ -1,0 +1,47 @@
+# 生产部署编排：直接拉取 CI 构建好的镜像，不在服务器上编译
+#
+# 与 docker-compose.yml 的唯一区别是去掉了 build 段、改用远程镜像，
+# 其余（容器名、端口、挂载、环境变量）必须与之保持一致。
+#
+# 用法：
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# 回滚到指定版本（标签见 Actions 运行摘要或 Docker Hub 的 Tags 页）：
+#   APP_TAG=main-a1b2c3d docker compose -f docker-compose.prod.yml up -d app
+services: # 容器服务定义
+  app: # 后端应用服务
+    # 镜像由 .github/workflows/build-app.yml 构建推送
+    # 默认拉 latest；临时指定 APP_TAG 环境变量即可回滚到某次提交
+    image: kilimaca/howe-system-app:${APP_TAG:-latest}
+    container_name: ${PROJECT_NAME}-app # 后端容器名称（Nginx 反代按此名解析，不可改）
+    restart: unless-stopped # 容器重启策略
+    env_file: # 从 .env 注入业务环境变量
+      - .env
+    environment: # 部署固定项（覆盖 .env 中同名键）
+      TZ: ${TZ} # 应用时区
+      SERVER_PORT: ${APP_PORT} # 服务端口
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE} # 激活配置环境
+    ports: # 后端端口映射（默认仅本机访问）
+      - "${BIND_HOST}:${APP_PORT}:${APP_PORT}"
+    volumes: # 后端日志与外部配置挂载
+      - ./server/logs:/app/logs
+      # 外部配置目录：优先级高于镜像内打包的 application.yml，改后重启容器即生效
+      - ./server/config:/app/config
+    user: "0:0" # 以 root 运行避免日志目录权限问题（生产环境建议用命名卷）
+
+  web: # 前端应用服务
+    # 镜像由 .github/workflows/build-web.yml 构建推送
+    # 注意 VITE_APP_TITLE 已在 CI 构建期烘进静态产物，此处及 .env 中再改无效
+    image: kilimaca/howe-system-web:${WEB_TAG:-latest}
+    container_name: ${PROJECT_NAME}-web # 前端容器名称
+    restart: unless-stopped # 容器重启策略
+    environment: # Nginx 模板渲染变量
+      TZ: ${TZ} # 容器时区
+      WEB_PORT: ${WEB_PORT} # 前端监听端口
+      APP_UPSTREAM: ${PROJECT_NAME}-app:${APP_PORT} # 后端上游地址（须与 app 的 container_name 一致）
+      NGINX_ENVSUBST_FILTER: "^(WEB_PORT|APP_UPSTREAM)$$" # 只替换这两个变量，保护 $uri/$host
+    ports: # 前端端口映射（默认仅本机访问）
+      - "${BIND_HOST}:${WEB_PORT}:${WEB_PORT}"
+    depends_on: # 前端依赖后端
+      - app

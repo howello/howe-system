@@ -1,0 +1,69 @@
+# 后端镜像构建：把 Maven 编译搬到 CI，服务器只负责拉取运行
+#
+# 触发条件：
+#   - push 到 main 且改动落在 server/ 下（只改前端不会白跑一遍 Maven）
+#   - 在 Actions 页面手动点 "Run workflow"（首次部署或需要强制重建时用）
+name: 构建后端镜像
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - ".github/workflows/build-app.yml"
+  workflow_dispatch:
+
+# 同一分支上新的 push 会取消进行中的旧构建，避免两次构建争抢 latest 标签
+concurrency:
+  group: build-app-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_NAME: kilimaca/howe-system-app
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@v4
+
+      - name: 计算短 SHA
+        id: vars
+        # 供回滚使用的版本标签，取 commit sha 前 7 位
+        run: echo "sha_short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: 配置 Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录 Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 构建并推送镜像
+        uses: docker/build-push-action@v6
+        with:
+          # 与 docker-compose.yml 的 context: ./server 保持一致
+          context: ./server
+          file: ./server/Dockerfile
+          # 服务器是 x86_64，只出 amd64；多平台需 QEMU 模拟，构建慢 5-10 倍
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:main-${{ steps.vars.outputs.sha_short }}
+          # 复用 Actions 缓存：pom.xml 未变时跳过 Maven 依赖下载那一层
+          cache-from: type=gha,scope=app
+          cache-to: type=gha,mode=max,scope=app
+
+      - name: 输出镜像标签
+        run: |
+          echo "已推送：" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`${{ env.IMAGE_NAME }}:latest\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`${{ env.IMAGE_NAME }}:main-${{ steps.vars.outputs.sha_short }}\`" >> "$GITHUB_STEP_SUMMARY"

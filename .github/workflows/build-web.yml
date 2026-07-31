@@ -1,0 +1,73 @@
+# 管理端镜像构建：把 npm install + vite build 搬到 CI，服务器只负责拉取运行
+#
+# 触发条件：
+#   - push 到 main 且改动落在 admin-ui/ 下（只改后端不会白跑一遍前端构建）
+#   - 在 Actions 页面手动点 "Run workflow"（首次部署或需要强制重建时用）
+name: 构建管理端镜像
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "admin-ui/**"
+      - ".github/workflows/build-web.yml"
+  workflow_dispatch:
+
+# 同一分支上新的 push 会取消进行中的旧构建，避免两次构建争抢 latest 标签
+concurrency:
+  group: build-web-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_NAME: kilimaca/howe-system-web
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@v4
+
+      - name: 计算短 SHA
+        id: vars
+        # 供回滚使用的版本标签，取 commit sha 前 7 位
+        run: echo "sha_short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: 配置 Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录 Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 构建并推送镜像
+        uses: docker/build-push-action@v6
+        with:
+          # 与 docker-compose.yml 的 context: ./admin-ui 保持一致
+          context: ./admin-ui
+          file: ./admin-ui/Dockerfile
+          # 服务器是 x86_64，只出 amd64；多平台需 QEMU 模拟，构建慢 5-10 倍
+          platforms: linux/amd64
+          push: true
+          # VITE_* 是构建期变量，在这里烘进静态产物。
+          # 改站点标题必须改这一行并重跑本 workflow，服务器上改 .env 不再有效。
+          build-args: |
+            VITE_APP_TITLE=后台管理系统
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:main-${{ steps.vars.outputs.sha_short }}
+          # 复用 Actions 缓存：package-lock.json 未变时跳过 npm install 那一层
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      - name: 输出镜像标签
+        run: |
+          echo "已推送：" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`${{ env.IMAGE_NAME }}:latest\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`${{ env.IMAGE_NAME }}:main-${{ steps.vars.outputs.sha_short }}\`" >> "$GITHUB_STEP_SUMMARY"
