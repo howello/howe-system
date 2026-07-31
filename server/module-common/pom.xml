@@ -35,10 +35,17 @@
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
-        <!-- pagehelper 分页插件 -->
+        <!-- pagehelper 分页插件
+             排除其传递的原生 mybatis starter，避免与 MyBatis-Plus 的自动配置并存 -->
         <dependency>
             <groupId>com.github.pagehelper</groupId>
             <artifactId>pagehelper-spring-boot-starter</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.mybatis.spring.boot</groupId>
+                    <artifactId>mybatis-spring-boot-starter</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!-- MyBatis-Plus：BaseMapper CRUD 与条件构造器 -->
