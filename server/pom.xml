@@ -9,7 +9,7 @@
     <version>3.9.2</version>
 
     <name>server</name>
-    <description>若依管理系统</description>
+    <description>后台管理系统</description>
 
     <properties>
         <howe.version>3.9.2</howe.version>

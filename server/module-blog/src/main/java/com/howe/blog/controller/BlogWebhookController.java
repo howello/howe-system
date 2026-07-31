@@ -31,8 +31,7 @@ import java.nio.charset.StandardCharsets;
  */
 @RestController
 @RequestMapping("/blog/webhook")
-public class BlogWebhookController extends BaseController
-{
+public class BlogWebhookController extends BaseController {
     private static final Logger log = LoggerFactory.getLogger(BlogWebhookController.class);
 
     private static final String SIGNATURE_PREFIX = "sha256=";
@@ -51,23 +50,19 @@ public class BlogWebhookController extends BaseController
     @RateLimiter(time = 60, count = 30, limitType = LimitType.IP)
     @PostMapping("/github")
     public AjaxResult github(@RequestBody String payload,
-            @RequestHeader(value = "X-Hub-Signature-256", required = false) String signature,
-            @RequestHeader(value = "X-GitHub-Event", required = false) String event)
-    {
+                             @RequestHeader(value = "X-Hub-Signature-256", required = false) String signature,
+                             @RequestHeader(value = "X-GitHub-Event", required = false) String event) {
         String secret = ConfigUtils.getString(ConfigConstants.BLOG_WEBHOOK_SECRET);
-        if (StringUtils.isEmpty(secret))
-        {
+        if (StringUtils.isEmpty(secret)) {
             // 没配密钥就等于没开启，直接拒绝，避免裸奔的同步入口
             log.warn("收到 webhook 请求但未配置密钥，已拒绝");
             return AjaxResult.error("Webhook 未启用");
         }
-        if (!verifySignature(payload, signature, secret))
-        {
+        if (!verifySignature(payload, signature, secret)) {
             log.warn("webhook 签名校验失败");
             return AjaxResult.error("签名校验失败");
         }
-        if (StringUtils.isNotEmpty(event) && !"push".equals(event))
-        {
+        if (StringUtils.isNotEmpty(event) && !"push".equals(event)) {
             // ping 等其它事件直接确认，避免 GitHub 侧显示投递失败
             return AjaxResult.success("已忽略事件：" + event);
         }
@@ -80,10 +75,8 @@ public class BlogWebhookController extends BaseController
     /**
      * 校验 HMAC-SHA256 签名
      */
-    private boolean verifySignature(String payload, String signature, String secret)
-    {
-        if (StringUtils.isEmpty(signature) || !signature.startsWith(SIGNATURE_PREFIX))
-        {
+    private boolean verifySignature(String payload, String signature, String secret) {
+        if (StringUtils.isEmpty(signature) || !signature.startsWith(SIGNATURE_PREFIX)) {
             return false;
         }
         String expected = new HMac(HmacAlgorithm.HmacSHA256, secret.getBytes(StandardCharsets.UTF_8))
@@ -92,15 +85,12 @@ public class BlogWebhookController extends BaseController
         return constantTimeEquals(expected, signature.substring(SIGNATURE_PREFIX.length()));
     }
 
-    private static boolean constantTimeEquals(String a, String b)
-    {
-        if (a == null || b == null || a.length() != b.length())
-        {
+    private static boolean constantTimeEquals(String a, String b) {
+        if (a == null || b == null || a.length() != b.length()) {
             return false;
         }
         int diff = 0;
-        for (int i = 0; i < a.length(); i++)
-        {
+        for (int i = 0; i < a.length(); i++) {
             diff |= Character.toLowerCase(a.charAt(i)) ^ Character.toLowerCase(b.charAt(i));
         }
         return diff == 0;

@@ -9,7 +9,7 @@ RUN npm install --no-audit --no-fund
 COPY . .
 
 # 站点标题：构建期变量，经 compose 的 build.args 从 .env 传入
-ARG VITE_APP_TITLE=若依管理系统
+ARG VITE_APP_TITLE=后台管理系统
 ENV VITE_APP_TITLE=${VITE_APP_TITLE}
 
 # 生产接口走同源 /api，由 Nginx 反代到后端容器。
