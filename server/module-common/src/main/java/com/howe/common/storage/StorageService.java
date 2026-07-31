@@ -1,7 +1,5 @@
 package com.howe.common.storage;
 
-import java.io.InputStream;
-
 /**
  * 文件存储服务
  *
@@ -24,13 +22,18 @@ public interface StorageService
     /**
      * 存储文件
      *
+     * <p>
+     * 收的是内容源而不是单个流：上传可能因重试而需要重新读取内容，
+     * 详见 {@link ContentSource}。本方法负责关闭自己打开的每一个流。
+     * </p>
+     *
      * @param key 对象键，形如 upload/2026/07/30/xxx.png，不以斜杠开头
-     * @param in 文件输入流，由本方法负责关闭
+     * @param source 文件内容源，可被重复打开
      * @param size 字节数，小于 0 表示未知
      * @param contentType MIME 类型，可为空
      * @return 可公开访问的地址：R2 返回完整 URL，本地返回 /profile 前缀的相对路径
      */
-    String store(String key, InputStream in, long size, String contentType);
+    String store(String key, ContentSource source, long size, String contentType);
 
     /**
      * 删除文件

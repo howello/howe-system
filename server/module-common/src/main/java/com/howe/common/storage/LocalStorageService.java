@@ -29,9 +29,9 @@ public class LocalStorageService implements StorageService
     }
 
     @Override
-    public String store(String key, InputStream in, long size, String contentType)
+    public String store(String key, ContentSource source, long size, String contentType)
     {
-        try (InputStream input = in)
+        try (InputStream input = source.open())
         {
             String target = YmlConfig.getProfile() + "/" + key;
             FileUtil.mkParentDirs(target);
@@ -41,10 +41,6 @@ public class LocalStorageService implements StorageService
         catch (Exception e)
         {
             throw new ServiceException("文件写入本地磁盘失败：" + e.getMessage());
-        }
-        finally
-        {
-            IoUtil.close(in);
         }
     }
 

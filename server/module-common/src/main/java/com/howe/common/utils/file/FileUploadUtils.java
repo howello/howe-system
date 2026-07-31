@@ -2,7 +2,6 @@ package com.howe.common.utils.file;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.Objects;
 
 import cn.hutool.core.io.FileUtil;
@@ -147,9 +146,8 @@ public class FileUploadUtils {
 
         String fileName = useCustomNaming ? uuidFilename(file) : extractFilename(file);
         String objectKey = buildObjectKey(bizDir, fileName);
-        try (InputStream in = file.getInputStream()) {
-            return storage().store(objectKey, in, file.getSize(), resolveContentType(file));
-        }
+        // 传内容源而非单个流：上传重试需要重新读取内容，MultipartFile 每次都能给出新流
+        return storage().store(objectKey, file::getInputStream, file.getSize(), resolveContentType(file));
     }
 
     /**
@@ -162,7 +160,7 @@ public class FileUploadUtils {
      * @return 可访问的文件地址
      */
     public static final String uploadBytes(String bizDir, String objectKey, byte[] data, String contentType) {
-        return storage().store(buildObjectKey(bizDir, objectKey), IoUtil.toStream(data), data.length, contentType);
+        return storage().store(buildObjectKey(bizDir, objectKey), () -> IoUtil.toStream(data), data.length, contentType);
     }
 
     /**

@@ -1,6 +1,5 @@
 package com.howe.common.storage;
 
-import java.io.InputStream;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 import com.howe.common.constant.ConfigConstants;
@@ -38,9 +37,9 @@ public class DelegatingStorageService implements StorageService
     }
 
     @Override
-    public String store(String key, InputStream in, long size, String contentType)
+    public String store(String key, ContentSource source, long size, String contentType)
     {
-        return current().store(key, in, size, contentType);
+        return current().store(key, source, size, contentType);
     }
 
     @Override

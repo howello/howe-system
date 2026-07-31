@@ -1,7 +1,12 @@
 package com.howe.common.storage;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 import cn.hutool.core.io.IoUtil;
 import cn.hutool.core.util.URLUtil;
 import org.slf4j.Logger;
@@ -15,6 +20,7 @@ import com.howe.common.utils.StringUtils;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.http.ContentStreamProvider;
 import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -40,6 +46,9 @@ public class R2StorageService implements StorageService
     /** R2 固定使用 auto 区域 */
     private static final String REGION = "auto";
 
+    /** 未指定 MIME 类型时的缺省值 */
+    private static final String DEFAULT_CONTENT_TYPE = "application/octet-stream";
+
     /** 当前缓存客户端对应的凭据指纹 */
     private volatile String cachedFingerprint;
 
@@ -52,20 +61,24 @@ public class R2StorageService implements StorageService
     }
 
     @Override
-    public String store(String key, InputStream in, long size, String contentType)
+    public String store(String key, ContentSource source, long size, String contentType)
     {
         String objectKey = withPrefix(key);
         String bucket = ConfigUtils.getRequired(ConfigConstants.STORAGE_R2_BUCKET, "R2 存储桶");
-        try (InputStream input = in)
+        // SDK 重试时会重新取流，只有最后一次取的流由它关闭，被丢弃的那些得自己收尾
+        List<InputStream> opened = Collections.synchronizedList(new ArrayList<>());
+        try
         {
             PutObjectRequest.Builder request = PutObjectRequest.builder().bucket(bucket).key(objectKey);
             if (StringUtils.isNotEmpty(contentType))
             {
                 request.contentType(contentType);
             }
-            // size 已知时走定长上传，避免 SDK 把整个流缓冲进内存
-            RequestBody body = size >= 0 ? RequestBody.fromInputStream(input, size)
-                    : RequestBody.fromBytes(IoUtil.readBytes(input));
+            String mimeType = StringUtils.isNotEmpty(contentType) ? contentType : DEFAULT_CONTENT_TYPE;
+            ContentStreamProvider provider = () -> openTracked(source, opened);
+            // 交出内容源而非单个流：重试要二次读取，流式上传因此不必把文件缓冲进内存
+            RequestBody body = size >= 0 ? RequestBody.fromContentProvider(provider, size, mimeType)
+                    : RequestBody.fromContentProvider(provider, mimeType);
             client().putObject(request.build(), body);
             return publicUrl() + "/" + objectKey;
         }
@@ -85,7 +98,29 @@ public class R2StorageService implements StorageService
         }
         finally
         {
-            IoUtil.close(in);
+            opened.forEach(IoUtil::close);
+        }
+    }
+
+    /**
+     * 打开内容源并登记，便于上传结束后统一关闭
+     *
+     * <p>
+     * {@link ContentStreamProvider} 不允许抛受检异常，这里把 IO 失败转成运行时异常，
+     * 由 {@link #store} 的兜底分支包装成 {@link ServiceException}。
+     * </p>
+     */
+    private InputStream openTracked(ContentSource source, List<InputStream> opened)
+    {
+        try
+        {
+            InputStream in = source.open();
+            opened.add(in);
+            return in;
+        }
+        catch (IOException e)
+        {
+            throw new ServiceException("读取上传内容失败：" + e.getMessage());
         }
     }
 
