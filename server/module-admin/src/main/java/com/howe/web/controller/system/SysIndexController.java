@@ -6,6 +6,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.howe.common.config.YmlConfig;
 import com.howe.common.core.domain.AjaxResult;
 import com.howe.common.core.domain.entity.SysUser;
@@ -18,6 +20,7 @@ import com.howe.system.service.ISysUserService;
  *
  * @author howe
  */
+@Tag(name = "首页", description = "服务欢迎页与锁屏解锁")
 @RestController
 public class SysIndexController
 {
@@ -31,6 +34,7 @@ public class SysIndexController
     /**
      * 访问首页，提示语
      */
+    @Operation(summary = "访问首页", description = "返回框架名称与版本的提示语，引导通过前端地址访问")
     @RequestMapping("/")
     public String index()
     {
@@ -40,6 +44,7 @@ public class SysIndexController
     /**
      * 解锁屏幕
      */
+    @Operation(summary = "解锁屏幕", description = "校验当前登录用户的密码以解除锁屏，需携带有效令牌")
     @PostMapping("/unlockscreen")
     public AjaxResult unlockScreen(@RequestBody Map<String, String> body)
     {

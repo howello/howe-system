@@ -19,12 +19,16 @@ import com.howe.common.utils.poi.ExcelUtil;
 import com.howe.framework.web.service.SysPasswordService;
 import com.howe.system.domain.SysLogininfor;
 import com.howe.system.service.ISysLogininforService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * 系统访问记录
  * 
  * @author howe
  */
+@Tag(name = "登录日志", description = "系统访问记录的查询、导出、删除与账户解锁")
 @RestController
 @RequestMapping("/monitor/logininfor")
 public class SysLogininforController extends BaseController
@@ -36,6 +40,7 @@ public class SysLogininforController extends BaseController
     private SysPasswordService passwordService;
 
     @PreAuthorize("@ss.hasPermi('monitor:logininfor:list')")
+    @Operation(summary = "查询登录日志列表", description = "分页查询系统访问记录")
     @GetMapping("/list")
     public TableDataInfo list(SysLogininfor logininfor)
     {
@@ -46,6 +51,7 @@ public class SysLogininforController extends BaseController
 
     @Log(title = "登录日志", businessType = BusinessType.EXPORT)
     @PreAuthorize("@ss.hasPermi('monitor:logininfor:export')")
+    @Operation(summary = "导出登录日志", description = "按查询条件导出登录日志 Excel")
     @PostMapping("/export")
     public void export(HttpServletResponse response, SysLogininfor logininfor)
     {
@@ -56,14 +62,16 @@ public class SysLogininforController extends BaseController
 
     @PreAuthorize("@ss.hasPermi('monitor:logininfor:remove')")
     @Log(title = "登录日志", businessType = BusinessType.DELETE)
+    @Operation(summary = "删除登录日志", description = "按访问编号批量删除登录日志")
     @DeleteMapping("/{infoIds}")
-    public AjaxResult remove(@PathVariable Long[] infoIds)
+    public AjaxResult remove(@Parameter(description = "访问编号数组") @PathVariable Long[] infoIds)
     {
         return toAjax(logininforService.deleteLogininforByIds(infoIds));
     }
 
     @PreAuthorize("@ss.hasPermi('monitor:logininfor:remove')")
     @Log(title = "登录日志", businessType = BusinessType.CLEAN)
+    @Operation(summary = "清空登录日志", description = "清空全部系统访问记录")
     @DeleteMapping("/clean")
     public AjaxResult clean()
     {
@@ -73,8 +81,9 @@ public class SysLogininforController extends BaseController
 
     @PreAuthorize("@ss.hasPermi('monitor:logininfor:unlock')")
     @Log(title = "账户解锁", businessType = BusinessType.OTHER)
+    @Operation(summary = "账户解锁", description = "清除指定用户的登录失败次数缓存以解除锁定")
     @GetMapping("/unlock/{userName}")
-    public AjaxResult unlock(@PathVariable("userName") String userName)
+    public AjaxResult unlock(@Parameter(description = "用户名") @PathVariable("userName") String userName)
     {
         passwordService.clearLoginRecordCache(userName);
         return success();

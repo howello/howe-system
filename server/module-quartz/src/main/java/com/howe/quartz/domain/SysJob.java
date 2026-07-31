@@ -12,46 +12,56 @@ import com.howe.common.constant.ScheduleConstants;
 import com.howe.common.core.domain.BaseEntity;
 import com.howe.common.utils.StringUtils;
 import com.howe.quartz.util.CronUtils;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * 定时任务调度表 sys_job
  *
  * @author howe
  */
+@Schema(description = "定时任务调度")
 public class SysJob extends BaseEntity
 {
     private static final long serialVersionUID = 1L;
 
     /** 任务ID */
     @Excel(name = "任务序号", cellType = ColumnType.NUMERIC)
+    @Schema(description = "任务ID", example = "1")
     private Long jobId;
 
     /** 任务名称 */
     @Excel(name = "任务名称")
+    @Schema(description = "任务名称", example = "系统默认（无参）")
     private String jobName;
 
     /** 任务组名 */
     @Excel(name = "任务组名")
+    @Schema(description = "任务组名", example = "DEFAULT")
     private String jobGroup;
 
     /** 调用目标字符串 */
     @Excel(name = "调用目标字符串")
+    @Schema(description = "调用目标字符串", example = "ryTask.ryNoParams")
     private String invokeTarget;
 
     /** cron执行表达式 */
     @Excel(name = "执行表达式 ")
+    @Schema(description = "cron 执行表达式", example = "0/10 * * * * ?")
     private String cronExpression;
 
     /** cron计划策略 */
     @Excel(name = "计划策略 ", readConverterExp = "0=默认,1=立即触发执行,2=触发一次执行,3=不触发立即执行")
+    @Schema(description = "计划执行错误策略（0默认 1立即触发执行 2触发一次执行 3不触发立即执行）", example = "0")
     private String misfirePolicy = ScheduleConstants.MISFIRE_DEFAULT;
 
     /** 是否并发执行（0允许 1禁止） */
     @Excel(name = "并发执行", readConverterExp = "0=允许,1=禁止")
+    @Schema(description = "是否并发执行（0允许 1禁止）", example = "1")
     private String concurrent;
 
     /** 任务状态（0正常 1暂停） */
     @Excel(name = "任务状态", readConverterExp = "0=正常,1=暂停")
+    @Schema(description = "任务状态（0正常 1暂停）", example = "0")
     private String status;
 
     public Long getJobId()

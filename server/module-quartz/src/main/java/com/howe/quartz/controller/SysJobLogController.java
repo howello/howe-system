@@ -18,12 +18,16 @@ import com.howe.common.enums.BusinessType;
 import com.howe.common.utils.poi.ExcelUtil;
 import com.howe.quartz.domain.SysJobLog;
 import com.howe.quartz.service.ISysJobLogService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * 调度日志操作处理
  *
  * @author howe
  */
+@Tag(name = "定时任务调度日志", description = "调度执行日志的查询、导出与清理")
 @RestController
 @RequestMapping("/monitor/jobLog")
 public class SysJobLogController extends BaseController
@@ -35,6 +39,7 @@ public class SysJobLogController extends BaseController
      * 查询定时任务调度日志列表
      */
     @PreAuthorize("@ss.hasPermi('monitor:job:list')")
+    @Operation(summary = "查询调度日志列表", description = "分页查询定时任务调度日志")
     @GetMapping("/list")
     public TableDataInfo list(SysJobLog sysJobLog)
     {
@@ -48,6 +53,7 @@ public class SysJobLogController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('monitor:job:export')")
     @Log(title = "任务调度日志", businessType = BusinessType.EXPORT)
+    @Operation(summary = "导出调度日志列表", description = "按查询条件导出调度日志 Excel")
     @PostMapping("/export")
     public void export(HttpServletResponse response, SysJobLog sysJobLog)
     {
@@ -60,8 +66,9 @@ public class SysJobLogController extends BaseController
      * 根据调度编号获取详细信息
      */
     @PreAuthorize("@ss.hasPermi('monitor:job:query')")
+    @Operation(summary = "获取调度日志详细信息", description = "根据调度日志编号查询详情")
     @GetMapping(value = "/{jobLogId}")
-    public AjaxResult getInfo(@PathVariable Long jobLogId)
+    public AjaxResult getInfo(@Parameter(description = "调度日志编号") @PathVariable Long jobLogId)
     {
         return success(jobLogService.selectJobLogById(jobLogId));
     }
@@ -72,8 +79,9 @@ public class SysJobLogController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('monitor:job:remove')")
     @Log(title = "定时任务调度日志", businessType = BusinessType.DELETE)
+    @Operation(summary = "删除调度日志", description = "按调度日志编号批量删除")
     @DeleteMapping("/{jobLogIds}")
-    public AjaxResult remove(@PathVariable Long[] jobLogIds)
+    public AjaxResult remove(@Parameter(description = "调度日志编号数组") @PathVariable Long[] jobLogIds)
     {
         return toAjax(jobLogService.deleteJobLogByIds(jobLogIds));
     }
@@ -83,6 +91,7 @@ public class SysJobLogController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('monitor:job:remove')")
     @Log(title = "调度日志", businessType = BusinessType.CLEAN)
+    @Operation(summary = "清空调度日志", description = "清空全部定时任务调度日志")
     @DeleteMapping("/clean")
     public AjaxResult clean()
     {

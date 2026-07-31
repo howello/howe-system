@@ -14,67 +14,83 @@ import com.howe.common.annotation.Excels;
 import com.howe.common.core.domain.BaseEntity;
 import com.howe.common.utils.SecurityUtils;
 import com.howe.common.xss.Xss;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * 用户对象 sys_user
  *
  * @author howe
  */
+@Schema(description = "用户对象 sys_user")
 public class SysUser extends BaseEntity
 {
     private static final long serialVersionUID = 1L;
 
     /** 用户ID */
     @Excel(name = "用户序号", type = Type.EXPORT, cellType = ColumnType.NUMERIC, prompt = "用户编号")
+    @Schema(description = "用户ID", example = "1")
     private Long userId;
 
     /** 部门ID */
     @Excel(name = "部门编号", type = Type.IMPORT)
+    @Schema(description = "部门ID", example = "103")
     private Long deptId;
 
     /** 用户账号 */
     @Excel(name = "登录名称")
+    @Schema(description = "用户账号", example = "admin")
     private String userName;
 
     /** 用户昵称 */
     @Excel(name = "用户名称")
+    @Schema(description = "用户昵称", example = "管理员")
     private String nickName;
 
     /** 用户邮箱 */
     @Excel(name = "用户邮箱")
+    @Schema(description = "用户邮箱", example = "howe@163.com")
     private String email;
 
     /** 手机号码 */
     @Excel(name = "手机号码", cellType = ColumnType.TEXT)
+    @Schema(description = "手机号码", example = "15888888888")
     private String phonenumber;
 
     /** 用户性别 */
     @Excel(name = "用户性别", readConverterExp = "0=男,1=女,2=未知")
+    @Schema(description = "用户性别（0男 1女 2未知）", example = "0")
     private String sex;
 
     /** 用户头像 */
+    @Schema(description = "用户头像地址")
     private String avatar;
 
     /** 密码 */
+    @Schema(description = "密码，仅入参使用，响应不返回", accessMode = Schema.AccessMode.WRITE_ONLY)
     private String password;
 
     /** 账号状态（0正常 1停用） */
     @Excel(name = "账号状态", readConverterExp = "0=正常,1=停用")
+    @Schema(description = "账号状态（0正常 1停用）", example = "0")
     private String status;
 
     /** 删除标志（0代表存在 2代表删除） */
+    @Schema(description = "删除标志（0代表存在 2代表删除）", example = "0")
     private String delFlag;
 
     /** 最后登录IP */
     @Excel(name = "最后登录IP", type = Type.EXPORT)
+    @Schema(description = "最后登录IP", example = "127.0.0.1")
     private String loginIp;
 
     /** 最后登录时间 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "最后登录时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss", type = Type.EXPORT)
+    @Schema(description = "最后登录时间", example = "2026-01-01 12:00:00")
     private Date loginDate;
 
     /** 密码最后更新时间 */
+    @Schema(description = "密码最后更新时间")
     private Date pwdUpdateDate;
 
     /** 部门对象 */
@@ -82,18 +98,23 @@ public class SysUser extends BaseEntity
         @Excel(name = "部门名称", targetAttr = "deptName", type = Type.EXPORT),
         @Excel(name = "部门负责人", targetAttr = "leader", type = Type.EXPORT)
     })
+    @Schema(description = "所属部门对象")
     private SysDept dept;
 
     /** 角色对象 */
+    @Schema(description = "用户拥有的角色对象列表")
     private List<SysRole> roles;
 
     /** 角色组 */
+    @Schema(description = "角色ID组，用于分配角色")
     private Long[] roleIds;
 
     /** 岗位组 */
+    @Schema(description = "岗位ID组，用于分配岗位")
     private Long[] postIds;
 
     /** 角色ID */
+    @Schema(description = "角色ID，按角色查询用户时使用", example = "2")
     private Long roleId;
 
     public SysUser()

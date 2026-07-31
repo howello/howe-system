@@ -21,6 +21,9 @@ public class YmlConfig
     /** 通用上传的业务目录（对象存储相对目录） */
     public static final String UPLOAD_DIR = "upload";
 
+    /** 通用下载的业务目录（对象存储相对目录），与 /common/download 取件路径对应 */
+    public static final String DOWNLOAD_DIR = "download";
+
     /** 项目名称 */
     private String name;
 

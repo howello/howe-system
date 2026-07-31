@@ -6,17 +6,21 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.howe.common.core.domain.AjaxResult;
 import com.howe.framework.web.domain.Server;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * 服务器监控
  * 
  * @author howe
  */
+@Tag(name = "服务器监控", description = "查看服务器 CPU、内存、磁盘与 JVM 运行状态")
 @RestController
 @RequestMapping("/monitor/server")
 public class ServerController
 {
     @PreAuthorize("@ss.hasPermi('monitor:server:list')")
+    @Operation(summary = "获取服务器监控信息", description = "返回 CPU、内存、JVM、磁盘及主机基础信息")
     @GetMapping()
     public AjaxResult getInfo() throws Exception
     {

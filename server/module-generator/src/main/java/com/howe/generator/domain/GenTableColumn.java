@@ -3,69 +3,89 @@ package com.howe.generator.domain;
 import jakarta.validation.constraints.NotBlank;
 import com.howe.common.core.domain.BaseEntity;
 import com.howe.common.utils.StringUtils;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * 代码生成业务字段表 gen_table_column
  *
  * @author howe
  */
+@Schema(description = "代码生成业务字段")
 public class GenTableColumn extends BaseEntity
 {
     private static final long serialVersionUID = 1L;
 
     /** 编号 */
+    @Schema(description = "编号", example = "1")
     private Long columnId;
 
     /** 归属表编号 */
+    @Schema(description = "归属表编号", example = "1")
     private Long tableId;
 
     /** 列名称 */
+    @Schema(description = "列名称", example = "user_id")
     private String columnName;
 
     /** 列描述 */
+    @Schema(description = "列描述", example = "用户ID")
     private String columnComment;
 
     /** 列类型 */
+    @Schema(description = "列类型", example = "bigint(20)")
     private String columnType;
 
     /** JAVA类型 */
+    @Schema(description = "JAVA 类型", example = "Long")
     private String javaType;
 
     /** JAVA字段名 */
     @NotBlank(message = "Java属性不能为空")
+    @Schema(description = "JAVA 字段名", example = "userId")
     private String javaField;
 
     /** 是否主键（1是） */
+    @Schema(description = "是否主键（1是）", example = "1")
     private String isPk;
 
     /** 是否自增（1是） */
+    @Schema(description = "是否自增（1是）", example = "1")
     private String isIncrement;
 
     /** 是否必填（1是） */
+    @Schema(description = "是否必填（1是）", example = "1")
     private String isRequired;
 
     /** 是否为插入字段（1是） */
+    @Schema(description = "是否为插入字段（1是）", example = "1")
     private String isInsert;
 
     /** 是否编辑字段（1是） */
+    @Schema(description = "是否编辑字段（1是）", example = "1")
     private String isEdit;
 
     /** 是否列表字段（1是） */
+    @Schema(description = "是否列表字段（1是）", example = "1")
     private String isList;
 
     /** 是否查询字段（1是） */
+    @Schema(description = "是否查询字段（1是）", example = "1")
     private String isQuery;
 
     /** 查询方式（EQ等于、NE不等于、GT大于、LT小于、LIKE模糊、BETWEEN范围） */
+    @Schema(description = "查询方式（EQ等于、NE不等于、GT大于、LT小于、LIKE模糊、BETWEEN范围）", example = "EQ")
     private String queryType;
 
     /** 显示类型（input文本框、textarea文本域、select下拉框、checkbox复选框、radio单选框、datetime日期控件、image图片上传控件、upload文件上传控件、editor富文本控件） */
+    @Schema(description = "显示类型（input文本框、textarea文本域、select下拉框、checkbox复选框、radio单选框、datetime日期控件、image图片上传控件、upload文件上传控件、editor富文本控件）", example = "input")
     private String htmlType;
 
     /** 字典类型 */
+    @Schema(description = "字典类型", example = "sys_normal_disable")
     private String dictType;
 
     /** 排序 */
+    @Schema(description = "排序", example = "1")
     private Integer sort;
 
     public void setColumnId(Long columnId)

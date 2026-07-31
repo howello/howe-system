@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.howe.common.constant.Constants;
 import com.howe.common.core.domain.AjaxResult;
 import com.howe.common.core.domain.entity.SysMenu;
@@ -29,6 +31,7 @@ import com.howe.system.service.ISysMenuService;
  * 
  * @author howe
  */
+@Tag(name = "登录认证", description = "登录取令牌，以及登录后获取用户信息与动态路由")
 @RestController
 public class SysLoginController
 {
@@ -53,13 +56,13 @@ public class SysLoginController
      * @param loginBody 登录信息
      * @return 结果
      */
+    @Operation(summary = "登录", description = "匿名接口。校验账号密码与验证码后签发 JWT 令牌")
     @PostMapping("/login")
     public AjaxResult login(@RequestBody LoginBody loginBody)
     {
         AjaxResult ajax = AjaxResult.success();
         // 生成令牌
-        String token = loginService.login(loginBody.getUsername(), loginBody.getPassword(), loginBody.getCode(),
-                loginBody.getUuid());
+        String token = loginService.login(loginBody);
         ajax.put(Constants.TOKEN, token);
         return ajax;
     }
@@ -69,6 +72,7 @@ public class SysLoginController
      * 
      * @return 用户信息
      */
+    @Operation(summary = "获取用户信息", description = "登录后接口。返回当前用户资料、角色、权限及密码策略提示")
     @GetMapping("getInfo")
     public AjaxResult getInfo()
     {
@@ -98,6 +102,7 @@ public class SysLoginController
      * 
      * @return 路由信息
      */
+    @Operation(summary = "获取路由信息", description = "登录后接口。返回当前用户可见的菜单路由树，供前端动态注册路由")
     @GetMapping("getRouters")
     public AjaxResult getRouters()
     {

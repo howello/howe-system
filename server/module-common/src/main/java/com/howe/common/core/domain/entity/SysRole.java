@@ -9,59 +9,74 @@ import org.apache.commons.lang3.builder.ToStringStyle;
 import com.howe.common.annotation.Excel;
 import com.howe.common.annotation.Excel.ColumnType;
 import com.howe.common.core.domain.BaseEntity;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * 角色表 sys_role
  *
  * @author howe
  */
+@Schema(description = "角色对象 sys_role")
 public class SysRole extends BaseEntity
 {
     private static final long serialVersionUID = 1L;
 
     /** 角色ID */
     @Excel(name = "角色序号", cellType = ColumnType.NUMERIC)
+    @Schema(description = "角色ID", example = "1")
     private Long roleId;
 
     /** 角色名称 */
     @Excel(name = "角色名称")
+    @Schema(description = "角色名称", example = "超级管理员")
     private String roleName;
 
     /** 角色权限 */
     @Excel(name = "角色权限")
+    @Schema(description = "角色权限字符", example = "admin")
     private String roleKey;
 
     /** 角色排序 */
     @Excel(name = "角色排序")
+    @Schema(description = "角色显示顺序", example = "1")
     private Integer roleSort;
 
     /** 数据范围（1：所有数据权限；2：自定义数据权限；3：本部门数据权限；4：本部门及以下数据权限；5：仅本人数据权限） */
     @Excel(name = "数据范围", readConverterExp = "1=所有数据权限,2=自定义数据权限,3=本部门数据权限,4=本部门及以下数据权限,5=仅本人数据权限")
+    @Schema(description = "数据范围（1所有数据权限 2自定义数据权限 3本部门数据权限 4本部门及以下数据权限 5仅本人数据权限）", example = "1")
     private String dataScope;
 
     /** 菜单树选择项是否关联显示（ 0：父子不互相关联显示 1：父子互相关联显示） */
+    @Schema(description = "菜单树选择项是否关联显示（false父子不互相关联显示 true父子互相关联显示）", example = "true")
     private boolean menuCheckStrictly;
 
     /** 部门树选择项是否关联显示（0：父子不互相关联显示 1：父子互相关联显示 ） */
+    @Schema(description = "部门树选择项是否关联显示（false父子不互相关联显示 true父子互相关联显示）", example = "true")
     private boolean deptCheckStrictly;
 
     /** 角色状态（0正常 1停用） */
     @Excel(name = "角色状态", readConverterExp = "0=正常,1=停用")
+    @Schema(description = "角色状态（0正常 1停用）", example = "0")
     private String status;
 
     /** 删除标志（0代表存在 2代表删除） */
+    @Schema(description = "删除标志（0代表存在 2代表删除）", example = "0")
     private String delFlag;
 
     /** 用户是否存在此角色标识 默认不存在 */
+    @Schema(description = "用户是否拥有此角色的标识，默认不存在", example = "false")
     private boolean flag = false;
 
     /** 菜单组 */
+    @Schema(description = "菜单ID组，用于分配菜单权限")
     private Long[] menuIds;
 
     /** 部门组（数据权限） */
+    @Schema(description = "部门ID组（自定义数据权限）")
     private Long[] deptIds;
 
     /** 角色菜单权限 */
+    @Schema(description = "角色拥有的菜单权限字符集合")
     private Set<String> permissions;
 
     public SysRole()

@@ -14,6 +14,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.howe.common.annotation.Log;
 import com.howe.common.core.controller.BaseController;
 import com.howe.common.core.domain.AjaxResult;
@@ -30,6 +33,7 @@ import com.howe.system.service.ISysDictTypeService;
  * 
  * @author howe
  */
+@Tag(name = "字典数据", description = "字典类型下具体字典项的查询与维护")
 @RestController
 @RequestMapping("/system/dict/data")
 public class SysDictDataController extends BaseController
@@ -41,6 +45,7 @@ public class SysDictDataController extends BaseController
     private ISysDictTypeService dictTypeService;
 
     @PreAuthorize("@ss.hasPermi('system:dict:list')")
+    @Operation(summary = "查询字典数据列表", description = "分页查询字典数据")
     @GetMapping("/list")
     public TableDataInfo list(SysDictData dictData)
     {
@@ -51,6 +56,7 @@ public class SysDictDataController extends BaseController
 
     @Log(title = "字典数据", businessType = BusinessType.EXPORT)
     @PreAuthorize("@ss.hasPermi('system:dict:export')")
+    @Operation(summary = "导出字典数据", description = "按查询条件导出字典数据 Excel")
     @PostMapping("/export")
     public void export(HttpServletResponse response, SysDictData dictData)
     {
@@ -63,8 +69,9 @@ public class SysDictDataController extends BaseController
      * 查询字典数据详细
      */
     @PreAuthorize("@ss.hasPermi('system:dict:query')")
+    @Operation(summary = "获取字典数据详细信息", description = "根据字典编码查询字典数据详情")
     @GetMapping(value = "/{dictCode}")
-    public AjaxResult getInfo(@PathVariable Long dictCode)
+    public AjaxResult getInfo(@Parameter(description = "字典编码") @PathVariable Long dictCode)
     {
         return success(dictDataService.selectDictDataById(dictCode));
     }
@@ -72,8 +79,9 @@ public class SysDictDataController extends BaseController
     /**
      * 根据字典类型查询字典数据信息
      */
+    @Operation(summary = "根据字典类型查询字典数据", description = "前端 useDict 的数据来源，无匹配时返回空列表")
     @GetMapping(value = "/type/{dictType}")
-    public AjaxResult dictType(@PathVariable String dictType)
+    public AjaxResult dictType(@Parameter(description = "字典类型") @PathVariable String dictType)
     {
         List<SysDictData> data = dictTypeService.selectDictDataByType(dictType);
         if (StringUtils.isNull(data))
@@ -88,6 +96,7 @@ public class SysDictDataController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('system:dict:add')")
     @Log(title = "字典数据", businessType = BusinessType.INSERT)
+    @Operation(summary = "新增字典数据", description = "在指定字典类型下新增字典项")
     @PostMapping
     public AjaxResult add(@Validated @RequestBody SysDictData dict)
     {
@@ -100,6 +109,7 @@ public class SysDictDataController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('system:dict:edit')")
     @Log(title = "字典数据", businessType = BusinessType.UPDATE)
+    @Operation(summary = "修改字典数据", description = "修改后同步刷新字典缓存")
     @PutMapping
     public AjaxResult edit(@Validated @RequestBody SysDictData dict)
     {
@@ -112,8 +122,9 @@ public class SysDictDataController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('system:dict:remove')")
     @Log(title = "字典类型", businessType = BusinessType.DELETE)
+    @Operation(summary = "删除字典数据", description = "支持传入多个字典编码批量删除")
     @DeleteMapping("/{dictCodes}")
-    public AjaxResult remove(@PathVariable Long[] dictCodes)
+    public AjaxResult remove(@Parameter(description = "字典编码数组") @PathVariable Long[] dictCodes)
     {
         dictDataService.deleteDictDataByIds(dictCodes);
         return success();

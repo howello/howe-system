@@ -12,6 +12,10 @@ import com.howe.common.core.domain.AjaxResult;
 import com.howe.common.enums.LimitType;
 import com.howe.common.utils.ConfigUtils;
 import com.howe.common.utils.StringUtils;
+import com.howe.common.utils.sign.ConstantTimeUtils;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +33,7 @@ import java.nio.charset.StandardCharsets;
  *
  * @author howe
  */
+@Tag(name = "GitHub Webhook", description = "接收仓库 push 事件并增量更新文章索引，匿名接口靠 HMAC 签名校验来源")
 @RestController
 @RequestMapping("/blog/webhook")
 public class BlogWebhookController extends BaseController {
@@ -46,11 +51,15 @@ public class BlogWebhookController extends BaseController {
      * @param signature X-Hub-Signature-256 头
      * @param event X-GitHub-Event 头
      */
+    @Operation(summary = "接收 GitHub push 事件",
+            description = "匿名接口，按 X-Hub-Signature-256 的 HMAC-SHA256 签名校验来源后增量更新文章索引；密钥未配置时一律拒绝，非 push 事件直接确认忽略")
     @Anonymous
     @RateLimiter(time = 60, count = 30, limitType = LimitType.IP)
     @PostMapping("/github")
     public AjaxResult github(@RequestBody String payload,
+                             @Parameter(description = "X-Hub-Signature-256 签名头，格式为 sha256=<十六进制摘要>")
                              @RequestHeader(value = "X-Hub-Signature-256", required = false) String signature,
+                             @Parameter(description = "X-GitHub-Event 事件类型头，只有 push 会触发同步")
                              @RequestHeader(value = "X-GitHub-Event", required = false) String event) {
         String secret = ConfigUtils.getString(ConfigConstants.BLOG_WEBHOOK_SECRET);
         if (StringUtils.isEmpty(secret)) {
@@ -82,17 +91,6 @@ public class BlogWebhookController extends BaseController {
         String expected = new HMac(HmacAlgorithm.HmacSHA256, secret.getBytes(StandardCharsets.UTF_8))
                 .digestHex(payload);
         // 定长比较，避免因提前返回泄漏签名信息
-        return constantTimeEquals(expected, signature.substring(SIGNATURE_PREFIX.length()));
-    }
-
-    private static boolean constantTimeEquals(String a, String b) {
-        if (a == null || b == null || a.length() != b.length()) {
-            return false;
-        }
-        int diff = 0;
-        for (int i = 0; i < a.length(); i++) {
-            diff |= Character.toLowerCase(a.charAt(i)) ^ Character.toLowerCase(b.charAt(i));
-        }
-        return diff == 0;
+        return ConstantTimeUtils.equals(expected, signature.substring(SIGNATURE_PREFIX.length()), true);
     }
 }

@@ -1,6 +1,8 @@
 package com.howe.blog.service;
 
 import com.howe.blog.domain.BlogArticle;
+import com.howe.blog.domain.dto.BlogArticlePublishBody;
+import com.howe.blog.domain.vo.BlogPublishResult;
 import com.howe.blog.domain.vo.BlogSyncResult;
 
 import java.util.List;
@@ -70,6 +72,19 @@ public interface IBlogArticleService
      * @return 同步统计
      */
     public BlogSyncResult handlePushEvent(String payload);
+
+    /**
+     * 发布整篇文章（开放接口用）
+     *
+     * <p>
+     * 按 slug 决定新建还是覆盖，走的仍是「先写 GitHub、成功后更新索引」这条链路。
+     * 与后台管理页的差别只在入参形态和没有登录上下文。
+     * </p>
+     *
+     * @param body 发布请求
+     * @return 发布结果
+     */
+    public BlogPublishResult publishArticle(BlogArticlePublishBody body);
 
     /**
      * 校验文章标识是否唯一

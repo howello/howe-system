@@ -19,12 +19,16 @@ import com.howe.common.utils.ConfigUtils;
 import com.howe.common.utils.StringUtils;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.http.ContentStreamProvider;
 import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
@@ -122,6 +126,50 @@ public class R2StorageService implements StorageService
         {
             throw new ServiceException("读取上传内容失败：" + e.getMessage());
         }
+    }
+
+    @Override
+    public StoredObject fetch(String location)
+    {
+        String objectKey = resolveKey(location);
+        if (StringUtils.isEmpty(objectKey))
+        {
+            return null;
+        }
+        String bucket = ConfigUtils.getRequired(ConfigConstants.STORAGE_R2_BUCKET, "R2 存储桶");
+        try
+        {
+            ResponseInputStream<GetObjectResponse> stream = client()
+                    .getObject(GetObjectRequest.builder().bucket(bucket).key(objectKey).build());
+            GetObjectResponse meta = stream.response();
+            Long length = meta.contentLength();
+            return new StoredObject(objectKey, fileNameOf(objectKey), meta.contentType(),
+                    length == null ? -1L : length, stream);
+        }
+        catch (NoSuchKeyException e)
+        {
+            log.warn("R2 中不存在该文件，key={}", objectKey);
+            return null;
+        }
+        catch (S3Exception e)
+        {
+            log.error("从 R2 读取文件失败，key={}", objectKey, e);
+            throw new ServiceException("读取文件失败：" + e.awsErrorDetails().errorMessage());
+        }
+        catch (Exception e)
+        {
+            log.error("从 R2 读取文件失败，key={}", objectKey, e);
+            throw new ServiceException("读取文件失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 取对象键里的文件名部分
+     */
+    private static String fileNameOf(String objectKey)
+    {
+        int index = objectKey.lastIndexOf('/');
+        return index < 0 ? objectKey : objectKey.substring(index + 1);
     }
 
     @Override

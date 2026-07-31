@@ -49,8 +49,16 @@
           <template #prefix><svg-icon icon-class="validCode" class="el-input__icon input-icon" /></template>
         </el-input>
         <div class="register-code">
-          <img :src="codeUrl" @click="getCode" class="register-code-img"/>
+          <img :src="codeUrl" @click="getCode" class="register-code-img" alt="验证码"/>
         </div>
+      </el-form-item>
+      <el-form-item v-if="turnstileEnabled" style="margin-bottom: 18px;">
+        <Turnstile
+          ref="turnstileRef"
+          v-model="registerForm.turnstileToken"
+          :site-key="turnstileSiteKey"
+          @error="handleTurnstileError"
+        />
       </el-form-item>
       <el-form-item style="width:100%;">
         <el-button
@@ -80,6 +88,7 @@ import { ElMessageBox } from "element-plus"
 import { getCodeImg, register } from "@/api/login"
 import defaultSettings from '@/settings'
 import { usePasswordRule } from "@/utils/passwordRule"
+import Turnstile from '@/components/Turnstile/index.vue'
 import type { RegisterForm } from '@/types/api/login'
 
 const title = import.meta.env.VITE_APP_TITLE
@@ -93,7 +102,8 @@ const registerForm = ref<RegisterForm>({
   password: "",
   confirmPassword: "",
   code: "",
-  uuid: ""
+  uuid: "",
+  turnstileToken: ""
 })
 
 const equalToPassword = (rule: any, value: string, callback: (error?: Error) => void): void => {
@@ -119,10 +129,22 @@ const registerRules = {
 const codeUrl = ref<string>("")
 const loading = ref<boolean>(false)
 const captchaEnabled = ref<boolean>(true)
+// 人机校验开关与站点密钥，都由 /captchaImage 下发
+const turnstileEnabled = ref<boolean>(false)
+const turnstileSiteKey = ref<string>("")
+const turnstileRef = ref<InstanceType<typeof Turnstile>>()
+
+function handleTurnstileError(message: string): void {
+  proxy.$modal.msgError(message)
+}
 
 function handleRegister(): void {
   proxy.$refs.registerRef.validate((valid: boolean) => {
     if (valid) {
+      if (turnstileEnabled.value && !registerForm.value.turnstileToken) {
+        proxy.$modal.msgWarning("请先完成人机校验")
+        return
+      }
       loading.value = true
       register(registerForm.value).then(() => {
         const username = registerForm.value.username
@@ -134,8 +156,13 @@ function handleRegister(): void {
         }).catch(() => {})
       }).catch(() => {
         loading.value = false
-        if (captchaEnabled) {
+        // 原来写的是 if (captchaEnabled)，ref 对象恒为真值，验证码关掉时也会白跑一次
+        if (captchaEnabled.value) {
           getCode()
+        }
+        // 令牌是一次性的，失败后必须换一张挑战
+        if (turnstileEnabled.value) {
+          turnstileRef.value?.reset()
         }
       })
     }
@@ -144,9 +171,12 @@ function handleRegister(): void {
 
 function getCode(): void {
   getCodeImg().then(res => {
+    turnstileEnabled.value = res.turnstileEnabled === true
+    turnstileSiteKey.value = res.turnstileSiteKey || ""
     captchaEnabled.value = res.captchaEnabled === undefined ? true : res.captchaEnabled
     if (captchaEnabled.value) {
-      codeUrl.value = "data:image/gif;base64," + res.img
+      // 图片格式随验证码类型变，GIF 类型返回的不是 png
+      codeUrl.value = `data:image/${res.imgType || "png"};base64,` + res.img
       registerForm.value.uuid = res.uuid
     }
   })

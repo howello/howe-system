@@ -2,12 +2,14 @@ package com.howe.common.core.domain;
 
 import java.io.Serializable;
 import com.howe.common.constant.HttpStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * 响应信息主体
  *
  * @author howe
  */
+@Schema(description = "通用响应信息主体")
 public class R<T> implements Serializable
 {
     private static final long serialVersionUID = 1L;
@@ -18,10 +20,13 @@ public class R<T> implements Serializable
     /** 失败 */
     public static final int FAIL = HttpStatus.ERROR;
 
+    @Schema(description = "状态码，200 成功、500 失败", example = "200")
     private int code;
 
+    @Schema(description = "响应提示信息", example = "操作成功")
     private String msg;
 
+    @Schema(description = "响应数据对象")
     private T data;
 
     public static <T> R<T> ok()

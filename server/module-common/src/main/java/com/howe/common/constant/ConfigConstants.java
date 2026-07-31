@@ -62,4 +62,38 @@ public class ConfigConstants
 
     /** GitHub 请求超时（毫秒） */
     public static final String BLOG_GITHUB_TIMEOUT = "blog.github.timeout";
+
+    /** 博客开放接口开关（外部 agent 投稿用） */
+    public static final String BLOG_OPEN_ENABLED = "blog.open.enabled";
+
+    /** 博客开放接口令牌，空值等于关闭 */
+    public static final String BLOG_OPEN_TOKEN = "blog.open.token";
+
+    /** 验证码开关 */
+    public static final String CAPTCHA_ENABLED = "sys.account.captchaEnabled";
+
+    /**
+     * 验证码类型
+     *
+     * <p>
+     * 取值见 {@code CaptchaType}：char/math/line/circle/shear/gif，另支持 random 每次随机。
+     * 留空时回落到 yml 的 {@code howe.captchaType}。
+     * </p>
+     */
+    public static final String CAPTCHA_TYPE = "sys.account.captchaType";
+
+    /** Cloudflare Turnstile 真人校验开关 */
+    public static final String TURNSTILE_ENABLED = "sys.turnstile.enabled";
+
+    /** Turnstile 站点密钥，前端渲染组件用，可公开 */
+    public static final String TURNSTILE_SITE_KEY = "sys.turnstile.siteKey";
+
+    /** Turnstile 服务端密钥，只在后端校验时使用，不得下发前端 */
+    public static final String TURNSTILE_SECRET_KEY = "sys.turnstile.secretKey";
+
+    /** Turnstile 校验接口地址 */
+    public static final String TURNSTILE_VERIFY_URL = "sys.turnstile.verifyUrl";
+
+    /** Turnstile 校验超时（毫秒） */
+    public static final String TURNSTILE_TIMEOUT = "sys.turnstile.timeout";
 }

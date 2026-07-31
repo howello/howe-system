@@ -8,27 +8,33 @@ import com.howe.common.constant.UserConstants;
 import com.howe.common.core.domain.entity.SysDept;
 import com.howe.common.core.domain.entity.SysMenu;
 import com.howe.common.utils.StringUtils;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * Treeselect树结构实体类
  *
  * @author howe
  */
+@Schema(description = "Treeselect树结构实体，用于前端树形下拉选择")
 public class TreeSelect implements Serializable
 {
     private static final long serialVersionUID = 1L;
 
     /** 节点ID */
+    @Schema(description = "节点ID", example = "100")
     private Long id;
 
     /** 节点名称 */
+    @Schema(description = "节点名称", example = "研发部门")
     private String label;
 
     /** 节点禁用 */
+    @Schema(description = "节点是否禁用选择", example = "false")
     private boolean disabled = false;
 
     /** 子节点 */
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    @Schema(description = "子节点列表")
     private List<TreeSelect> children;
 
     public TreeSelect()

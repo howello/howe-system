@@ -9,50 +9,64 @@ import jakarta.validation.constraints.Size;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import com.howe.common.core.domain.BaseEntity;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * 部门表 sys_dept
  *
  * @author howe
  */
+@Schema(description = "部门对象 sys_dept")
 public class SysDept extends BaseEntity
 {
     private static final long serialVersionUID = 1L;
 
     /** 部门ID */
+    @Schema(description = "部门ID", example = "103")
     private Long deptId;
 
     /** 父部门ID */
+    @Schema(description = "父部门ID", example = "101")
     private Long parentId;
 
     /** 祖级列表 */
+    @Schema(description = "祖级列表，逗号分隔的所有上级部门ID", example = "0,100,101")
     private String ancestors;
 
     /** 部门名称 */
+    @Schema(description = "部门名称", example = "研发部门")
     private String deptName;
 
     /** 显示顺序 */
+    @Schema(description = "显示顺序", example = "1")
     private Integer orderNum;
 
     /** 负责人 */
+    @Schema(description = "负责人", example = "howe")
     private String leader;
 
     /** 联系电话 */
+    @Schema(description = "联系电话", example = "15888888888")
     private String phone;
 
     /** 邮箱 */
+    @Schema(description = "邮箱", example = "howe@163.com")
     private String email;
 
     /** 部门状态:0正常,1停用 */
+    @Schema(description = "部门状态（0正常 1停用）", example = "0")
     private String status;
 
     /** 删除标志（0代表存在 2代表删除） */
+    @Schema(description = "删除标志（0代表存在 2代表删除）", example = "0")
     private String delFlag;
 
     /** 父部门名称 */
+    @Schema(description = "父部门名称", example = "howe科技")
     private String parentName;
 
     /** 子部门 */
+    @Schema(description = "子部门列表")
     private List<SysDept> children = new ArrayList<SysDept>();
 
     public Long getDeptId()

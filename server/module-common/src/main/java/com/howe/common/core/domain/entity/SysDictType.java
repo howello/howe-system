@@ -8,30 +8,36 @@ import org.apache.commons.lang3.builder.ToStringStyle;
 import com.howe.common.annotation.Excel;
 import com.howe.common.annotation.Excel.ColumnType;
 import com.howe.common.core.domain.BaseEntity;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * 字典类型表 sys_dict_type
  *
  * @author howe
  */
+@Schema(description = "字典类型对象 sys_dict_type")
 public class SysDictType extends BaseEntity
 {
     private static final long serialVersionUID = 1L;
 
     /** 字典主键 */
     @Excel(name = "字典主键", cellType = ColumnType.NUMERIC)
+    @Schema(description = "字典主键", example = "1")
     private Long dictId;
 
     /** 字典名称 */
     @Excel(name = "字典名称")
+    @Schema(description = "字典名称", example = "用户性别")
     private String dictName;
 
     /** 字典类型 */
     @Excel(name = "字典类型")
+    @Schema(description = "字典类型，须以字母开头且只含小写字母、数字、下划线", example = "sys_user_sex")
     private String dictType;
 
     /** 状态（0正常 1停用） */
     @Excel(name = "状态", readConverterExp = "0=正常,1=停用")
+    @Schema(description = "状态（0正常 1停用）", example = "0")
     private String status;
 
     public Long getDictId()

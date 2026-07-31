@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import com.howe.common.annotation.Excel;
 import com.howe.common.annotation.Excel.ColumnType;
 import com.howe.common.core.domain.BaseEntity;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -22,69 +23,86 @@ import java.util.Date;
  *
  * @author howe
  */
+@Schema(description = "博客文章索引，正文真源在 GitHub 仓库的 markdown 文件，本表只是本地索引")
 public class BlogArticle extends BaseEntity
 {
     private static final long serialVersionUID = 1L;
 
     /** 文章ID（本地索引主键） */
+    @Schema(description = "文章ID（本地索引主键）", example = "1")
     @Excel(name = "文章ID", cellType = ColumnType.NUMERIC)
     private Long articleId;
 
     /** 文章标识，决定 URL /article/{slug} */
+    @Schema(description = "文章标识，决定文章 URL /article/{slug}，全局唯一", example = "interview-notes-jvm")
     @Excel(name = "文章标识")
     private String slug;
 
     /** 文章标题 */
+    @Schema(description = "文章标题", example = "JVM 原理｜java知识点")
     @Excel(name = "标题")
     private String title;
 
     /** 仓库内文件路径 */
+    @Schema(description = "仓库内文件路径，相对仓库根", example = "src/content/blog/interview-notes/01-jvm.md")
     @Excel(name = "文件路径")
     private String filePath;
 
     /** 文件 blob sha，GitHub 写操作的乐观锁凭据 */
+    @Schema(description = "文件 blob sha，GitHub 写操作的乐观锁凭据，写和删必须带上，过期会返回 409", example = "9daeafb9864cf43055ae93beb0afd6c7d144bfa4")
     private String gitSha;
 
     /** 发布日期 */
+    @Schema(description = "发布日期", example = "2026-03-30 11:26:55")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "发布日期", dateFormat = "yyyy-MM-dd")
     private Date publishDate;
 
     /** 分类，多个用逗号分隔 */
+    @Schema(description = "分类，多个用逗号分隔", example = "java知识点")
     @Excel(name = "分类")
     private String categories;
 
     /** 标签，多个用逗号分隔 */
+    @Schema(description = "标签，多个用逗号分隔", example = "java知识点,Java")
     @Excel(name = "标签")
     private String tags;
 
     /** 封面图地址 */
+    @Schema(description = "封面图地址", example = "https://img.wyantao.com/cover.png")
     private String cover;
 
     /** 是否推荐（0否 1是） */
+    @Schema(description = "是否推荐（0否 1是）", example = "0")
     @Excel(name = "推荐", readConverterExp = "0=否,1=是")
     private String recommend;
 
     /** 是否隐藏（0否 1是） */
+    @Schema(description = "是否隐藏（0否 1是），只是从首页/RSS/上下篇隐去，文章页仍可访问，不等于草稿", example = "0")
     @Excel(name = "隐藏", readConverterExp = "0=否,1=是")
     private String hide;
 
     /** 是否置顶（0否 1是） */
+    @Schema(description = "是否置顶（0否 1是）", example = "0")
     @Excel(name = "置顶", readConverterExp = "0=否,1=是")
     private String isTop;
 
     /** 摘要 */
+    @Schema(description = "摘要")
     private String summary;
 
     /** 正文字数 */
+    @Schema(description = "正文字数", example = "1280")
     @Excel(name = "字数", cellType = ColumnType.NUMERIC)
     private Integer wordCount;
 
     /** 最后一次与仓库对齐的时间 */
+    @Schema(description = "最后一次与仓库对齐的时间", example = "2026-07-30 09:00:00")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date lastSyncTime;
 
     /** markdown 正文，不落库：读详情时从 GitHub 拉取，保存时写回 GitHub */
+    @Schema(description = "markdown 正文，不落库：读详情时从 GitHub 拉取，保存时写回 GitHub")
     private String content;
 
     public Long getArticleId()

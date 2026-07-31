@@ -26,12 +26,16 @@ import com.howe.quartz.domain.SysJob;
 import com.howe.quartz.service.ISysJobService;
 import com.howe.quartz.util.CronUtils;
 import com.howe.quartz.util.ScheduleUtils;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * 调度任务信息操作处理
  *
  * @author howe
  */
+@Tag(name = "定时任务", description = "Quartz 调度任务的增删改查、状态变更与立即执行")
 @RestController
 @RequestMapping("/monitor/job")
 public class SysJobController extends BaseController
@@ -43,6 +47,7 @@ public class SysJobController extends BaseController
      * 查询定时任务列表
      */
     @PreAuthorize("@ss.hasPermi('monitor:job:list')")
+    @Operation(summary = "查询定时任务列表", description = "分页查询调度任务")
     @GetMapping("/list")
     public TableDataInfo list(SysJob sysJob)
     {
@@ -56,6 +61,7 @@ public class SysJobController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('monitor:job:export')")
     @Log(title = "定时任务", businessType = BusinessType.EXPORT)
+    @Operation(summary = "导出定时任务列表", description = "按查询条件导出调度任务 Excel")
     @PostMapping("/export")
     public void export(HttpServletResponse response, SysJob sysJob)
     {
@@ -68,8 +74,9 @@ public class SysJobController extends BaseController
      * 获取定时任务详细信息
      */
     @PreAuthorize("@ss.hasPermi('monitor:job:query')")
+    @Operation(summary = "获取定时任务详细信息", description = "根据任务编号查询任务详情")
     @GetMapping(value = "/{jobId}")
-    public AjaxResult getInfo(@PathVariable("jobId") Long jobId)
+    public AjaxResult getInfo(@Parameter(description = "任务编号") @PathVariable("jobId") Long jobId)
     {
         return success(jobService.selectJobById(jobId));
     }
@@ -79,6 +86,7 @@ public class SysJobController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('monitor:job:add')")
     @Log(title = "定时任务", businessType = BusinessType.INSERT)
+    @Operation(summary = "新增定时任务", description = "校验 Cron 表达式与调用目标白名单后新增任务")
     @PostMapping
     public AjaxResult add(@RequestBody SysJob job) throws SchedulerException, TaskException
     {
@@ -115,6 +123,7 @@ public class SysJobController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('monitor:job:edit')")
     @Log(title = "定时任务", businessType = BusinessType.UPDATE)
+    @Operation(summary = "修改定时任务", description = "校验 Cron 表达式与调用目标白名单后修改任务")
     @PutMapping
     public AjaxResult edit(@RequestBody SysJob job) throws SchedulerException, TaskException
     {
@@ -151,6 +160,7 @@ public class SysJobController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('monitor:job:changeStatus')")
     @Log(title = "定时任务", businessType = BusinessType.UPDATE)
+    @Operation(summary = "修改定时任务状态", description = "启动或暂停指定的调度任务")
     @PutMapping("/changeStatus")
     public AjaxResult changeStatus(@RequestBody SysJob job) throws SchedulerException
     {
@@ -164,6 +174,7 @@ public class SysJobController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('monitor:job:changeStatus')")
     @Log(title = "定时任务", businessType = BusinessType.UPDATE)
+    @Operation(summary = "定时任务立即执行一次", description = "手动触发一次任务调度")
     @PutMapping("/run")
     public AjaxResult run(@RequestBody SysJob job) throws SchedulerException
     {
@@ -176,8 +187,9 @@ public class SysJobController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('monitor:job:remove')")
     @Log(title = "定时任务", businessType = BusinessType.DELETE)
+    @Operation(summary = "删除定时任务", description = "按任务编号批量删除调度任务")
     @DeleteMapping("/{jobIds}")
-    public AjaxResult remove(@PathVariable Long[] jobIds) throws SchedulerException
+    public AjaxResult remove(@Parameter(description = "任务编号数组") @PathVariable Long[] jobIds) throws SchedulerException
     {
         jobService.deleteJobByIds(jobIds);
         return success();

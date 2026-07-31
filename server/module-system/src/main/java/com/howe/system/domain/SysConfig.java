@@ -7,34 +7,41 @@ import org.apache.commons.lang3.builder.ToStringStyle;
 import com.howe.common.annotation.Excel;
 import com.howe.common.annotation.Excel.ColumnType;
 import com.howe.common.core.domain.BaseEntity;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * 参数配置表 sys_config
  *
  * @author howe
  */
+@Schema(description = "参数配置")
 public class SysConfig extends BaseEntity
 {
     private static final long serialVersionUID = 1L;
 
     /** 参数主键 */
     @Excel(name = "参数主键", cellType = ColumnType.NUMERIC)
+    @Schema(description = "参数主键", example = "1")
     private Long configId;
 
     /** 参数名称 */
     @Excel(name = "参数名称")
+    @Schema(description = "参数名称", example = "主框架页-默认皮肤样式名称")
     private String configName;
 
     /** 参数键名 */
     @Excel(name = "参数键名")
+    @Schema(description = "参数键名", example = "sys.index.skinName")
     private String configKey;
 
     /** 参数键值 */
     @Excel(name = "参数键值")
+    @Schema(description = "参数键值", example = "skin-blue")
     private String configValue;
 
     /** 系统内置（Y是 N否） */
     @Excel(name = "系统内置", readConverterExp = "Y=是,N=否")
+    @Schema(description = "系统内置（Y是 N否）", example = "Y")
     private String configType;
 
     public Long getConfigId()

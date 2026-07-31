@@ -33,10 +33,8 @@ public class ResourcesConfig implements WebMvcConfigurer
         registry.addResourceHandler(Constants.RESOURCE_PREFIX + "/**")
                 .addResourceLocations("file:" + YmlConfig.getProfile() + "/");
 
-        /** swagger配置 */
-        registry.addResourceHandler("/swagger-ui/**")
-                .addResourceLocations("classpath:/META-INF/resources/webjars/springfox-swagger-ui/")
-                .setCacheControl(CacheControl.maxAge(5, TimeUnit.HOURS).cachePublic());
+        // 原先这里给 /swagger-ui/** 指了 springfox 的 webjar 目录，但项目早已换成 springdoc，
+        // 该目录根本不存在，反而会把 springdoc 自己的静态资源截胡。已移除，交给 springdoc 自动配置
     }
 
     /**

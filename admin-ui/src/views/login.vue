@@ -37,8 +37,16 @@
           <template #prefix><svg-icon icon-class="validCode" class="el-input__icon input-icon" /></template>
         </el-input>
         <div class="login-code">
-          <img :src="codeUrl" @click="getCode" class="login-code-img"/>
+          <img :src="codeUrl" @click="getCode" class="login-code-img" alt="验证码"/>
         </div>
+      </el-form-item>
+      <el-form-item v-if="turnstileEnabled" style="margin-bottom: 18px;">
+        <Turnstile
+          ref="turnstileRef"
+          v-model="loginForm.turnstileToken"
+          :site-key="turnstileSiteKey"
+          @error="handleTurnstileError"
+        />
       </el-form-item>
       <el-checkbox v-model="loginForm.rememberMe" style="margin:0px 0px 25px 0px;">记住密码</el-checkbox>
       <el-form-item style="width:100%;">
@@ -70,7 +78,7 @@ import Cookies from "js-cookie"
 import { encrypt, decrypt } from "@/utils/jsencrypt"
 import useUserStore from '@/store/modules/user'
 import defaultSettings from '@/settings'
-import type { CaptchaInfoResult } from '@/types/api/login'
+import Turnstile from '@/components/Turnstile/index.vue'
 import type { LoginForm } from '@/types/api/login'
 
 const title = import.meta.env.VITE_APP_TITLE
@@ -85,7 +93,8 @@ const loginForm = ref<LoginForm>({
   password: "admin123",
   rememberMe: false,
   code: "",
-  uuid: ""
+  uuid: "",
+  turnstileToken: ""
 })
 
 const loginRules = {
@@ -98,6 +107,10 @@ const codeUrl = ref("")
 const loading = ref(false)
 // 验证码开关
 const captchaEnabled = ref(true)
+// 人机校验开关与站点密钥，都由 /captchaImage 下发
+const turnstileEnabled = ref(false)
+const turnstileSiteKey = ref("")
+const turnstileRef = ref<InstanceType<typeof Turnstile>>()
 // 注册开关
 const register = ref(false)
 const redirect = ref<string | undefined>(undefined)
@@ -106,9 +119,17 @@ watch(route, (newRoute: any) => {
     redirect.value = (newRoute.query && newRoute.query.redirect) as string | undefined
 }, { immediate: true })
 
+function handleTurnstileError(message: string): void {
+  proxy.$modal.msgError(message)
+}
+
 function handleLogin(): void {
   proxy.$refs.loginRef.validate((valid: boolean) => {
     if (valid) {
+      if (turnstileEnabled.value && !loginForm.value.turnstileToken) {
+        proxy.$modal.msgWarning("请先完成人机校验")
+        return
+      }
       loading.value = true
       // 勾选了需要记住密码设置在 cookie 中设置记住用户名和密码
       if (loginForm.value.rememberMe) {
@@ -137,6 +158,10 @@ function handleLogin(): void {
         if (captchaEnabled.value) {
           getCode()
         }
+        // Turnstile 令牌是一次性的，失败后必须换一张挑战，否则后端第二次校验必然不过
+        if (turnstileEnabled.value) {
+          turnstileRef.value?.reset()
+        }
       })
     }
   })
@@ -144,9 +169,12 @@ function handleLogin(): void {
 
 function getCode(): void {
   getCodeImg().then(res => {
+    turnstileEnabled.value = res.turnstileEnabled === true
+    turnstileSiteKey.value = res.turnstileSiteKey || ""
     captchaEnabled.value = res.captchaEnabled === undefined ? true : res.captchaEnabled
     if (captchaEnabled.value) {
-      codeUrl.value = "data:image/gif;base64," + res.img
+      // 图片格式随验证码类型变，GIF 类型返回的不是 png
+      codeUrl.value = `data:image/${res.imgType || "png"};base64,` + res.img
       loginForm.value.uuid = res.uuid
     }
   })
@@ -157,6 +185,7 @@ function getCookie(): void {
   const password = Cookies.get("password")
   const rememberMe = Cookies.get("rememberMe")
   loginForm.value = {
+    ...loginForm.value,
     username: username === undefined ? loginForm.value.username : username,
     password: password === undefined ? loginForm.value.password : decrypt(password),
     rememberMe: rememberMe === undefined ? false : Boolean(rememberMe)

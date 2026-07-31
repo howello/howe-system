@@ -1,14 +1,9 @@
 import request from '@/utils/request'
 import type { SysRegister, LoginInfoResult, UserInfoResult, CaptchaInfoResult, AjaxResult } from '@/types'
+import type { LoginForm } from '@/types/api/login'
 
 // 登录方法
-export function login(username: string, password: string, code: string, uuid: string): Promise<LoginInfoResult> {
-  const data = {
-    username,
-    password,
-    code,
-    uuid
-  }
+export function login(data: Pick<LoginForm, 'username' | 'password' | 'code' | 'uuid' | 'turnstileToken'>): Promise<LoginInfoResult> {
   return request({
     url: '/login',
     headers: {

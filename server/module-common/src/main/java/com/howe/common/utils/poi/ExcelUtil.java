@@ -1,5 +1,6 @@
 package com.howe.common.utils.poi;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -75,6 +76,7 @@ import com.howe.common.annotation.Excel.ColumnType;
 import com.howe.common.annotation.Excel.Type;
 import com.howe.common.annotation.Excels;
 import com.howe.common.config.YmlConfig;
+import com.howe.common.utils.file.FileUploadUtils;
 import com.howe.common.core.domain.AjaxResult;
 import com.howe.common.core.text.Convert;
 import com.howe.common.exception.UtilException;
@@ -100,6 +102,9 @@ public class ExcelUtil<T>
     public static final String FORMULA_REGEX_STR = "=|-|\\+|@";
 
     public static final String[] FORMULA_STR = { "=", "-", "+", "@" };
+
+    /** xlsx 的 MIME 类型，导出文件写入对象存储时带上，避免被图床当作二进制附件 */
+    private static final String XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
     /**
      * 用于dictType属性数据存储，避免重复查缓存
@@ -628,13 +633,14 @@ public class ExcelUtil<T>
             return AjaxResult.error("导出数据不能为空");
         }
         SXSSFWorkbook wb = buildWorkbook(sheets);
-        OutputStream out = null;
         try
         {
             ExcelUtil firstUtil = new ExcelUtil(sheets.get(0).getClazz());
             String filename = firstUtil.encodingFilename(sheets.get(0).getSheetName());
-            out = new FileOutputStream(firstUtil.getAbsoluteFile(filename));
+            // 同 exportExcel()：写进当前存储而不是本地盘
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
             wb.write(out);
+            FileUploadUtils.uploadBytes(YmlConfig.DOWNLOAD_DIR, filename, out.toByteArray(), XLSX_CONTENT_TYPE);
             return AjaxResult.success(filename);
         }
         catch (Exception e)
@@ -645,7 +651,6 @@ public class ExcelUtil<T>
         finally
         {
             IOUtils.closeQuietly(wb);
-            IOUtils.closeQuietly(out);
         }
     }
 
@@ -775,13 +780,15 @@ public class ExcelUtil<T>
      */
     public AjaxResult exportExcel()
     {
-        OutputStream out = null;
         try
         {
             writeSheet();
             String filename = encodingFilename(sheetName);
-            out = new FileOutputStream(getAbsoluteFile(filename));
+            // 写进当前存储（默认 R2）而不是本地盘：/common/download 也是从存储取件的，
+            // 落本地盘在 r2 模式下会导致「导出成功但下载 404」
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
             wb.write(out);
+            FileUploadUtils.uploadBytes(YmlConfig.DOWNLOAD_DIR, filename, out.toByteArray(), XLSX_CONTENT_TYPE);
             return AjaxResult.success(filename);
         }
         catch (Exception e)
@@ -792,7 +799,6 @@ public class ExcelUtil<T>
         finally
         {
             IOUtils.closeQuietly(wb);
-            IOUtils.closeQuietly(out);
         }
     }
 
@@ -1612,22 +1618,6 @@ public class ExcelUtil<T>
     public String encodingFilename(String filename)
     {
         return UUID.randomUUID() + "_" + filename + ".xlsx";
-    }
-
-    /**
-     * 获取下载路径
-     *
-     * @param filename 文件名称
-     */
-    public String getAbsoluteFile(String filename)
-    {
-        String downloadPath = YmlConfig.getDownloadPath() + filename;
-        File desc = new File(downloadPath);
-        if (!desc.getParentFile().exists())
-        {
-            desc.getParentFile().mkdirs();
-        }
-        return downloadPath;
     }
 
     /**

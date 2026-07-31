@@ -144,6 +144,19 @@
             <artifactId>hutool-crypto</artifactId>
         </dependency>
 
+        <!-- Hutool 验证码：线段/圆圈/扭曲/GIF/算术多种类型，替代原先的 kaptcha -->
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-captcha</artifactId>
+        </dependency>
+
+        <!-- swagger 注解：让所有模块（blog/quartz/generator/system/common）都能写
+             @Tag/@Operation/@Schema，运行时引擎仍只装在 module-admin -->
+        <dependency>
+            <groupId>io.swagger.core.v3</groupId>
+            <artifactId>swagger-annotations-jakarta</artifactId>
+        </dependency>
+
         <!-- S3 客户端：对接 Cloudflare R2（R2 完全兼容 S3 协议）
              排除默认的 apache/netty HTTP 客户端，改用最轻量的 url-connection-client，
              避免为一个 PutObject 引入两套 HTTP 栈 -->

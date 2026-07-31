@@ -68,6 +68,8 @@ export interface SysRegister {
   code?: string;
   /** 唯一标识 */
   uuid?: string;
+  /** Cloudflare 人机校验令牌，未开启人机校验时可不传 */
+  turnstileToken?: string;
 }
 
 /** 用户详情查询响应 */

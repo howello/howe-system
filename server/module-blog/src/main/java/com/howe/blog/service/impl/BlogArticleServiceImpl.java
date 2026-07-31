@@ -4,6 +4,8 @@ import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.howe.blog.domain.BlogArticle;
+import com.howe.blog.domain.dto.BlogArticlePublishBody;
+import com.howe.blog.domain.vo.BlogPublishResult;
 import com.howe.blog.domain.vo.BlogSyncResult;
 import com.howe.blog.github.GithubCommit;
 import com.howe.blog.github.GithubContentClient;
@@ -38,6 +40,12 @@ import java.util.*;
 public class BlogArticleServiceImpl implements IBlogArticleService
 {
     private static final Logger log = LoggerFactory.getLogger(BlogArticleServiceImpl.class);
+
+    /** 无登录上下文时，webhook 同步记录的操作者 */
+    private static final String GITHUB_OPERATOR = "github";
+
+    /** 无登录上下文时，开放发布接口记录的操作者 */
+    private static final String OPEN_API_OPERATOR = "openapi";
 
     /** 摘要截取长度 */
     private static final int SUMMARY_LENGTH = 200;
@@ -107,7 +115,7 @@ public class BlogArticleServiceImpl implements IBlogArticleService
 
         blogArticle.setGitSha(commit.getContentSha());
         blogArticle.setLastSyncTime(new Date());
-        blogArticle.setCreateBy(SecurityUtils.getUsername());
+        blogArticle.setCreateBy(currentUsername(OPEN_API_OPERATOR));
         fillDerived(blogArticle);
         return blogArticleMapper.insertBlogArticle(blogArticle);
     }
@@ -164,7 +172,7 @@ public class BlogArticleServiceImpl implements IBlogArticleService
         blogArticle.setFilePath(newPath);
         blogArticle.setGitSha(commit.getContentSha());
         blogArticle.setLastSyncTime(new Date());
-        blogArticle.setUpdateBy(SecurityUtils.getUsername());
+        blogArticle.setUpdateBy(currentUsername(OPEN_API_OPERATOR));
         fillDerived(blogArticle);
         return blogArticleMapper.updateBlogArticle(blogArticle);
     }
@@ -324,6 +332,41 @@ public class BlogArticleServiceImpl implements IBlogArticleService
     }
 
     @Override
+    public BlogPublishResult publishArticle(BlogArticlePublishBody body)
+    {
+        githubClient.assertConfigured();
+        BlogArticle article = body.toArticle();
+        BlogArticle existing = blogArticleMapper.selectBlogArticleBySlug(article.getSlug());
+        if (existing == null)
+        {
+            insertBlogArticle(article);
+            log.info("开放接口新增文章：{} -> {}", article.getSlug(), article.getFilePath());
+            return new BlogPublishResult(article.getArticleId(), article.getSlug(), article.getFilePath(),
+                    "/article/" + article.getSlug(), true);
+        }
+
+        if (!body.isOverwrite())
+        {
+            throw new ServiceException("文章标识已存在：" + article.getSlug() + "，如需覆盖请把 overwrite 设为 true");
+        }
+        article.setArticleId(existing.getArticleId());
+        if (StringUtils.isEmpty(article.getFilePath()))
+        {
+            // 没指定路径就沿用原路径，否则会被当成「移动文章」而白白删建一次
+            article.setFilePath(existing.getFilePath());
+        }
+        if (article.getPublishDate() == null)
+        {
+            // 覆盖时保留原发布时间，不然每次重发都把日期顶到当下
+            article.setPublishDate(existing.getPublishDate());
+        }
+        updateBlogArticle(article);
+        log.info("开放接口覆盖文章：{} -> {}", article.getSlug(), article.getFilePath());
+        return new BlogPublishResult(article.getArticleId(), article.getSlug(), article.getFilePath(),
+                "/article/" + article.getSlug(), false);
+    }
+
+    @Override
     public boolean checkSlugUnique(BlogArticle blogArticle)
     {
         BlogArticle existing = blogArticleMapper.selectBlogArticleBySlug(blogArticle.getSlug());
@@ -366,12 +409,12 @@ public class BlogArticleServiceImpl implements IBlogArticleService
                 blogArticleMapper.updateBlogArticle(article);
                 return false;
             }
-            article.setCreateBy(currentUsername());
+            article.setCreateBy(currentUsername(GITHUB_OPERATOR));
             blogArticleMapper.insertBlogArticle(article);
             return true;
         }
         article.setArticleId(existing.getArticleId());
-        article.setUpdateBy(currentUsername());
+        article.setUpdateBy(currentUsername(GITHUB_OPERATOR));
         blogArticleMapper.updateBlogArticle(article);
         return false;
     }
@@ -541,10 +584,13 @@ public class BlogArticleServiceImpl implements IBlogArticleService
      * 取当前登录用户名
      *
      * <p>
-     * webhook 是匿名调用的，此时没有登录上下文，用 github 作为操作者标记。
+     * webhook 与开放发布接口都是匿名调用的，此时没有登录上下文，用调用方给的标记兜底，
+     * 免得 {@code SecurityUtils.getUsername()} 直接抛异常把写入流程打断。
      * </p>
+     *
+     * @param fallback 无登录上下文时使用的操作者标记
      */
-    private static String currentUsername()
+    private static String currentUsername(String fallback)
     {
         try
         {
@@ -552,7 +598,7 @@ public class BlogArticleServiceImpl implements IBlogArticleService
         }
         catch (Exception e)
         {
-            return "github";
+            return fallback;
         }
     }
 }

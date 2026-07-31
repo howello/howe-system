@@ -1,0 +1,26 @@
+# 统一行分隔符：仓库内规范化存 LF，检出到工作区一律 CRLF（Windows 开发环境）
+# 详见仓库根 CLAUDE.md「约定 > 行分隔符」
+* text=auto eol=crlf
+
+# 二进制文件不做任何换行符转换
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.eot   binary
+*.pdf   binary
+*.zip   binary
+*.gz    binary
+*.jar   binary
+*.class binary
+*.mp4   binary
+*.webm  binary
+
+# Windows 批处理必须是 CRLF，否则 cmd 解析异常
+*.bat text eol=crlf
+*.cmd text eol=crlf

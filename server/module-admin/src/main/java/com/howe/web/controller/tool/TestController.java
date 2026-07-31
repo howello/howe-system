@@ -16,6 +16,7 @@ import com.howe.common.core.controller.BaseController;
 import com.howe.common.core.domain.R;
 import com.howe.common.utils.StringUtils;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
@@ -24,7 +25,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
  *
  * @author howe
  */
-@Tag(name = "用户信息管理")
+@Tag(name = "用户信息管理", description = "Swagger 演示接口，基于内存数据的用户增删改查")
 @RestController
 @RequestMapping("/test/user")
 public class TestController extends BaseController
@@ -45,7 +46,7 @@ public class TestController extends BaseController
     
     @Operation(summary = "获取用户详细")
     @GetMapping("/{userId}")
-    public R<UserEntity> getUser(@PathVariable(name = "userId")
+    public R<UserEntity> getUser(@Parameter(description = "用户ID") @PathVariable(name = "userId")
     Integer userId)
     {
         if (!users.isEmpty() && users.containsKey(userId))
@@ -90,7 +91,7 @@ public class TestController extends BaseController
     
     @Operation(summary = "删除用户信息")
     @DeleteMapping("/{userId}")
-    public R<String> delete(@PathVariable(name = "userId")
+    public R<String> delete(@Parameter(description = "用户ID") @PathVariable(name = "userId")
     Integer userId)
     {
         if (!users.isEmpty() && users.containsKey(userId))

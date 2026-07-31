@@ -2,21 +2,18 @@ package com.howe.framework.web.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import com.howe.common.constant.CacheConstants;
 import com.howe.common.constant.Constants;
 import com.howe.common.constant.UserConstants;
 import com.howe.common.core.domain.entity.SysUser;
 import com.howe.common.core.domain.model.RegisterBody;
-import com.howe.common.core.redis.RedisCache;
-import com.howe.common.exception.user.CaptchaException;
-import com.howe.common.exception.user.CaptchaExpireException;
 import com.howe.common.utils.DateUtils;
 import com.howe.common.utils.MessageUtils;
 import com.howe.common.utils.SecurityUtils;
 import com.howe.common.utils.StringUtils;
+import com.howe.framework.captcha.CaptchaService;
+import com.howe.framework.captcha.TurnstileService;
 import com.howe.framework.manager.AsyncManager;
 import com.howe.framework.manager.factory.AsyncFactory;
-import com.howe.system.service.ISysConfigService;
 import com.howe.system.service.ISysUserService;
 
 /**
@@ -31,10 +28,10 @@ public class SysRegisterService
     private ISysUserService userService;
 
     @Autowired
-    private ISysConfigService configService;
+    private CaptchaService captchaService;
 
     @Autowired
-    private RedisCache redisCache;
+    private TurnstileService turnstileService;
 
     /**
      * 注册
@@ -45,9 +42,11 @@ public class SysRegisterService
         SysUser sysUser = new SysUser();
         sysUser.setUserName(username);
 
+        // 人机校验，未开启时直接放行
+        turnstileService.validate(registerBody.getTurnstileToken());
+
         // 验证码开关
-        boolean captchaEnabled = configService.selectCaptchaEnabled();
-        if (captchaEnabled)
+        if (captchaService.isEnabled())
         {
             validateCaptcha(username, registerBody.getCode(), registerBody.getUuid());
         }
@@ -102,16 +101,6 @@ public class SysRegisterService
      */
     public void validateCaptcha(String username, String code, String uuid)
     {
-        String verifyKey = CacheConstants.CAPTCHA_CODE_KEY + StringUtils.nvl(uuid, "");
-        String captcha = redisCache.getCacheObject(verifyKey);
-        redisCache.deleteObject(verifyKey);
-        if (captcha == null)
-        {
-            throw new CaptchaExpireException();
-        }
-        if (!code.equalsIgnoreCase(captcha))
-        {
-            throw new CaptchaException();
-        }
+        captchaService.validate(uuid, code);
     }
 }

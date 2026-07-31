@@ -1,5 +1,6 @@
 package com.howe.common.storage;
 
+import java.io.File;
 import java.io.InputStream;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.io.IoUtil;
@@ -45,19 +46,60 @@ public class LocalStorageService implements StorageService
     }
 
     @Override
+    public StoredObject fetch(String location)
+    {
+        String key = resolveKey(location);
+        if (StringUtils.isEmpty(key))
+        {
+            return null;
+        }
+        String target = YmlConfig.getProfile() + "/" + key;
+        if (!FileUtil.isFile(target))
+        {
+            return null;
+        }
+        File file = FileUtil.file(target);
+        return new StoredObject(key, file.getName(), FileUtil.getMimeType(target), file.length(),
+                FileUtil.getInputStream(file));
+    }
+
+    @Override
     public boolean remove(String location)
     {
-        if (StringUtils.isEmpty(location))
+        String key = resolveKey(location);
+        if (StringUtils.isEmpty(key))
         {
             return false;
         }
-        // 兼容三种入参：/profile/upload/xxx.png、upload/xxx.png、完整 URL
-        String key = location;
+        String target = YmlConfig.getProfile() + "/" + key;
+        return FileUtil.isFile(target) && FileUtil.del(target);
+    }
+
+    /**
+     * 把各种形态的地址还原成 profile 下的相对路径
+     *
+     * <p>
+     * 兼容三种入参：{@code /profile/upload/xxx.png}、{@code upload/xxx.png}、以及切换存储前
+     * 遗留的完整 URL（本地盘上不会有这种文件，直接判定为不存在）。
+     * </p>
+     */
+    private String resolveKey(String location)
+    {
+        if (StringUtils.isEmpty(location))
+        {
+            return null;
+        }
+        String key = location.trim();
+        if (StringUtils.startsWithIgnoreCase(key, "http://") || StringUtils.startsWithIgnoreCase(key, "https://"))
+        {
+            return null;
+        }
         if (StringUtils.contains(key, Constants.RESOURCE_PREFIX + "/"))
         {
             key = StringUtils.substringAfter(key, Constants.RESOURCE_PREFIX + "/");
         }
-        String target = YmlConfig.getProfile() + "/" + StringUtils.stripStart(key, "/");
-        return FileUtil.isFile(target) && FileUtil.del(target);
+        key = StringUtils.stripStart(key, "/");
+        // 防止 ../ 穿越到 profile 目录之外
+        return key.contains("..") ? null : key;
     }
 }

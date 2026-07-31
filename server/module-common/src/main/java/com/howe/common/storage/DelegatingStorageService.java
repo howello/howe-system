@@ -43,6 +43,12 @@ public class DelegatingStorageService implements StorageService
     }
 
     @Override
+    public StoredObject fetch(String location)
+    {
+        return current().fetch(location);
+    }
+
+    @Override
     public boolean remove(String location)
     {
         return current().remove(location);

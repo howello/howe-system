@@ -7,39 +7,48 @@ import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * Entity基类
  *
  * @author howe
  */
+@Schema(description = "Entity基类，包含创建/更新审计字段与通用请求参数")
 public class BaseEntity implements Serializable
 {
     private static final long serialVersionUID = 1L;
 
     /** 搜索值 */
     @JsonIgnore
+    @Schema(description = "搜索值")
     private String searchValue;
 
     /** 创建者 */
+    @Schema(description = "创建者", example = "admin")
     private String createBy;
 
     /** 创建时间 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Schema(description = "创建时间", example = "2026-01-01 12:00:00")
     private Date createTime;
 
     /** 更新者 */
+    @Schema(description = "更新者", example = "admin")
     private String updateBy;
 
     /** 更新时间 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Schema(description = "更新时间", example = "2026-01-01 12:00:00")
     private Date updateTime;
 
     /** 备注 */
+    @Schema(description = "备注")
     private String remark;
 
     /** 请求参数 */
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    @Schema(description = "请求参数，用于承载查询扩展条件（如时间区间、数据权限片段）")
     private Map<String, Object> params;
 
     public String getSearchValue()

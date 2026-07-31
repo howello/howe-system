@@ -14,6 +14,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.howe.common.annotation.Log;
 import com.howe.common.constant.UserConstants;
 import com.howe.common.core.controller.BaseController;
@@ -28,6 +31,7 @@ import com.howe.system.service.ISysDeptService;
  * 
  * @author howe
  */
+@Tag(name = "部门管理", description = "组织架构部门树的查询与维护")
 @RestController
 @RequestMapping("/system/dept")
 public class SysDeptController extends BaseController
@@ -39,6 +43,7 @@ public class SysDeptController extends BaseController
      * 获取部门列表
      */
     @PreAuthorize("@ss.hasPermi('system:dept:list')")
+    @Operation(summary = "查询部门列表", description = "返回符合条件的部门集合，前端自行构建树形结构")
     @GetMapping("/list")
     public AjaxResult list(SysDept dept)
     {
@@ -50,8 +55,9 @@ public class SysDeptController extends BaseController
      * 查询部门列表（排除节点）
      */
     @PreAuthorize("@ss.hasPermi('system:dept:list')")
+    @Operation(summary = "查询部门列表（排除节点）", description = "排除指定部门及其所有下级，用于选择上级部门时防止成环")
     @GetMapping("/list/exclude/{deptId}")
-    public AjaxResult excludeChild(@PathVariable(value = "deptId", required = false) Long deptId)
+    public AjaxResult excludeChild(@Parameter(description = "需要排除的部门编号") @PathVariable(value = "deptId", required = false) Long deptId)
     {
         List<SysDept> depts = deptService.selectDeptList(new SysDept());
         depts.removeIf(d -> d.getDeptId().intValue() == deptId || ArrayUtils.contains(StringUtils.split(d.getAncestors(), ","), deptId + ""));
@@ -62,8 +68,9 @@ public class SysDeptController extends BaseController
      * 根据部门编号获取详细信息
      */
     @PreAuthorize("@ss.hasPermi('system:dept:query')")
+    @Operation(summary = "获取部门详细信息", description = "根据部门编号查询详情，受数据权限校验约束")
     @GetMapping(value = "/{deptId}")
-    public AjaxResult getInfo(@PathVariable Long deptId)
+    public AjaxResult getInfo(@Parameter(description = "部门编号") @PathVariable Long deptId)
     {
         deptService.checkDeptDataScope(deptId);
         return success(deptService.selectDeptById(deptId));
@@ -74,6 +81,7 @@ public class SysDeptController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('system:dept:add')")
     @Log(title = "部门管理", businessType = BusinessType.INSERT)
+    @Operation(summary = "新增部门", description = "同一上级下部门名称不可重复")
     @PostMapping
     public AjaxResult add(@Validated @RequestBody SysDept dept)
     {
@@ -90,6 +98,7 @@ public class SysDeptController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('system:dept:edit')")
     @Log(title = "部门管理", businessType = BusinessType.UPDATE)
+    @Operation(summary = "修改部门", description = "上级部门不能是自己，停用前需先停用全部子部门")
     @PutMapping
     public AjaxResult edit(@Validated @RequestBody SysDept dept)
     {
@@ -116,6 +125,7 @@ public class SysDeptController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('system:dept:edit')")
     @Log(title = "保存部门排序", businessType = BusinessType.UPDATE)
+    @Operation(summary = "保存部门排序", description = "拖拽排序后提交，deptIds 与 orderNums 为逗号分隔的等长序列")
     @PutMapping("/updateSort")
     public AjaxResult updateSort(@RequestBody Map<String, String> params)
     {
@@ -130,8 +140,9 @@ public class SysDeptController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('system:dept:remove')")
     @Log(title = "部门管理", businessType = BusinessType.DELETE)
+    @Operation(summary = "删除部门", description = "存在下级部门或部门下有用户时不允许删除")
     @DeleteMapping("/{deptId}")
-    public AjaxResult remove(@PathVariable Long deptId)
+    public AjaxResult remove(@Parameter(description = "部门编号") @PathVariable Long deptId)
     {
         if (deptService.hasChildByDeptId(deptId))
         {

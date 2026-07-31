@@ -7,101 +7,129 @@ import org.apache.commons.lang3.ArrayUtils;
 import com.howe.common.constant.GenConstants;
 import com.howe.common.core.domain.BaseEntity;
 import com.howe.common.utils.StringUtils;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * 业务表 gen_table
  *
  * @author howe
  */
+@Schema(description = "代码生成业务表")
 public class GenTable extends BaseEntity
 {
     private static final long serialVersionUID = 1L;
 
     /** 编号 */
+    @Schema(description = "编号", example = "1")
     private Long tableId;
 
     /** 表名称 */
     @NotBlank(message = "表名称不能为空")
+    @Schema(description = "表名称", example = "sys_user")
     private String tableName;
 
     /** 表描述 */
     @NotBlank(message = "表描述不能为空")
+    @Schema(description = "表描述", example = "用户信息表")
     private String tableComment;
 
     /** 关联父表的表名 */
+    @Schema(description = "关联父表的表名", example = "sys_user")
     private String subTableName;
 
     /** 本表关联父表的外键名 */
+    @Schema(description = "本表关联父表的外键名", example = "user_id")
     private String subTableFkName;
 
     /** 实体类名称(首字母大写) */
     @NotBlank(message = "实体类名称不能为空")
+    @Schema(description = "实体类名称（首字母大写）", example = "SysUser")
     private String className;
 
     /** 使用的模板（crud单表操作 tree树表操作 sub主子表操作） */
+    @Schema(description = "使用的模板（crud单表操作 tree树表操作 sub主子表操作）", example = "crud")
     private String tplCategory;
 
     /** 前端类型（element-ui模版 element-plus模版 element-plus-typescript模版） */
+    @Schema(description = "前端类型（element-ui 模版 element-plus 模版 element-plus-typescript 模版）", example = "element-plus")
     private String tplWebType;
 
     /** 生成包路径 */
     @NotBlank(message = "生成包路径不能为空")
+    @Schema(description = "生成包路径", example = "com.howe.system")
     private String packageName;
 
     /** 生成模块名 */
     @NotBlank(message = "生成模块名不能为空")
+    @Schema(description = "生成模块名", example = "system")
     private String moduleName;
 
     /** 生成业务名 */
     @NotBlank(message = "生成业务名不能为空")
+    @Schema(description = "生成业务名", example = "user")
     private String businessName;
 
     /** 生成功能名 */
     @NotBlank(message = "生成功能名不能为空")
+    @Schema(description = "生成功能名", example = "用户信息")
     private String functionName;
 
     /** 生成作者 */
     @NotBlank(message = "作者不能为空")
+    @Schema(description = "生成作者", example = "howe")
     private String functionAuthor;
 
     /** 表单布局（单列 双列 三列） */
+    @Schema(description = "表单布局（1单列 2双列 3三列）", example = "1")
     private Integer formColNum;
 
     /** 生成代码方式（0zip压缩包 1自定义路径） */
+    @Schema(description = "生成代码方式（0zip压缩包 1自定义路径）", example = "0")
     private String genType;
 
     /** 生成路径（不填默认项目路径） */
+    @Schema(description = "生成路径（不填默认项目路径）", example = "/")
     private String genPath;
 
     /** 主键信息 */
+    @Schema(description = "主键列信息")
     private GenTableColumn pkColumn;
 
     /** 子表信息 */
+    @Schema(description = "子表信息")
     private GenTable subTable;
 
     /** 表列信息 */
     @Valid
+    @Schema(description = "表列信息")
     private List<GenTableColumn> columns;
 
     /** 其它生成选项 */
+    @Schema(description = "其它生成选项")
     private String options;
 
     /** 树编码字段 */
+    @Schema(description = "树编码字段", example = "dept_id")
     private String treeCode;
 
     /** 树父编码字段 */
+    @Schema(description = "树父编码字段", example = "parent_id")
     private String treeParentCode;
 
     /** 树名称字段 */
+    @Schema(description = "树名称字段", example = "dept_name")
     private String treeName;
 
     /** 上级菜单ID字段 */
+    @Schema(description = "上级菜单ID", example = "0")
     private Long parentMenuId;
 
     /** 上级菜单名称字段 */
+    @Schema(description = "上级菜单名称", example = "系统管理")
     private String parentMenuName;
 
     /** 是否生成详情页 */
+    @Schema(description = "是否生成详情页", example = "false")
     private boolean isView;
 
     public Long getTableId()

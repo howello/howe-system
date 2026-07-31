@@ -18,12 +18,16 @@ import com.howe.common.enums.BusinessType;
 import com.howe.common.utils.poi.ExcelUtil;
 import com.howe.system.domain.SysOperLog;
 import com.howe.system.service.ISysOperLogService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * 操作日志记录
  * 
  * @author howe
  */
+@Tag(name = "操作日志", description = "系统操作日志的查询、导出与清理")
 @RestController
 @RequestMapping("/monitor/operlog")
 public class SysOperlogController extends BaseController
@@ -32,6 +36,7 @@ public class SysOperlogController extends BaseController
     private ISysOperLogService operLogService;
 
     @PreAuthorize("@ss.hasPermi('monitor:operlog:list')")
+    @Operation(summary = "查询操作日志列表", description = "分页查询系统操作日志")
     @GetMapping("/list")
     public TableDataInfo list(SysOperLog operLog)
     {
@@ -42,6 +47,7 @@ public class SysOperlogController extends BaseController
 
     @Log(title = "操作日志", businessType = BusinessType.EXPORT)
     @PreAuthorize("@ss.hasPermi('monitor:operlog:export')")
+    @Operation(summary = "导出操作日志", description = "按查询条件导出操作日志 Excel")
     @PostMapping("/export")
     public void export(HttpServletResponse response, SysOperLog operLog)
     {
@@ -52,14 +58,16 @@ public class SysOperlogController extends BaseController
 
     @Log(title = "操作日志", businessType = BusinessType.DELETE)
     @PreAuthorize("@ss.hasPermi('monitor:operlog:remove')")
+    @Operation(summary = "删除操作日志", description = "按操作编号批量删除操作日志")
     @DeleteMapping("/{operIds}")
-    public AjaxResult remove(@PathVariable Long[] operIds)
+    public AjaxResult remove(@Parameter(description = "操作编号数组") @PathVariable Long[] operIds)
     {
         return toAjax(operLogService.deleteOperLogByIds(operIds));
     }
 
     @Log(title = "操作日志", businessType = BusinessType.CLEAN)
     @PreAuthorize("@ss.hasPermi('monitor:operlog:remove')")
+    @Operation(summary = "清空操作日志", description = "清空全部系统操作日志")
     @DeleteMapping("/clean")
     public AjaxResult clean()
     {

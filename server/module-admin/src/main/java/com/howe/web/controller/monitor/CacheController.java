@@ -21,12 +21,16 @@ import com.howe.common.constant.CacheConstants;
 import com.howe.common.core.domain.AjaxResult;
 import com.howe.common.utils.StringUtils;
 import com.howe.system.domain.SysCache;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * 缓存监控
  * 
  * @author howe
  */
+@Tag(name = "缓存监控", description = "Redis 缓存信息查询与缓存清理")
 @RestController
 @RequestMapping("/monitor/cache")
 public class CacheController
@@ -47,6 +51,7 @@ public class CacheController
 
     @SuppressWarnings("deprecation")
     @PreAuthorize("@ss.hasPermi('monitor:cache:list')")
+    @Operation(summary = "获取缓存监控信息", description = "返回 Redis 服务信息、键总数以及各命令调用次数统计")
     @GetMapping()
     public AjaxResult getInfo() throws Exception
     {
@@ -71,6 +76,7 @@ public class CacheController
     }
 
     @PreAuthorize("@ss.hasPermi('monitor:cache:list')")
+    @Operation(summary = "获取缓存名称列表", description = "返回系统预置的缓存分类名称")
     @GetMapping("/getNames")
     public AjaxResult cache()
     {
@@ -78,16 +84,18 @@ public class CacheController
     }
 
     @PreAuthorize("@ss.hasPermi('monitor:cache:list')")
+    @Operation(summary = "获取缓存键名列表", description = "按缓存名称前缀模糊匹配所有键名")
     @GetMapping("/getKeys/{cacheName}")
-    public AjaxResult getCacheKeys(@PathVariable String cacheName)
+    public AjaxResult getCacheKeys(@Parameter(description = "缓存名称") @PathVariable String cacheName)
     {
         Set<String> cacheKeys = redisTemplate.keys(cacheName + "*");
         return AjaxResult.success(new TreeSet<>(cacheKeys));
     }
 
     @PreAuthorize("@ss.hasPermi('monitor:cache:list')")
+    @Operation(summary = "获取缓存内容", description = "根据缓存名称与键名查询缓存值")
     @GetMapping("/getValue/{cacheName}/{cacheKey}")
-    public AjaxResult getCacheValue(@PathVariable String cacheName, @PathVariable String cacheKey)
+    public AjaxResult getCacheValue(@Parameter(description = "缓存名称") @PathVariable String cacheName, @Parameter(description = "缓存键名") @PathVariable String cacheKey)
     {
         String cacheValue = redisTemplate.opsForValue().get(cacheKey);
         SysCache sysCache = new SysCache(cacheName, cacheKey, cacheValue);
@@ -95,8 +103,9 @@ public class CacheController
     }
 
     @PreAuthorize("@ss.hasPermi('monitor:cache:list')")
+    @Operation(summary = "清理指定名称缓存", description = "删除该缓存名称前缀下的全部键")
     @DeleteMapping("/clearCacheName/{cacheName}")
-    public AjaxResult clearCacheName(@PathVariable String cacheName)
+    public AjaxResult clearCacheName(@Parameter(description = "缓存名称") @PathVariable String cacheName)
     {
         Collection<String> cacheKeys = redisTemplate.keys(cacheName + "*");
         redisTemplate.delete(cacheKeys);
@@ -104,14 +113,16 @@ public class CacheController
     }
 
     @PreAuthorize("@ss.hasPermi('monitor:cache:list')")
+    @Operation(summary = "清理指定键名缓存", description = "删除单个缓存键")
     @DeleteMapping("/clearCacheKey/{cacheKey}")
-    public AjaxResult clearCacheKey(@PathVariable String cacheKey)
+    public AjaxResult clearCacheKey(@Parameter(description = "缓存键名") @PathVariable String cacheKey)
     {
         redisTemplate.delete(cacheKey);
         return AjaxResult.success();
     }
 
     @PreAuthorize("@ss.hasPermi('monitor:cache:list')")
+    @Operation(summary = "清理全部缓存", description = "删除当前 Redis 库中的所有键")
     @DeleteMapping("/clearCacheAll")
     public AjaxResult clearCacheAll()
     {

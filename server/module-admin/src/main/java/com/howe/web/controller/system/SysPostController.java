@@ -13,6 +13,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.howe.common.annotation.Log;
 import com.howe.common.core.controller.BaseController;
 import com.howe.common.core.domain.AjaxResult;
@@ -27,6 +30,7 @@ import com.howe.system.service.ISysPostService;
  * 
  * @author howe
  */
+@Tag(name = "岗位管理", description = "岗位信息的查询与维护")
 @RestController
 @RequestMapping("/system/post")
 public class SysPostController extends BaseController
@@ -38,6 +42,7 @@ public class SysPostController extends BaseController
      * 获取岗位列表
      */
     @PreAuthorize("@ss.hasPermi('system:post:list')")
+    @Operation(summary = "查询岗位列表", description = "分页查询岗位信息")
     @GetMapping("/list")
     public TableDataInfo list(SysPost post)
     {
@@ -48,6 +53,7 @@ public class SysPostController extends BaseController
     
     @Log(title = "岗位管理", businessType = BusinessType.EXPORT)
     @PreAuthorize("@ss.hasPermi('system:post:export')")
+    @Operation(summary = "导出岗位数据", description = "按查询条件导出岗位 Excel")
     @PostMapping("/export")
     public void export(HttpServletResponse response, SysPost post)
     {
@@ -60,8 +66,9 @@ public class SysPostController extends BaseController
      * 根据岗位编号获取详细信息
      */
     @PreAuthorize("@ss.hasPermi('system:post:query')")
+    @Operation(summary = "获取岗位详细信息", description = "根据岗位编号查询岗位详情")
     @GetMapping(value = "/{postId}")
-    public AjaxResult getInfo(@PathVariable Long postId)
+    public AjaxResult getInfo(@Parameter(description = "岗位编号") @PathVariable Long postId)
     {
         return success(postService.selectPostById(postId));
     }
@@ -71,6 +78,7 @@ public class SysPostController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('system:post:add')")
     @Log(title = "岗位管理", businessType = BusinessType.INSERT)
+    @Operation(summary = "新增岗位", description = "岗位名称与岗位编码均不可重复")
     @PostMapping
     public AjaxResult add(@Validated @RequestBody SysPost post)
     {
@@ -91,6 +99,7 @@ public class SysPostController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('system:post:edit')")
     @Log(title = "岗位管理", businessType = BusinessType.UPDATE)
+    @Operation(summary = "修改岗位", description = "岗位名称与岗位编码不可与其它岗位重复")
     @PutMapping
     public AjaxResult edit(@Validated @RequestBody SysPost post)
     {
@@ -111,8 +120,9 @@ public class SysPostController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('system:post:remove')")
     @Log(title = "岗位管理", businessType = BusinessType.DELETE)
+    @Operation(summary = "删除岗位", description = "岗位已分配给用户时不允许删除")
     @DeleteMapping("/{postIds}")
-    public AjaxResult remove(@PathVariable Long[] postIds)
+    public AjaxResult remove(@Parameter(description = "岗位编号数组") @PathVariable Long[] postIds)
     {
         return toAjax(postService.deletePostByIds(postIds));
     }
@@ -120,6 +130,7 @@ public class SysPostController extends BaseController
     /**
      * 获取岗位选择框列表
      */
+    @Operation(summary = "获取岗位选择框列表", description = "返回全部岗位，供下拉选择使用")
     @GetMapping("/optionselect")
     public AjaxResult optionselect()
     {

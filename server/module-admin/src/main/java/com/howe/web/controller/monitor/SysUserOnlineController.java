@@ -22,12 +22,16 @@ import com.howe.common.enums.BusinessType;
 import com.howe.common.utils.StringUtils;
 import com.howe.system.domain.SysUserOnline;
 import com.howe.system.service.ISysUserOnlineService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * 在线用户监控
  * 
  * @author howe
  */
+@Tag(name = "在线用户监控", description = "查询当前在线会话并支持强制退出")
 @RestController
 @RequestMapping("/monitor/online")
 public class SysUserOnlineController extends BaseController
@@ -39,8 +43,9 @@ public class SysUserOnlineController extends BaseController
     private RedisCache redisCache;
 
     @PreAuthorize("@ss.hasPermi('monitor:online:list')")
+    @Operation(summary = "查询在线用户列表", description = "从 Redis 会话缓存中筛选在线用户，支持按登录地址和用户名过滤")
     @GetMapping("/list")
-    public TableDataInfo list(String ipaddr, String userName)
+    public TableDataInfo list(@Parameter(description = "登录地址") String ipaddr, @Parameter(description = "用户名") String userName)
     {
         Collection<String> keys = redisCache.keys(CacheConstants.LOGIN_TOKEN_KEY + "*");
         List<SysUserOnline> userOnlineList = new ArrayList<SysUserOnline>();
@@ -74,8 +79,9 @@ public class SysUserOnlineController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('monitor:online:forceLogout')")
     @Log(title = "在线用户", businessType = BusinessType.FORCE)
+    @Operation(summary = "强退用户", description = "删除指定会话令牌，强制该用户下线")
     @DeleteMapping("/{tokenId}")
-    public AjaxResult forceLogout(@PathVariable String tokenId)
+    public AjaxResult forceLogout(@Parameter(description = "会话令牌编号") @PathVariable String tokenId)
     {
         redisCache.deleteObject(CacheConstants.LOGIN_TOKEN_KEY + tokenId);
         return success();

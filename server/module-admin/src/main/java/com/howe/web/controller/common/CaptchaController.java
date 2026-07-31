@@ -1,94 +1,64 @@
 package com.howe.web.controller.common;
 
-import java.awt.image.BufferedImage;
-import java.io.IOException;
-import java.util.concurrent.TimeUnit;
-import jakarta.annotation.Resource;
-import javax.imageio.ImageIO;
-import jakarta.servlet.http.HttpServletResponse;
+import com.howe.common.core.domain.AjaxResult;
+import com.howe.framework.captcha.CaptchaService;
+import com.howe.framework.captcha.CaptchaVo;
+import com.howe.framework.captcha.TurnstileService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.util.FastByteArrayOutputStream;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
-import com.google.code.kaptcha.Producer;
-import com.howe.common.config.YmlConfig;
-import com.howe.common.constant.CacheConstants;
-import com.howe.common.constant.Constants;
-import com.howe.common.core.domain.AjaxResult;
-import com.howe.common.core.redis.RedisCache;
-import com.howe.common.utils.sign.Base64;
-import com.howe.common.utils.uuid.IdUtils;
-import com.howe.system.service.ISysConfigService;
 
 /**
  * 验证码操作处理
  *
+ * <p>
+ * 一次请求把登录页需要的两层校验信息都取回去：图形验证码（图片 + 标识）
+ * 与 Cloudflare Turnstile 的开关和站点密钥。两者互相独立，可以只开一个。
+ * </p>
+ *
  * @author howe
  */
+@Tag(name = "验证码", description = "登录页图形验证码与人机校验")
 @RestController
 public class CaptchaController
 {
-    @Resource(name = "captchaProducer")
-    private Producer captchaProducer;
-
-    @Resource(name = "captchaProducerMath")
-    private Producer captchaProducerMath;
+    @Autowired
+    private CaptchaService captchaService;
 
     @Autowired
-    private RedisCache redisCache;
+    private TurnstileService turnstileService;
 
-    @Autowired
-    private ISysConfigService configService;
     /**
      * 生成验证码
      */
+    @Operation(summary = "获取验证码", description = "返回图形验证码图片与人机校验站点密钥，匿名可访问")
     @GetMapping("/captchaImage")
-    public AjaxResult getCode(HttpServletResponse response) throws IOException
+    public AjaxResult getCode()
     {
         AjaxResult ajax = AjaxResult.success();
-        boolean captchaEnabled = configService.selectCaptchaEnabled();
+        // Turnstile 的开关与站点密钥跟验证码开关无关，任何情况下都要下发
+        boolean turnstileEnabled = turnstileService.isEnabled();
+        ajax.put("turnstileEnabled", turnstileEnabled);
+        if (turnstileEnabled)
+        {
+            ajax.put("turnstileSiteKey", turnstileService.getSiteKey());
+        }
+
+        boolean captchaEnabled = captchaService.isEnabled();
         ajax.put("captchaEnabled", captchaEnabled);
         if (!captchaEnabled)
         {
             return ajax;
         }
 
-        // 保存验证码信息
-        String uuid = IdUtils.simpleUUID();
-        String verifyKey = CacheConstants.CAPTCHA_CODE_KEY + uuid;
-
-        String capStr = null, code = null;
-        BufferedImage image = null;
-
-        // 生成验证码
-        String captchaType = YmlConfig.getCaptchaType();
-        if ("math".equals(captchaType))
-        {
-            String capText = captchaProducerMath.createText();
-            capStr = capText.substring(0, capText.lastIndexOf("@"));
-            code = capText.substring(capText.lastIndexOf("@") + 1);
-            image = captchaProducerMath.createImage(capStr);
-        }
-        else if ("char".equals(captchaType))
-        {
-            capStr = code = captchaProducer.createText();
-            image = captchaProducer.createImage(capStr);
-        }
-
-        redisCache.setCacheObject(verifyKey, code, Constants.CAPTCHA_EXPIRATION, TimeUnit.MINUTES);
-        // 转换流信息写出
-        FastByteArrayOutputStream os = new FastByteArrayOutputStream();
-        try
-        {
-            ImageIO.write(image, "jpg", os);
-        }
-        catch (IOException e)
-        {
-            return AjaxResult.error(e.getMessage());
-        }
-
-        ajax.put("uuid", uuid);
-        ajax.put("img", Base64.encode(os.toByteArray()));
+        CaptchaVo captcha = captchaService.create();
+        ajax.put("uuid", captcha.uuid());
+        ajax.put("img", captcha.img());
+        // 图片格式随类型变（GIF 验证码不是 png），前端据此拼 data URI 前缀
+        ajax.put("imgType", captcha.imgType());
+        ajax.put("captchaType", captcha.captchaType());
         return ajax;
     }
 }

@@ -35,17 +35,7 @@
             <artifactId>druid-spring-boot-3-starter</artifactId>
         </dependency>
 
-        <!-- 验证码 -->
-        <dependency>
-            <groupId>pro.fessional</groupId>
-            <artifactId>kaptcha</artifactId>
-            <exclusions>
-                <exclusion>
-                    <artifactId>servlet-api</artifactId>
-                    <groupId>javax.servlet</groupId>
-                </exclusion>
-            </exclusions>
-        </dependency>
+        <!-- 验证码已改用 hutool-captcha（module-common 引入），原 kaptcha 依赖移除 -->
 
         <!-- 获取系统信息 -->
         <dependency>

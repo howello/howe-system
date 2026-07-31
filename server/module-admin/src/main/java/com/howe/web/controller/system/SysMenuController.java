@@ -13,6 +13,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.howe.common.annotation.Log;
 import com.howe.common.constant.UserConstants;
 import com.howe.common.core.controller.BaseController;
@@ -27,6 +30,7 @@ import com.howe.system.service.ISysMenuService;
  * 
  * @author howe
  */
+@Tag(name = "菜单管理", description = "菜单与按钮权限的查询、维护及排序")
 @RestController
 @RequestMapping("/system/menu")
 public class SysMenuController extends BaseController
@@ -38,6 +42,7 @@ public class SysMenuController extends BaseController
      * 获取菜单列表
      */
     @PreAuthorize("@ss.hasPermi('system:menu:list')")
+    @Operation(summary = "查询菜单列表", description = "按当前登录用户可见范围返回菜单集合")
     @GetMapping("/list")
     public AjaxResult list(SysMenu menu)
     {
@@ -49,8 +54,9 @@ public class SysMenuController extends BaseController
      * 根据菜单编号获取详细信息
      */
     @PreAuthorize("@ss.hasPermi('system:menu:query')")
+    @Operation(summary = "获取菜单详细信息", description = "根据菜单编号查询菜单详情")
     @GetMapping(value = "/{menuId}")
-    public AjaxResult getInfo(@PathVariable Long menuId)
+    public AjaxResult getInfo(@Parameter(description = "菜单编号") @PathVariable Long menuId)
     {
         return success(menuService.selectMenuById(menuId));
     }
@@ -58,6 +64,7 @@ public class SysMenuController extends BaseController
     /**
      * 获取菜单下拉树列表
      */
+    @Operation(summary = "获取菜单下拉树列表", description = "返回构建好的菜单树，供选择上级菜单使用")
     @GetMapping("/treeselect")
     public AjaxResult treeselect(SysMenu menu)
     {
@@ -68,8 +75,9 @@ public class SysMenuController extends BaseController
     /**
      * 加载对应角色菜单列表树
      */
+    @Operation(summary = "加载对应角色菜单列表树", description = "返回菜单树以及该角色已勾选的菜单编号")
     @GetMapping(value = "/roleMenuTreeselect/{roleId}")
-    public AjaxResult roleMenuTreeselect(@PathVariable("roleId") Long roleId)
+    public AjaxResult roleMenuTreeselect(@Parameter(description = "角色编号") @PathVariable("roleId") Long roleId)
     {
         List<SysMenu> menus = menuService.selectMenuList(getUserId());
         AjaxResult ajax = AjaxResult.success();
@@ -83,6 +91,7 @@ public class SysMenuController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('system:menu:add')")
     @Log(title = "菜单管理", businessType = BusinessType.INSERT)
+    @Operation(summary = "新增菜单", description = "菜单名称、路由名称与路由地址均不可重复；外链地址须以 http(s):// 开头")
     @PostMapping
     public AjaxResult add(@Validated @RequestBody SysMenu menu)
     {
@@ -107,6 +116,7 @@ public class SysMenuController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('system:menu:edit')")
     @Log(title = "菜单管理", businessType = BusinessType.UPDATE)
+    @Operation(summary = "修改菜单", description = "上级菜单不能选择自己，路由名称或地址不可与其它菜单冲突")
     @PutMapping
     public AjaxResult edit(@Validated @RequestBody SysMenu menu)
     {
@@ -135,6 +145,7 @@ public class SysMenuController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('system:menu:edit')")
     @Log(title = "保存菜单排序", businessType = BusinessType.UPDATE)
+    @Operation(summary = "保存菜单排序", description = "拖拽排序后提交，menuIds 与 orderNums 为逗号分隔的等长序列")
     @PutMapping("/updateSort")
     public AjaxResult updateSort(@RequestBody Map<String, String> params)
     {
@@ -149,8 +160,9 @@ public class SysMenuController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('system:menu:remove')")
     @Log(title = "菜单管理", businessType = BusinessType.DELETE)
+    @Operation(summary = "删除菜单", description = "存在子菜单或已分配给角色时不允许删除")
     @DeleteMapping("/{menuId}")
-    public AjaxResult remove(@PathVariable("menuId") Long menuId)
+    public AjaxResult remove(@Parameter(description = "菜单编号") @PathVariable("menuId") Long menuId)
     {
         if (menuService.hasChildByMenuId(menuId))
         {

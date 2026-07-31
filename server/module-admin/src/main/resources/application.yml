@@ -124,11 +124,38 @@ springdoc:
     enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:true}
     path: /swagger-ui.html
     tags-sorter: alpha
+    operations-sorter: alpha
+  # 分组按业务域拆。原先只扫 com.howe.web.controller.tool，导致文档里只有 TestController，
+  # 其余 26 个 controller 全都看不见。注意 blog/quartz/generator 的 controller 不在 com.howe.web 下
   group-configs:
-    - group: 'default'
-      display-name: '测试模块'
+    - group: '01-系统管理'
+      display-name: '系统管理'
       paths-to-match: '/**'
-      packages-to-scan: com.howe.web.controller.tool
+      packages-to-scan: com.howe.web.controller.system
+    - group: '02-系统监控'
+      display-name: '系统监控'
+      paths-to-match: '/**'
+      packages-to-scan: com.howe.web.controller.monitor
+    - group: '03-通用接口'
+      display-name: '通用接口'
+      paths-to-match: '/**'
+      packages-to-scan: com.howe.web.controller.common
+    - group: '04-博客管理'
+      display-name: '博客管理'
+      paths-to-match: '/**'
+      packages-to-scan: com.howe.blog.controller
+    - group: '05-定时任务'
+      display-name: '定时任务'
+      paths-to-match: '/**'
+      packages-to-scan: com.howe.quartz.controller
+    - group: '06-代码生成'
+      display-name: '代码生成'
+      paths-to-match: '/**'
+      packages-to-scan: com.howe.generator.controller
+    - group: '99-全部接口'
+      display-name: '全部接口'
+      paths-to-match: '/**'
+      packages-to-scan: com.howe
 
 # 防盗链配置
 referer:

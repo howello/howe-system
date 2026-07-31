@@ -1,6 +1,7 @@
 package com.howe.system.domain.vo;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
 /**
@@ -9,51 +10,61 @@ import java.util.List;
  * @author howe
  */
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
+@Schema(description = "路由配置信息")
 public class RouterVo
 {
     /**
      * 路由名字
      */
+    @Schema(description = "路由名字", example = "User")
     private String name;
 
     /**
      * 路由地址
      */
+    @Schema(description = "路由地址", example = "/system/user")
     private String path;
 
     /**
      * 是否隐藏路由，当设置 true 的时候该路由不会再侧边栏出现
      */
+    @Schema(description = "是否隐藏路由，为 true 时该路由不在侧边栏出现", example = "false")
     private boolean hidden;
 
     /**
      * 重定向地址，当设置 noRedirect 的时候该路由在面包屑导航中不可被点击
      */
+    @Schema(description = "重定向地址，设置为 noRedirect 时该路由在面包屑导航中不可点击", example = "noRedirect")
     private String redirect;
 
     /**
      * 组件地址
      */
+    @Schema(description = "组件地址", example = "system/user/index")
     private String component;
 
     /**
      * 路由参数：如 {"id": 1, "name": "ry"}
      */
+    @Schema(description = "路由参数", example = "{\"id\": 1, \"name\": \"ry\"}")
     private String query;
 
     /**
      * 当你一个路由下面的 children 声明的路由大于1个时，自动会变成嵌套的模式--如组件页面
      */
+    @Schema(description = "子路由多于 1 个时自动变成嵌套模式", example = "true")
     private Boolean alwaysShow;
 
     /**
      * 其他元素
      */
+    @Schema(description = "路由显示信息")
     private MetaVo meta;
 
     /**
      * 子路由
      */
+    @Schema(description = "子路由列表")
     private List<RouterVo> children;
 
     public String getName()

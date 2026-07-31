@@ -36,6 +36,18 @@ public interface StorageService
     String store(String key, ContentSource source, long size, String contentType);
 
     /**
+     * 读取文件
+     *
+     * <p>
+     * 下载走这里而不是直接读磁盘：上传早就全量落到对象存储了，本地盘上根本没有文件。
+     * </p>
+     *
+     * @param location 存储时返回的地址（完整 URL 或 /profile 相对路径），也接受裸对象键
+     * @return 文件内容与元信息；文件不存在时返回 {@code null}。调用方必须关闭返回值
+     */
+    StoredObject fetch(String location);
+
+    /**
      * 删除文件
      *
      * @param location 存储时返回的地址（完整 URL 或 /profile 相对路径），也接受裸对象键

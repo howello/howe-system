@@ -1,32 +1,38 @@
 package com.howe.system.domain.vo;
 
 import com.howe.common.utils.StringUtils;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * 路由显示信息
  *
  * @author howe
  */
+@Schema(description = "路由显示信息")
 public class MetaVo
 {
     /**
      * 设置该路由在侧边栏和面包屑中展示的名字
      */
+    @Schema(description = "该路由在侧边栏和面包屑中展示的名字", example = "用户管理")
     private String title;
 
     /**
      * 设置该路由的图标，对应路径src/assets/icons/svg
      */
+    @Schema(description = "该路由的图标，对应路径 src/assets/icons/svg", example = "user")
     private String icon;
 
     /**
      * 设置为true，则不会被 <keep-alive>缓存
      */
+    @Schema(description = "设置为 true 则不会被 keep-alive 缓存", example = "false")
     private boolean noCache;
 
     /**
      * 内链地址（http(s)://开头）
      */
+    @Schema(description = "内链地址（http(s):// 开头）", example = "https://howe.vip")
     private String link;
 
     public MetaVo()

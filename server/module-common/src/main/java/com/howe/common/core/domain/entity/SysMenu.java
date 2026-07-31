@@ -8,65 +8,84 @@ import jakarta.validation.constraints.Size;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import com.howe.common.core.domain.BaseEntity;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * 菜单权限表 sys_menu
  *
  * @author howe
  */
+@Schema(description = "菜单权限对象 sys_menu")
 public class SysMenu extends BaseEntity
 {
     private static final long serialVersionUID = 1L;
 
     /** 菜单ID */
+    @Schema(description = "菜单ID", example = "2000")
     private Long menuId;
 
     /** 菜单名称 */
+    @Schema(description = "菜单名称", example = "用户管理")
     private String menuName;
 
     /** 父菜单名称 */
+    @Schema(description = "父菜单名称", example = "系统管理")
     private String parentName;
 
     /** 父菜单ID */
+    @Schema(description = "父菜单ID", example = "1")
     private Long parentId;
 
     /** 显示顺序 */
+    @Schema(description = "显示顺序", example = "1")
     private Integer orderNum;
 
     /** 路由地址 */
+    @Schema(description = "路由地址", example = "user")
     private String path;
 
     /** 组件路径 */
+    @Schema(description = "组件路径，相对 views 目录且不含 .vue 后缀", example = "system/user/index")
     private String component;
 
     /** 路由参数 */
+    @Schema(description = "路由参数")
     private String query;
 
     /** 路由名称，默认和路由地址相同的驼峰格式（注意：因为vue3版本的router会删除名称相同路由，为避免名字的冲突，特殊情况可以自定义） */
+    @Schema(description = "路由名称，默认为路由地址的驼峰格式，冲突时可自定义", example = "User")
     private String routeName;
 
     /** 是否为外链（0是 1否） */
+    @Schema(description = "是否为外链（0是 1否）", example = "1")
     private String isFrame;
 
     /** 是否缓存（0缓存 1不缓存） */
+    @Schema(description = "是否缓存（0缓存 1不缓存）", example = "0")
     private String isCache;
 
     /** 类型（M目录 C菜单 F按钮） */
+    @Schema(description = "菜单类型（M目录 C菜单 F按钮）", example = "C")
     private String menuType;
 
     /** 显示状态（0显示 1隐藏） */
+    @Schema(description = "显示状态（0显示 1隐藏）", example = "0")
     private String visible;
 
     /** 菜单状态（0正常 1停用） */
+    @Schema(description = "菜单状态（0正常 1停用）", example = "0")
     private String status;
 
     /** 权限字符串 */
+    @Schema(description = "权限标识字符串", example = "system:user:list")
     private String perms;
 
     /** 菜单图标 */
+    @Schema(description = "菜单图标", example = "user")
     private String icon;
 
     /** 子菜单 */
+    @Schema(description = "子菜单列表")
     private List<SysMenu> children = new ArrayList<SysMenu>();
 
     public Long getMenuId()
