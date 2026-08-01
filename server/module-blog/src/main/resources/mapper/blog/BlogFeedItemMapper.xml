@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.blog.mapper.BlogFeedItemMapper">
+
+    <resultMap type="BlogFeedItem" id="BlogFeedItemResult">
+        <result property="itemId"      column="item_id"     />
+        <result property="linkId"      column="link_id"     />
+        <result property="title"       column="title"       />
+        <result property="author"      column="author"      />
+        <result property="url"         column="url"         />
+        <result property="summary"     column="summary"     />
+        <result property="pubDate"     column="pub_date"    />
+        <result property="createTime"  column="create_time" />
+        <!-- 非表字段，join blog_link 带出 -->
+        <result property="linkName"    column="link_name"   />
+    </resultMap>
+
+    <select id="selectBlogFeedItemList" parameterType="BlogFeedItem" resultMap="BlogFeedItemResult">
+        select i.item_id, i.link_id, i.title, i.author, i.url, i.summary, i.pub_date, i.create_time,
+               l.link_name
+        from blog_feed_item i
+        left join blog_link l on l.link_id = i.link_id
+        <where>
+            <!-- 管理端主从联动：选中某个订阅源时只看该源的条目 -->
+            <if test="linkId != null">
+                AND i.link_id = #{linkId}
+            </if>
+            <if test="title != null and title != ''">
+                AND i.title like concat('%', #{title}, '%')
+            </if>
+            <if test="author != null and author != ''">
+                AND i.author like concat('%', #{author}, '%')
+            </if>
+        </where>
+        order by i.pub_date desc, i.item_id desc
+    </select>
+
+    <!--
+      面向 blog-ui 的匿名查询：用 inner join 而非 left join，
+      订阅源被停用（status='1'）或已被删除时，其条目一并从站点上消失。
+      left join 会让「孤儿条目」继续外泄，这里必须收紧。
+    -->
+    <select id="selectPublicFeedItemList" resultMap="BlogFeedItemResult">
+        select i.item_id, i.link_id, i.title, i.author, i.url, i.summary, i.pub_date, i.create_time,
+               l.link_name
+        from blog_feed_item i
+        inner join blog_link l on l.link_id = i.link_id
+        where l.link_type = '2' and l.status = '0'
+        order by i.pub_date desc, i.item_id desc
+    </select>
+
+    <!-- 先查后插的第一步：一次问清哪些 url 已经入过库 -->
+    <select id="selectExistingUrls" resultType="java.lang.String">
+        select url from blog_feed_item where url in
+        <foreach item="url" collection="urls" open="(" separator="," close=")">
+            #{url}
+        </foreach>
+    </select>
+
+    <insert id="batchInsert">
+        insert into blog_feed_item (link_id, title, author, url, summary, pub_date, create_time)
+        values
+        <foreach item="item" collection="list" separator=",">
+            (#{item.linkId}, #{item.title}, #{item.author}, #{item.url}, #{item.summary},
+             #{item.pubDate}, sysdate())
+        </foreach>
+    </insert>
+
+    <delete id="deleteBlogFeedItemByIds" parameterType="Long">
+        delete from blog_feed_item where item_id in
+        <foreach item="itemId" collection="array" open="(" separator="," close=")">
+            #{itemId}
+        </foreach>
+    </delete>
+
+    <delete id="deleteByLinkId" parameterType="Long">
+        delete from blog_feed_item where link_id = #{linkId}
+    </delete>
+
+</mapper>

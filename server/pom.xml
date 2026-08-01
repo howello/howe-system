@@ -33,6 +33,7 @@
         <swagger-annotations.version>2.2.47</swagger-annotations.version>
         <aws-sdk.version>2.46.21</aws-sdk.version>
         <hutool.version>5.8.36</hutool.version>
+        <rome.version>2.1.0</rome.version>
     </properties>
 
     <!-- 依赖声明 -->
@@ -64,6 +65,17 @@
                 <version>${hutool.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+
+            <!-- ROME：RSS/Atom 解析。
+                 这是「网络请求、文件与 IO 工具统一用 hutool」约定的显式例外：
+                 抓取目标是不受控的第三方博客，RSS 2.0 与 Atom 的字段差异、
+                 RFC822/ISO8601 的多种日期变体都需大量实战校正，手写解析会持续踩坑。
+                 HTTP 取流仍用 hutool HttpRequest，ROME 只负责解析已取回的字节流。 -->
+            <dependency>
+                <groupId>com.rometools</groupId>
+                <artifactId>rome</artifactId>
+                <version>${rome.version}</version>
             </dependency>
 
             <!-- 阿里数据库连接池 -->

@@ -23,6 +23,12 @@
             <artifactId>module-common</artifactId>
         </dependency>
 
+        <!-- RSS/Atom 解析：统一 RSS 0.9/1.0/2.0 与 Atom 0.3/1.0 为 SyndFeed 模型 -->
+        <dependency>
+            <groupId>com.rometools</groupId>
+            <artifactId>rome</artifactId>
+        </dependency>
+
     </dependencies>
 
 </project>

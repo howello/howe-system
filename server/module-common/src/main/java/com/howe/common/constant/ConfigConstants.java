@@ -69,6 +69,18 @@ public class ConfigConstants
     /** 博客开放接口令牌，空值等于关闭 */
     public static final String BLOG_OPEN_TOKEN = "blog.open.token";
 
+    /** RSS 抓取超时（毫秒） */
+    public static final String BLOG_FEED_TIMEOUT = "blog.feed.timeout";
+
+    /** RSS 响应体大小上限（字节），防超大 RSS 撑爆内存 */
+    public static final String BLOG_FEED_MAX_SIZE = "blog.feed.maxSize";
+
+    /** RSS 摘要剥离 HTML 后的截断字数 */
+    public static final String BLOG_FEED_SUMMARY_LENGTH = "blog.feed.summaryLength";
+
+    /** RSS 请求 User-Agent，部分站点拒绝默认 UA */
+    public static final String BLOG_FEED_USER_AGENT = "blog.feed.userAgent";
+
     /** 验证码开关 */
     public static final String CAPTCHA_ENABLED = "sys.account.captchaEnabled";
 
