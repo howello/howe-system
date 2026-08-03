@@ -5,7 +5,9 @@ import com.howe.blog.domain.BlogLink;
 import com.howe.blog.domain.BlogTalk;
 import com.howe.blog.domain.vo.BlogLinkGroupVo;
 import com.howe.blog.domain.vo.BlogLinkPublicVo;
+import com.howe.blog.domain.vo.BlogNoticePublicVo;
 import com.howe.blog.domain.vo.BlogTalkPublicVo;
+import com.howe.blog.mapper.BlogNoticeMapper;
 import com.howe.blog.service.IBlogFeedItemService;
 import com.howe.blog.service.IBlogLinkService;
 import com.howe.blog.service.IBlogTalkService;
@@ -76,6 +78,7 @@ public class BlogPublicController extends BaseController {
     private final IBlogLinkService blogLinkService;
     private final IBlogFeedItemService blogFeedItemService;
     private final IBlogTalkService blogTalkService;
+    private final BlogNoticeMapper blogNoticeMapper;
 
     /**
      * 按请求参数分页，但把每页条数钳在上限内
@@ -84,8 +87,9 @@ public class BlogPublicController extends BaseController {
         PageDomain pageDomain = TableSupport.buildPageRequest();
         Integer pageNum = pageDomain.getPageNum();
         Integer pageSize = pageDomain.getPageSize();
-        PageHelper.startPage(pageNum == null ? 1 : pageNum,
-                Math.min(pageSize == null ? 10 : pageSize, MAX_PAGE_SIZE));
+        int safePageNum = pageNum == null ? 1 : Math.max(pageNum, 1);
+        int safePageSize = pageSize == null ? 10 : Math.max(Math.min(pageSize, MAX_PAGE_SIZE), 1);
+        PageHelper.startPage(safePageNum, safePageSize);
     }
 
     /**
@@ -145,6 +149,21 @@ public class BlogPublicController extends BaseController {
                 .map(t -> new BlogTalkPublicVo(t.getContent(), t.getTags(), t.getPubDate(), t.getIsTop()))
                 .toList());
         return table;
+    }
+
+    /**
+     * 分页查询已发布的博客公告
+     *
+     * @return 公告分页数据
+     */
+    @Operation(summary = "查询博客公开公告", description = "返回正常状态的通知公告，按创建时间倒序")
+    @Anonymous
+    @RateLimiter(time = 60, count = 60, limitType = LimitType.IP)
+    @GetMapping("/notices")
+    public TableDataInfo notices() {
+        startPublicPage();
+        List<BlogNoticePublicVo> list = blogNoticeMapper.selectPublicNoticeList();
+        return getDataTable(list);
     }
 
     /**

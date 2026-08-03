@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.blog.mapper.BlogNoticeMapper">
+
+    <resultMap id="BlogNoticePublicResult" type="com.howe.blog.domain.vo.BlogNoticePublicVo">
+        <constructor>
+            <idArg name="noticeId" column="notice_id" javaType="java.lang.Long" />
+            <arg name="noticeTitle" column="notice_title" javaType="java.lang.String" />
+            <arg name="noticeContent" column="notice_content" javaType="java.lang.String" />
+            <arg name="createTime" column="create_time" javaType="java.util.Date" />
+        </constructor>
+    </resultMap>
+
+    <select id="selectPublicNoticeList" resultMap="BlogNoticePublicResult">
+        select notice_id, notice_title, notice_content, create_time
+        from sys_notice
+        where status = '0'
+          and notice_type = '1'
+        order by create_time desc, notice_id desc
+    </select>
+
+</mapper>
