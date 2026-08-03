@@ -34,12 +34,12 @@ public class BlogLink extends BaseEntity {
     @Schema(description = "类型（1友链 2RSS订阅源）", example = "1")
     private String linkType;
 
-    @Schema(description = "站点名称", example = "韩小韩博客")
+    @Schema(description = "站点名称", example = "王艳涛博客")
     @NotBlank(message = "站点名称不能为空")
     @Size(max = 128, message = "站点名称长度不能超过128个字符")
     private String linkName;
 
-    @Schema(description = "站点地址", example = "https://www.vvhan.com")
+    @Schema(description = "站点地址", example = "https://www.wyantao.com")
     @Size(max = 500, message = "站点地址长度不能超过500个字符")
     private String linkUrl;
 
@@ -55,7 +55,7 @@ public class BlogLink extends BaseEntity {
     @Size(max = 64, message = "分组编码长度不能超过64个字符")
     private String groupCode;
 
-    @Schema(description = "RSS/Atom 订阅地址（仅订阅源使用）", example = "https://www.vvhan.com/rss.xml")
+    @Schema(description = "RSS/Atom 订阅地址（仅订阅源使用）", example = "https://www.wyantao.com/rss.xml")
     @Size(max = 500, message = "订阅地址长度不能超过500个字符")
     private String rssUrl;
 

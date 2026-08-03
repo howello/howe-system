@@ -31,10 +31,10 @@ public class BlogFeedItem implements Serializable {
     @Schema(description = "条目标题", example = "一篇博客文章")
     private String title;
 
-    @Schema(description = "条目作者", example = "韩小韩")
+    @Schema(description = "条目作者", example = "王艳涛")
     private String author;
 
-    @Schema(description = "条目原文链接，同时是去重唯一键", example = "https://www.vvhan.com/article/1")
+    @Schema(description = "条目原文链接，同时是去重唯一键", example = "https://www.wyantao.com/article/1")
     private String url;
 
     @Schema(description = "摘要纯文本，抓取时已剥离HTML并截断")
@@ -49,6 +49,6 @@ public class BlogFeedItem implements Serializable {
     private Date createTime;
 
     /** 非表字段：来源站点名称，由 join blog_link 带出 */
-    @Schema(description = "来源站点名称（非表字段，join 带出）", example = "韩小韩博客")
+    @Schema(description = "来源站点名称（非表字段，join 带出）", example = "王艳涛博客")
     private String linkName;
 }
