@@ -153,7 +153,9 @@ springdoc:
       paths-to-match: '/**'
       packages-to-scan: com.howe.generator.controller
     - group: '99-全部接口'
-      display-name: '全部接口'
+      # 以 0 开头让它在 swagger-ui 的分组下拉里排第一、默认选中显示全部接口
+      # （swagger-config 的 urls 按 display-name 的 Unicode 码点升序排列，与 group 前缀无关）
+      display-name: '0-全部接口'
       paths-to-match: '/**'
       packages-to-scan: com.howe
 
