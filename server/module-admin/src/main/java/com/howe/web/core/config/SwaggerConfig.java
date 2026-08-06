@@ -2,7 +2,6 @@ package com.howe.web.core.config;
 
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import com.howe.common.config.YmlConfig;
@@ -25,13 +24,6 @@ public class SwaggerConfig {
     @Autowired
     private YmlConfig ymlConfig;
 
-    /** 绑定地址与端口（来自 .env，经 compose env_file 注入），用于拼 swagger Try it out 的请求基址 */
-    @Value("${BIND_HOST:127.0.0.1}")
-    private String bindHost;
-
-    @Value("${APP_PORT:9527}")
-    private String appPort;
-
     /**
      * 自定义的 OpenAPI 对象
      */
@@ -42,11 +34,10 @@ public class SwaggerConfig {
                         .addSecuritySchemes("apikey", securityScheme()))
                 .addSecurityItem(new SecurityRequirement().addList("apikey"))
                 .info(getApiInfo());
-        // 用 BIND_HOST:APP_PORT 拼 server 基址（如 http://127.0.0.1:9527），Try it out 直连后端端口、
-        // 不经 nginx 反代，所以协议是 http 且不带 /api。生产要外部可达就把 BIND_HOST 设成可达地址
-        if (bindHost != null && !bindHost.isBlank()) {
-            openApi.servers(List.of(new Server().url("http://" + bindHost + ":" + appPort)));
-        }
+        // 相对 server /api：swagger-ui 按当前页面 origin 解析成「协议://域名/api」。
+        // 在 https://admin.wyantao.com/api/swagger-ui 打开时即自动拼出 https://admin.wyantao.com/api，
+        // 协议与域名随访问方式自动变化，无需在配置里写死；/api 前缀与前端 VITE_APP_BASE_API / Nginx 反代硬耦合
+        openApi.servers(List.of(new Server().url("/api")));
         return openApi;
     }
 
