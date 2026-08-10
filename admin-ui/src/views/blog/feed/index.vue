@@ -67,7 +67,7 @@
                   <span v-else class="feed-ok">—</span>
                </template>
             </el-table-column>
-            <el-table-column label="操作" align="center" width="210" class-name="small-padding fixed-width">
+            <el-table-column label="操作" align="center" width="210" fixed="right" class-name="small-padding fixed-width">
                <template #default="scope">
                   <el-button link type="warning" icon="Refresh" @click="handleSyncOne(scope.row)" v-hasPermi="['blog:feed:sync']">同步</el-button>
                   <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['blog:feed:edit']">修改</el-button>

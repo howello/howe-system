@@ -65,7 +65,7 @@
             </template>
          </el-table-column>
          <el-table-column label="发布路径" align="left" prop="publishedPath" :show-overflow-tooltip="true" min-width="180" />
-         <el-table-column label="操作" align="center" width="220" class-name="small-padding fixed-width">
+         <el-table-column label="操作" align="center" width="220" fixed="right" class-name="small-padding fixed-width">
             <template #default="scope">
                <el-button link type="primary" icon="Edit" :disabled="scope.row.status === '1'" @click="handleUpdate(scope.row)" v-hasPermi="['blog:draft:edit']">修改</el-button>
                <el-button link type="success" icon="Upload" :disabled="scope.row.status === '1'" @click="handlePublish(scope.row)" v-hasPermi="['blog:draft:publish']">发布</el-button>
