@@ -24,6 +24,7 @@ export * from "./monitor/jobLog";
 export * from "./monitor/logininfor";
 export * from "./monitor/operlog";
 export * from "./monitor/online";
+export * from "./monitor/server";
 
 // 博客模块
 export * from "./blog/article";
@@ -31,6 +32,9 @@ export * from "./blog/draft";
 export * from "./blog/link";
 export * from "./blog/feed";
 export * from "./blog/talk";
+
+// 首页工作台
+export * from "./home/stats";
 
 // 代码生成模块
 export * from "./tool/gen";

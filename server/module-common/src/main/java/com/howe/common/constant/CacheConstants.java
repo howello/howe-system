@@ -41,4 +41,9 @@ public class CacheConstants
      * 登录账户密码错误次数 redis key
      */
     public static final String PWD_ERR_CNT_KEY = "pwd_err_cnt:";
+
+    /**
+     * 首页统计缓存 key（完整键名，无冒号后缀）
+     */
+    public static final String HOME_STATS_KEY = "home:stats:summary";
 }

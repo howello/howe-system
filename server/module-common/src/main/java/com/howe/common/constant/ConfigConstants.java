@@ -108,4 +108,7 @@ public class ConfigConstants
 
     /** Turnstile 校验超时（毫秒） */
     public static final String TURNSTILE_TIMEOUT = "sys.turnstile.timeout";
+
+    /** 首页博客统计聚合结果缓存 TTL（秒），参数页修改即时生效 */
+    public static final String HOME_STATS_CACHE_TTL = "sys.home.statsCacheTtl";
 }
