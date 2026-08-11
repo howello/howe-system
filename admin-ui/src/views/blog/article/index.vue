@@ -35,6 +35,9 @@
             <el-button type="primary" plain icon="Plus" @click="handleAdd" v-hasPermi="['blog:article:add']">新增</el-button>
          </el-col>
          <el-col :span="1.5">
+            <el-button type="primary" plain icon="DocumentAdd" @click="handleQuickAdd" v-hasPermi="['blog:article:add']">一键新增</el-button>
+         </el-col>
+         <el-col :span="1.5">
             <el-button type="success" plain icon="Edit" :disabled="single" @click="handleUpdate()" v-hasPermi="['blog:article:edit']">修改</el-button>
          </el-col>
          <el-col :span="1.5">
@@ -163,6 +166,25 @@
             </div>
          </template>
       </el-dialog>
+
+      <!-- 一键新增对话框 -->
+      <el-dialog title="一键新增" v-model="quickAddOpen" width="680px" top="8vh" append-to-body :close-on-click-modal="false" @close="handleQuickAddClose">
+         <el-input
+            v-model="quickAddText"
+            type="textarea"
+            :rows="14"
+            placeholder="粘贴聊天投稿生成的 JSON。可含 slug / title / categories / tags / filePath / content / publishDate / cover / recommend / hide / top / overwrite；未知字段会被忽略"
+         />
+         <el-alert v-if="quickAddErrors.length > 0" type="error" show-icon :closable="false" title="解析失败" style="margin-top: 8px">
+            <p v-for="err in quickAddErrors" :key="err" class="quick-add-error-item">{{ err }}</p>
+         </el-alert>
+         <template #footer>
+            <div class="dialog-footer">
+               <el-button type="primary" @click="handleParseAndOpen">解析并打开表单</el-button>
+               <el-button @click="quickAddOpen = false">取 消</el-button>
+            </div>
+         </template>
+      </el-dialog>
    </div>
 </template>
 
@@ -187,6 +209,11 @@ const total = ref<number>(0)
 const title = ref<string>("")
 const dateRange = ref<string[]>([])
 
+// ---- 一键新增状态 ----
+const quickAddOpen = ref<boolean>(false)
+const quickAddText = ref<string>("")
+const quickAddErrors = ref<string[]>([])
+
 const data = reactive({
   form: {} as BlogArticle,
   queryParams: {
@@ -209,6 +236,130 @@ const data = reactive({
 })
 
 const { queryParams, form, rules } = toRefs(data)
+
+// ---- 一键新增：JSON 解析与校验（与 BlogArticlePublishBody 同形） ----
+const QUICK_ADD_FIELD_WHITELIST = [
+  "slug", "title", "categories", "tags", "filePath", "content",
+  "publishDate", "cover", "recommend", "hide", "top", "overwrite"
+] as const
+
+const QUICK_ADD_REQUIRED_FIELDS = ["slug", "title", "categories", "content"] as const
+
+/** 一键新增解析成功 */
+interface QuickAddSuccess {
+  ok: true
+  article: BlogArticle
+  overwrite: boolean
+}
+
+/** 一键新增解析失败 */
+interface QuickAddFailure {
+  ok: false
+  errors: string[]
+}
+
+type QuickAddParseResult = QuickAddSuccess | QuickAddFailure
+
+/** 布尔开关 → '1'/'0'，保留字符串 "1"/"0" 容错；非法类型返回 undefined */
+function toSwitchFlag(value: unknown): "0" | "1" | undefined {
+  if (value === undefined || value === null) return "0"
+  if (typeof value === "boolean") return value ? "1" : "0"
+  if (value === "1") return "1"
+  if (value === "0") return "0"
+  return undefined
+}
+
+/**
+ * 解析「一键新增」粘贴的 JSON 为 BlogArticle。
+ * 白名单过滤（未知字段忽略）；tags 数组 → 逗号串；recommend/hide/top 布尔 → '1'/'0'（JSON 键 top → 表单字段 isTop）；
+ * publishDate/cover/filePath 字符串透传；overwrite 单独取出、不写入 form；
+ * slug/title/categories/content 必填；非法 JSON / tags 类型不符 / 开关类型不符给出具体错误。
+ */
+function parseArticleJson(text: string): QuickAddParseResult {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return { ok: false, errors: ["JSON 解析失败：请检查粘贴内容是否为合法的 JSON"] }
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return { ok: false, errors: ["JSON 顶层必须是对象（由一个或多个文章字段组成）"] }
+  }
+  // 白名单过滤：直接删除未白名单的键，避免未知字段漏进表单
+  const source = parsed as Record<string, unknown>
+  for (const key of Object.keys(source)) {
+    if (!(QUICK_ADD_FIELD_WHITELIST as readonly string[]).includes(key)) {
+      delete source[key]
+    }
+  }
+
+  // 1. 必填字段校验：缺失 / 非字符串 / trim 后为空 分别报具体错误
+  const errors: string[] = []
+  for (const key of QUICK_ADD_REQUIRED_FIELDS) {
+    const value = source[key]
+    if (value === undefined || value === null) {
+      errors.push(`缺少必填字段：${key}`)
+    } else if (typeof value !== "string") {
+      errors.push(`字段 ${key} 必须是字符串`)
+    } else if (value.trim() === "") {
+      errors.push(`字段 ${key} 不能为空`)
+    }
+  }
+  if (errors.length > 0) {
+    return { ok: false, errors }
+  }
+
+  // 2. 可选字符串字段类型校验：类型不符时报错，不静默丢弃（与必填/标签/开关的错误处理一致）
+  for (const key of ["filePath", "publishDate", "cover"]) {
+    const value = source[key]
+    if (value !== undefined && value !== null && typeof value !== "string") {
+      errors.push(`字段 ${key} 必须是字符串`)
+    }
+  }
+  if (errors.length > 0) {
+    return { ok: false, errors }
+  }
+
+  // 3. tags 必须是字符串数组（可空），去空白与空项后 join 成逗号串
+  let tags = ""
+  if (source.tags !== undefined) {
+    if (!Array.isArray(source.tags) || source.tags.some(item => typeof item !== "string")) {
+      return { ok: false, errors: ['tags 必须是字符串数组，如 ["标签1", "标签2"]'] }
+    }
+    tags = (source.tags as string[]).map(item => item.trim()).filter(item => item !== "").join(",")
+  }
+
+  // 4. 布尔开关 → '1'/'0'；JSON 键 top 映射到表单字段 isTop
+  const recommend = toSwitchFlag(source.recommend)
+  const hide = toSwitchFlag(source.hide)
+  const top = toSwitchFlag(source.top)
+  if (recommend === undefined || hide === undefined || top === undefined) {
+    return { ok: false, errors: ['recommend / hide / top 必须是布尔值（true/false）或字符串 "1"/"0"'] }
+  }
+
+  // 5. overwrite 单独取出，不写入表单；仅接受布尔或 "true"/"false"
+  const ow = source.overwrite
+  if (ow !== undefined && ow !== null && typeof ow !== "boolean" && ow !== "true" && ow !== "false") {
+    return { ok: false, errors: ['overwrite 必须是布尔值（true/false）'] }
+  }
+  const overwrite = ow === true || ow === "true"
+
+  const article: BlogArticle = {
+    articleId: undefined,
+    slug: source.slug as string,
+    title: source.title as string,
+    categories: source.categories as string,
+    content: source.content as string,
+    tags,
+    recommend,
+    hide,
+    isTop: top,
+    filePath: typeof source.filePath === "string" ? source.filePath : undefined,
+    publishDate: typeof source.publishDate === "string" ? source.publishDate : undefined,
+    cover: typeof source.cover === "string" ? source.cover : undefined
+  }
+  return { ok: true, article, overwrite }
+}
 
 // 三个开关在表里是 '0'/'1'，界面上用复选框更直观
 const topFlag = computed({
@@ -288,6 +439,61 @@ function handleAdd() {
   title.value = "新增文章"
 }
 
+/** 一键新增 slug 预检（基于当前列表，尽力而为；后端 insertBlogArticle 仍会兜底） */
+interface SlugPreCheckOk {
+  blocked: false
+  message: string | null
+}
+interface SlugPreCheckBlocked {
+  blocked: true
+  message: string
+}
+type SlugPreCheckResult = SlugPreCheckOk | SlugPreCheckBlocked
+function preCheckSlug(slug: string, overwrite: boolean): SlugPreCheckResult {
+  const occupied = articleList.value.some((item: BlogArticle) => item.slug === slug)
+  if (occupied && overwrite) {
+    return { blocked: true, message: "一键新增仅支持新建，覆盖请走既有修改流程" }
+  }
+  if (occupied) {
+    return { blocked: false, message: `文章标识已存在：${slug}` }
+  }
+  return { blocked: false, message: null }
+}
+
+/** 一键新增按钮操作：打开粘贴弹窗并清空上次状态 */
+function handleQuickAdd() {
+  quickAddText.value = ""
+  quickAddErrors.value = []
+  quickAddOpen.value = true
+}
+
+/** 一键新增弹窗关闭：重置粘贴内容与解析状态 */
+function handleQuickAddClose() {
+  quickAddText.value = ""
+  quickAddErrors.value = []
+}
+
+/** 解析 JSON，预检通过后转入可编辑的新增表单（提交仍走既有 submitForm） */
+function handleParseAndOpen() {
+  const result = parseArticleJson(quickAddText.value)
+  if (!result.ok) {
+    quickAddErrors.value = result.errors
+    return
+  }
+  const slug = result.article.slug as string
+  const check = preCheckSlug(slug, result.overwrite)
+  if (check.message) {
+    proxy.$modal.msgWarning(check.message)
+  }
+  if (check.blocked) {
+    return
+  }
+  // 复用既有新增表单路径：reset + 赋值 + 打开；提交走 submitForm → addArticle
+  handleAdd()
+  Object.assign(form.value, result.article)
+  quickAddOpen.value = false
+}
+
 /** 修改按钮操作 */
 function handleUpdate(row?: BlogArticle) {
   reset()
@@ -358,3 +564,9 @@ function handleExport() {
 
 getList()
 </script>
+
+<style scoped>
+.quick-add-error-item {
+  margin: 4px 0 0;
+}
+</style>
