@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>server</artifactId>
+        <groupId>com.howe</groupId>
+        <version>3.9.2</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>module-ai</artifactId>
+    <description>管理员助手基础模块</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.howe</groupId>
+            <artifactId>module-common</artifactId>
+        </dependency>
+        <!-- 管理员助手领域契约与公共层：Tool SPI 等对 module-blog 等提供方开放的契约下沉于此 -->
+        <dependency>
+            <groupId>com.howe</groupId>
+            <artifactId>module-ai-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- 集成测试连真实 MySQL（独立隔离库 howe-ai-itest，不碰业务库）：驱动由 spring-boot BOM 管版本 -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

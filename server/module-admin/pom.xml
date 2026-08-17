@@ -60,6 +60,18 @@
             <artifactId>module-blog</artifactId>
         </dependency>
 
+        <!-- 管理员助手模块 -->
+        <dependency>
+            <groupId>com.howe</groupId>
+            <artifactId>module-ai</artifactId>
+        </dependency>
+
+        <!-- 管理员助手领域契约与公共层：由 admin 汇聚，供 Tool 提供方反向实现 SPI -->
+        <dependency>
+            <groupId>com.howe</groupId>
+            <artifactId>module-ai-common</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>

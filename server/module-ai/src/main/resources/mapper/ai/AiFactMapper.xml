@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.ai.persistence.AiFactMapper">
+  <insert id="insertAgent" parameterType="map" useGeneratedKeys="true" keyProperty="agentId" keyColumn="agent_id">
+    INSERT INTO ai_agent(agent_key,name,draft_version,status,draft_json,create_by,create_time,update_by,update_time)
+    VALUES(#{agentKey},#{name},0,'0',#{draftJson},#{createBy},NOW(),#{createBy},NOW())
+  </insert>
+  <select id="selectAgent" resultType="map">SELECT * FROM ai_agent WHERE agent_id=#{agentId}</select>
+  <select id="selectAgentVersions" resultType="map">
+    SELECT version_id,agent_id,version_no,system_prompt,route_snapshot,tool_snapshot,capability_snapshot,budget_snapshot,published_by,published_time
+    FROM ai_agent_version WHERE agent_id=#{agentId} ORDER BY version_no DESC LIMIT #{offset},#{limit}
+  </select>
+  <update id="disableAgent">UPDATE ai_agent SET status='1',update_time=NOW() WHERE agent_id=#{agentId} AND status='0'</update>
+  <update id="publishAgent">UPDATE ai_agent a JOIN ai_agent_version v ON v.version_id=#{versionId} AND v.agent_id=#{agentId} SET a.published_version_id=v.version_id,a.update_by=#{updateBy},a.update_time=NOW(),v.published_by=#{updateBy},v.published_time=NOW() WHERE a.agent_id=#{agentId} AND a.status='0' AND v.published_time IS NULL</update>
+  <select id="selectConversationAgent" resultType="map">SELECT a.agent_id,a.status,a.published_version_id,v.version_no,v.system_prompt,v.route_snapshot,v.tool_snapshot,v.budget_snapshot FROM ai_conversation c JOIN ai_agent a ON a.agent_id=c.agent_id LEFT JOIN ai_agent_version v ON v.version_id=a.published_version_id WHERE c.conversation_id=#{conversationId} AND (c.user_id=#{userId} OR #{userId}=1)</select>
+  <insert id="insertApiKey" parameterType="map" useGeneratedKeys="true" keyProperty="keyId" keyColumn="key_id">INSERT INTO ai_channel_key(channel_id,secret_cipher,enabled,created_time) VALUES(#{channelId},#{secret},'1',NOW())</insert>
+  <update id="updateAgentDraft">
+    UPDATE ai_agent SET draft_json=#{draftJson}, draft_version=draft_version+1, update_by=#{updateBy}, update_time=NOW()
+    WHERE agent_id=#{agentId} AND draft_version=#{expectedVersion} AND status='0' AND published_version_id IS NULL
+  </update>
+  <insert id="insertRun" parameterType="map" useGeneratedKeys="true" keyProperty="runId" keyColumn="run_id">
+    INSERT INTO ai_run (conversation_id,agent_id,agent_version_id,status,route_snapshot,tool_snapshot,budget_snapshot,idempotency_key,create_time,update_time)
+    VALUES (#{conversationId},#{agentId},#{agentVersionId},#{status},#{routeSnapshot},#{toolSnapshot},#{budgetSnapshot},#{idempotencyKey},NOW(),NOW())
+    ON DUPLICATE KEY UPDATE run_id=LAST_INSERT_ID(run_id)
+  </insert>
+  <insert id="insertMessage" parameterType="map" useGeneratedKeys="true" keyProperty="messageId" keyColumn="message_id">
+    INSERT INTO ai_message(conversation_id,run_id,role,content,metadata_json,create_time)
+    VALUES(#{conversationId},#{runId},#{role},#{content},#{metadataJson},NOW())
+  </insert>
+  <select id="selectRunIdByIdempotency" resultType="long">
+    SELECT run_id FROM ai_run WHERE conversation_id=#{conversationId} AND idempotency_key=#{idempotencyKey}
+  </select>
+  <select id="lockRun" resultType="long">
+    SELECT run_id FROM ai_run WHERE run_id=#{runId} FOR UPDATE
+  </select>
+  <select id="selectNextEventSequence" resultType="long">
+    SELECT COALESCE(MAX(sequence_no), 0) + 1 FROM ai_run_event WHERE run_id=#{runId}
+  </select>
+  <!-- 唯一键 (run_id, idempotency_key) 上的幂等查询：消息重投时复用既有序号而不是再插一条。 -->
+  <select id="selectEventSequenceByIdempotency" resultType="java.lang.Long">
+    SELECT sequence_no FROM ai_run_event WHERE run_id=#{runId} AND idempotency_key=#{idempotencyKey}
+  </select>
+  <insert id="insertOutbox">
+    INSERT INTO ai_outbox_event(aggregate_type,aggregate_id,event_type,payload_json,idempotency_key,status,attempts,available_time)
+    VALUES(#{aggregateType},#{aggregateId},#{eventType},#{payloadJson},#{idempotencyKey},'PENDING',0,NOW())
+    ON DUPLICATE KEY UPDATE outbox_id=LAST_INSERT_ID(outbox_id)
+  </insert>
+  <select id="selectPendingOutbox" resultType="map">
+    SELECT outbox_id, aggregate_type, aggregate_id, event_type, payload_json, idempotency_key
+    FROM ai_outbox_event WHERE status='PENDING' AND available_time &lt;= NOW()
+    ORDER BY outbox_id LIMIT #{limit}
+  </select>
+  <update id="markOutboxSent">
+    UPDATE ai_outbox_event SET status='SENT', sent_time=NOW(), attempts=attempts+1
+    WHERE outbox_id=#{outboxId} AND status='PENDING'
+  </update>
+  <update id="recordOutboxFailure">
+    UPDATE ai_outbox_event SET attempts=attempts+1, available_time=DATE_ADD(NOW(), INTERVAL LEAST(attempts * 5, 300) SECOND)
+    WHERE outbox_id=#{outboxId} AND status='PENDING'
+  </update>
+  <update id="claimRunLease">
+    UPDATE ai_run SET worker_id=#{workerId}, lease_until=#{leaseUntil}, heartbeat_time=NOW(),
+      update_time=NOW()
+    WHERE run_id=#{runId} AND status=#{expectedStatus}
+      AND status NOT IN ('SUCCEEDED','FAILED','CANCELLED','TIMED_OUT')
+      AND (lease_until IS NULL OR lease_until &lt;= NOW())
+  </update>
+  <update id="renewRunLease">
+    UPDATE ai_run SET lease_until=#{leaseUntil}, heartbeat_time=NOW(), update_time=NOW()
+    WHERE run_id=#{runId} AND worker_id=#{workerId}
+      AND status NOT IN ('SUCCEEDED','FAILED','CANCELLED','TIMED_OUT')
+      AND lease_until &gt; NOW()
+  </update>
+  <select id="selectExpiredLeases" resultType="map">
+    SELECT run_id, status, worker_id, lease_until, recovery_count
+    FROM ai_run WHERE lease_until IS NOT NULL AND lease_until &lt; NOW()
+      AND status NOT IN ('SUCCEEDED','FAILED','CANCELLED','TIMED_OUT')
+      AND recovery_count &lt;= #{maxRecoveryCount}
+    ORDER BY update_time LIMIT 100
+  </select>
+  <update id="incrementRecoveryCount">
+    UPDATE ai_run SET recovery_count=recovery_count+1, worker_id=NULL, lease_until=NULL, update_time=NOW()
+    WHERE run_id=#{runId} AND status NOT IN ('SUCCEEDED','FAILED','CANCELLED','TIMED_OUT')
+  </update>
+  <update id="markRunRecoveryDead">
+    UPDATE ai_run SET status='FAILED', error_code=#{errorCode}, worker_id=NULL, lease_until=NULL,
+      finished_time=NOW(), update_time=NOW()
+    WHERE run_id=#{runId} AND status NOT IN ('SUCCEEDED','FAILED','CANCELLED','TIMED_OUT')
+  </update>
+  <insert id="insertCheckpoint">
+    INSERT INTO ai_run_checkpoint(run_id,sequence_no,state_json,create_time)
+    VALUES(#{runId},#{sequenceNo},#{stateJson},NOW())
+    ON DUPLICATE KEY UPDATE state_json=VALUES(state_json)
+  </insert>
+  <insert id="insertAgentVersion" parameterType="map" useGeneratedKeys="true" keyProperty="versionId" keyColumn="version_id">
+    INSERT INTO ai_agent_version(agent_id,version_no,system_prompt,route_snapshot,tool_snapshot,capability_snapshot,budget_snapshot,published_time)
+    VALUES(#{agentId},#{versionNo},#{systemPrompt},#{routeSnapshot},#{toolSnapshot},#{capabilitySnapshot},#{budgetSnapshot},NULL)
+  </insert>
+  <select id="selectAgentVersion" resultType="map">
+    SELECT version_id,agent_id,version_no,system_prompt,route_snapshot,tool_snapshot,capability_snapshot,budget_snapshot,published_by,published_time
+    FROM ai_agent_version WHERE agent_id=#{agentId} AND version_no=#{versionNo}
+  </select>
+  <update id="updateRunStatus">
+    UPDATE ai_run r JOIN ai_conversation c ON c.conversation_id=r.conversation_id
+    SET r.status=#{status}, r.update_time=NOW(), r.finished_time=IF(#{status} IN ('SUCCEEDED','FAILED','CANCELLED','TIMED_OUT'),NOW(),r.finished_time)
+    WHERE r.run_id=#{runId} AND (c.user_id=#{userId} OR #{userId}=1) AND r.status=#{expectedStatus}
+      AND r.status NOT IN ('SUCCEEDED','FAILED','CANCELLED','TIMED_OUT')
+  </update>
+  <update id="updateRunStatusWithLease">
+    UPDATE ai_run SET status=#{status}, update_time=NOW(), finished_time=IF(#{status} IN ('SUCCEEDED','FAILED','CANCELLED','TIMED_OUT'),NOW(),finished_time)
+    WHERE run_id=#{runId} AND status=#{expectedStatus} AND worker_id=#{workerId}
+      AND lease_until &gt; NOW() AND status NOT IN ('SUCCEEDED','FAILED','CANCELLED','TIMED_OUT')
+  </update>
+  <insert id="insertEvent">
+    INSERT INTO ai_run_event(run_id,sequence_no,event_type,event_json,idempotency_key,create_time)
+    VALUES(#{runId},#{sequenceNo},#{eventType},#{eventJson},#{idempotencyKey},NOW())
+  </insert>
+  <select id="selectRunEvents" resultType="map">
+    SELECT e.event_id,e.run_id,e.sequence_no,e.event_type,e.event_json,e.idempotency_key,e.create_time
+    FROM ai_run_event e JOIN ai_run r ON r.run_id=e.run_id JOIN ai_conversation c ON c.conversation_id=r.conversation_id
+    WHERE e.run_id=#{runId} AND (c.user_id=#{userId} OR #{userId}=1)
+    ORDER BY e.sequence_no LIMIT #{offset},#{limit}
+  </select>
+  <select id="selectRunEventsAfter" resultType="map">
+    SELECT event_id,run_id,sequence_no,event_type,event_json,idempotency_key,create_time
+    FROM ai_run_event WHERE run_id=#{runId} AND sequence_no &gt; #{sequence}
+    ORDER BY sequence_no LIMIT #{limit}
+  </select>
+  <select id="selectRunSnapshot" resultType="map">
+    SELECT run_id, agent_id, agent_version_id, route_snapshot, tool_snapshot, budget_snapshot, status,
+      worker_id, lease_until, recovery_count FROM ai_run WHERE run_id=#{runId}
+  </select>
+  <!-- Harness 执行上下文：只读取 Run 创建时固化的快照与已发布版本，不回读可变草稿。 -->
+  <select id="selectRunExecutionContext" resultType="map">
+    SELECT r.run_id, r.route_snapshot, r.budget_snapshot, v.system_prompt,
+      (SELECT m.content FROM ai_message m
+        WHERE m.conversation_id=r.conversation_id AND m.role='user'
+        ORDER BY m.message_id DESC LIMIT 1) AS user_prompt
+    FROM ai_run r JOIN ai_agent_version v ON v.version_id=r.agent_version_id
+    WHERE r.run_id=#{runId}
+  </select>
+  <select id="countRunAccess" resultType="int">
+    SELECT COUNT(1) FROM ai_run r JOIN ai_conversation c ON c.conversation_id=r.conversation_id
+    WHERE r.run_id=#{runId} AND (c.user_id=#{userId} OR #{userId}=1)
+  </select>
+  <select id="selectModelCalls" resultType="map">
+    SELECT m.call_id,m.run_id,m.channel_id,m.model_id,m.status,m.request_started,m.request_finished,m.usage_json,m.price_snapshot,m.estimated_cost,m.actual_cost,m.error_json
+    FROM ai_model_call m JOIN ai_run r ON r.run_id=m.run_id JOIN ai_conversation c ON c.conversation_id=r.conversation_id
+    WHERE m.run_id=#{runId} AND (c.user_id=#{userId} OR #{userId}=1)
+    ORDER BY m.call_id DESC LIMIT #{offset},#{limit}
+  </select>
+  <select id="selectToolCalls" resultType="map">
+    SELECT t.tool_call_id,t.run_id,t.tool_key,t.idempotency_key,t.status,t.request_json,t.result_summary,t.started_time,t.finished_time
+    FROM ai_tool_call t JOIN ai_run r ON r.run_id=t.run_id JOIN ai_conversation c ON c.conversation_id=r.conversation_id
+    WHERE t.run_id=#{runId} AND (c.user_id=#{userId} OR #{userId}=1)
+    ORDER BY t.tool_call_id DESC LIMIT #{offset},#{limit}
+  </select>
+  <!-- 建会话前校验 Agent：必须存在、启用（status='0'）且已发布（published_version_id 非空）。 -->
+  <select id="selectPublishableAgent" resultType="map">
+    SELECT agent_id, agent_key, name, status, published_version_id
+    FROM ai_agent WHERE agent_key=#{agentKey}
+  </select>
+  <insert id="insertConversation" parameterType="map" useGeneratedKeys="true" keyProperty="conversationId" keyColumn="conversation_id">
+    INSERT INTO ai_conversation(agent_id,user_id,title,status,create_time,update_time)
+    VALUES(#{agentId},#{userId},#{title},'ACTIVE',NOW(),NOW())
+  </insert>
+  <select id="selectConversations" resultType="map">
+    SELECT conversation_id, agent_id, user_id, title, status, create_time, update_time
+    FROM ai_conversation
+    WHERE (user_id=#{userId} OR #{userId}=1)
+    <if test="keyword != null and keyword != ''">
+      AND title LIKE CONCAT('%', #{keyword}, '%')
+    </if>
+    ORDER BY update_time DESC LIMIT #{offset},#{limit}
+  </select>
+  <select id="countConversations" resultType="int">
+    SELECT COUNT(1) FROM ai_conversation
+    WHERE (user_id=#{userId} OR #{userId}=1)
+    <if test="keyword != null and keyword != ''">
+      AND title LIKE CONCAT('%', #{keyword}, '%')
+    </if>
+  </select>
+</mapper>

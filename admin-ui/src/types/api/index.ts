@@ -38,3 +38,6 @@ export * from "./home/stats";
 
 // 代码生成模块
 export * from "./tool/gen";
+
+// AI 管理员助手模块
+export * from "./ai";
