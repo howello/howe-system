@@ -75,4 +75,13 @@ public interface BlogLinkMapper {
      */
     public int updateSyncResult(@Param("linkId") Long linkId, @Param("lastSyncTime") Date lastSyncTime,
                                 @Param("lastError") String lastError);
+
+    /**
+     * 按站点地址与类型查询友链
+     *
+     * @param linkUrl  站点地址
+     * @param linkType 类型（1友链 2RSS订阅源）
+     * @return 友链，不存在返回 null
+     */
+    public BlogLink selectBlogLinkByUrl(@Param("linkUrl") String linkUrl, @Param("linkType") String linkType);
 }

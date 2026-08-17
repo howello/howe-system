@@ -114,4 +114,13 @@ public class ConfigConstants
 
     /** 首页博客统计聚合结果缓存 TTL（秒），参数页修改即时生效 */
     public static final String HOME_STATS_CACHE_TTL = "sys.home.statsCacheTtl";
+
+    /** waline 评论列表端点（默认 https://waline.wyantao.com/api/comment） */
+    public static final String BLOG_WALINE_URL = "blog.waline.url";
+
+    /** waline 每页条数（默认 10） */
+    public static final String BLOG_WALINE_PAGE_SIZE = "blog.waline.pageSize";
+
+    /** waline 请求超时（毫秒，默认 30000） */
+    public static final String BLOG_WALINE_TIMEOUT = "blog.waline.timeout";
 }
