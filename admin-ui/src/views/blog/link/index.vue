@@ -83,6 +83,21 @@
 
       <!-- 新增/修改对话框 -->
       <el-dialog :title="title" v-model="open" width="680px" append-to-body :close-on-click-modal="false">
+         <!-- 粘贴友链快捷新增 -->
+         <el-collapse v-model="quickAddActive" style="margin-bottom: 16px">
+            <el-collapse-item title="粘贴友链快捷新增" name="quickAdd">
+               <el-input
+                  v-model="quickAddText"
+                  type="textarea"
+                  :rows="5"
+                  placeholder="粘贴友链申请文本，格式：&#10;name: 王艳涛博客&#10;link: https://www.wyantao.com/&#10;avatar: https://q1.qlogo.cn/g?b=qq&nk=1669937522&s=640&#10;desc: 保持努力，保持进步。"
+               />
+               <div style="margin-top: 12px">
+                  <el-button type="primary" @click="parseLinkText" :loading="parsing">解析并填充</el-button>
+                  <el-button @click="quickAddText = ''">清空</el-button>
+               </div>
+            </el-collapse-item>
+         </el-collapse>
          <el-form ref="linkRef" :model="form" :rules="rules" label-width="90px">
             <el-row :gutter="20">
                <el-col :span="12">
@@ -105,7 +120,21 @@
                <el-input v-model="form.linkUrl" placeholder="请输入完整地址，含 https://" />
             </el-form-item>
             <el-form-item label="图标地址" prop="avatar">
-               <el-input v-model="form.avatar" placeholder="留空则站点页展示名称首字" />
+               <el-input v-model="form.avatar" placeholder="留空则站点页展示名称首字">
+                  <template #append>
+                     <el-upload
+                        ref="avatarUploadRef"
+                        :action="uploadAvatarUrl"
+                        :headers="headers"
+                        :show-file-list="false"
+                        :on-success="handleAvatarUploadSuccess"
+                        :before-upload="handleAvatarBeforeUpload"
+                        accept="image/*"
+                     >
+                        <el-button :icon="Upload">上传</el-button>
+                     </el-upload>
+                  </template>
+               </el-input>
             </el-form-item>
             <el-form-item label="站点描述" prop="descr">
                <el-input v-model="form.descr" type="textarea" :rows="2" placeholder="一句话介绍，会展示在友链卡片上" />
@@ -140,6 +169,8 @@
 </template>
 
 <script setup lang="ts" name="BlogLink">
+import { Upload } from "@element-plus/icons-vue"
+import { getToken } from "@/utils/auth"
 import { listLink, getLink, delLink, addLink, updateLink } from "@/api/blog/link"
 import type { BlogLink, BlogLinkQueryParams } from "@/types/api/blog/link"
 
@@ -177,6 +208,140 @@ const data = reactive({
 
 const { queryParams, form, rules } = toRefs(data)
 
+// 快捷新增折叠状态
+const quickAddActive = ref<string[]>([])
+const quickAddText = ref<string>("")
+const parsing = ref<boolean>(false)
+
+// 头像上传
+const avatarUploadRef = ref()
+const uploadAvatarUrl = ref(import.meta.env.VITE_APP_BASE_API + "/common/upload")
+const headers = ref({ Authorization: "Bearer " + getToken() })
+
+/** 解析粘贴的友链文本 */
+async function parseLinkText() {
+  if (!quickAddText.value.trim()) {
+    proxy.$modal.msgWarning("请先粘贴友链文本")
+    return
+  }
+  parsing.value = true
+  try {
+    const lines = quickAddText.value.split(/\r?\n/)
+    const fields: Record<string, string> = {}
+    for (const line of lines) {
+      const trimmed = line.trim().replace("：", ":")
+      if (!trimmed) continue
+      const colon = trimmed.indexOf(":")
+      if (colon < 0) continue
+      const key = trimmed.substring(0, colon).trim().toLowerCase()
+      const value = trimmed.substring(colon + 1).trim()
+      if (["name", "link", "avatar", "desc"].includes(key)) {
+        fields[key] = value
+      }
+    }
+
+    if (!fields.name) {
+      proxy.$modal.msgError("解析失败：缺少 name 字段")
+      return
+    }
+
+    // 填充表单
+    form.value.linkName = fields.name
+    form.value.linkUrl = fields.link || ""
+    form.value.descr = fields.desc || ""
+
+    // avatar 特殊处理：非 URL 自动转文件上传
+    const avatar = fields.avatar || ""
+    if (avatar && !/^https?:\/\//i.test(avatar)) {
+      proxy.$modal.msg("检测到非 URL 头像，正在转存到 R2...")
+      const uploadedUrl = await uploadAvatarAsFile(avatar)
+      form.value.avatar = uploadedUrl
+    } else {
+      form.value.avatar = avatar
+    }
+
+    proxy.$modal.msgSuccess("解析成功")
+    quickAddActive.value = [] // 折叠收起
+  } catch (error: any) {
+    proxy.$modal.msgError("解析失败：" + (error.message || error))
+  } finally {
+    parsing.value = false
+  }
+}
+
+/** 头像上传成功回调 */
+function handleAvatarUploadSuccess(response: any) {
+  if (response.code === 200 && response.url) {
+    form.value.avatar = response.url
+    proxy.$modal.msgSuccess("上传成功")
+  } else {
+    proxy.$modal.msgError(response.msg || "上传失败")
+  }
+}
+
+/** 头像上传前校验 */
+function handleAvatarBeforeUpload(file: File) {
+  const extension = file.name.split(".").pop()?.toLowerCase()
+  const imageExtensions = ["png", "jpg", "jpeg", "gif", "webp", "svg"]
+  const isImage = file.type.startsWith("image/") || imageExtensions.includes(extension || "")
+  const isLt5M = file.size / 1024 / 1024 < 5
+  if (!isImage) {
+    proxy.$modal.msgError("只能上传图片文件")
+    return false
+  }
+  if (!isLt5M) {
+    proxy.$modal.msgError("图片大小不能超过 5MB")
+    return false
+  }
+  return true
+}
+
+/** 把非 URL 的 avatar（base64/svg 代码）转成文件上传到 R2 */
+async function uploadAvatarAsFile(content: string): Promise<string> {
+  let blob: Blob
+  let filename: string
+  const trimmed = content.trim()
+
+  if (/^data:image\//i.test(trimmed)) {
+    // base64 格式
+    const match = trimmed.match(/^data:(image\/[^;]+);base64,([\s\S]+)$/i)
+    if (!match) {
+      throw new Error("base64 格式不合法")
+    }
+    const mimeType = match[1].toLowerCase()
+    const base64Data = match[2].replace(/\s/g, "")
+    const byteString = atob(base64Data)
+    const arrayBuffer = new Uint8Array(byteString.length)
+    for (let i = 0; i < byteString.length; i++) {
+      arrayBuffer[i] = byteString.charCodeAt(i)
+    }
+    blob = new Blob([arrayBuffer], { type: mimeType })
+    const extension = mimeType === "image/svg+xml" ? "svg" : mimeType.split("/")[1]
+    filename = "avatar." + extension
+  } else if (/^<svg[\s>]/i.test(trimmed) || /<svg[\\s>]/i.test(trimmed)) {
+    // svg 代码
+    blob = new Blob([trimmed], { type: "image/svg+xml" })
+    filename = "avatar.svg"
+  } else {
+    throw new Error("无法识别的头像格式（需要 http(s) URL、base64 或 svg 代码）")
+  }
+
+  const formData = new FormData()
+  formData.append("file", blob, filename)
+
+  const response = await fetch(uploadAvatarUrl.value, {
+    method: "POST",
+    headers: { Authorization: headers.value.Authorization },
+    body: formData
+  })
+
+  const result = await response.json()
+  if (!response.ok || result.code !== 200 || !result.url) {
+    throw new Error(result.msg || "上传失败")
+  }
+  return result.url
+}
+
 /** 查询友链列表 */
 function getList() {
   loading.value = true
@@ -208,6 +373,8 @@ function reset() {
     status: "0",
     remark: undefined
   }
+  quickAddActive.value = []
+  quickAddText.value = ""
   proxy.resetForm("linkRef")
 }
 

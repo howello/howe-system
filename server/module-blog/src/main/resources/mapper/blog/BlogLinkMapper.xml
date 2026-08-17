@@ -132,4 +132,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where link_id = #{linkId} and link_type = '2'
     </update>
 
+    <!-- waline 同步去重：按站点地址与类型查询，已存在则跳过写入 -->
+    <select id="selectBlogLinkByUrl" resultMap="BlogLinkResult">
+        <include refid="selectBlogLinkVo"/>
+        where link_url = #{linkUrl} and link_type = #{linkType}
+        limit 1
+    </select>
+
 </mapper>
