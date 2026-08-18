@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.ai.config.AiConfigMapper">
+  <select id="list" resultType="map">
+    SELECT * FROM ${table}
+    <where><if test="keyword != null and keyword != ''">AND <choose><when test="table == 'ai_provider'">(provider_key LIKE CONCAT('%',#{keyword},'%') OR name LIKE CONCAT('%',#{keyword},'%'))</when><when test="table == 'ai_model'">(model_key LIKE CONCAT('%',#{keyword},'%') OR model_name LIKE CONCAT('%',#{keyword},'%'))</when><when test="table == 'ai_route_policy'">(policy_key LIKE CONCAT('%',#{keyword},'%') OR name LIKE CONCAT('%',#{keyword},'%'))</when><when test="table == 'ai_agent'">(agent_key LIKE CONCAT('%',#{keyword},'%') OR name LIKE CONCAT('%',#{keyword},'%'))</when><otherwise>1=1</otherwise></choose></if></where>
+    ORDER BY 1 DESC LIMIT #{offset},#{limit}
+  </select>
+  <select id="get" resultType="map">SELECT * FROM ${table} WHERE ${idColumn}=#{id}</select>
+  <update id="toggle">UPDATE ${table} SET enabled=#{enabled} WHERE ${idColumn}=#{id}</update>
+  <delete id="delete">DELETE FROM ${table} WHERE ${idColumn}=#{id}</delete>
+  <insert id="insertApiKey">INSERT INTO ai_channel_key(channel_id,secret_cipher,key_version,enabled,created_time) VALUES(#{channelId},#{ciphertext},#{keyVersion},'1',NOW())</insert>
+  <update id="disableApiKeys">UPDATE ai_channel_key SET enabled='0',replaced_time=NOW() WHERE channel_id=#{channelId} AND enabled='1'</update>
+  <insert id="insert">
+    INSERT INTO ${table} (${columns}) VALUES (${values})
+  </insert>
+  <update id="update">
+    UPDATE ${table} SET ${assignments} WHERE ${idColumn}=#{id}
+  </update>
+</mapper>

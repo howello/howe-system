@@ -23,6 +23,18 @@
             <artifactId>module-common</artifactId>
         </dependency>
 
+        <!-- AI 领域契约：反向实现 AiToolProvider SPI 暴露只读 Tool，不得依赖 module-ai 实现 -->
+        <dependency>
+            <groupId>com.howe</groupId>
+            <artifactId>module-ai-common</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <!-- RSS/Atom 解析：统一 RSS 0.9/1.0/2.0 与 Atom 0.3/1.0 为 SyndFeed 模型 -->
         <dependency>
             <groupId>com.rometools</groupId>

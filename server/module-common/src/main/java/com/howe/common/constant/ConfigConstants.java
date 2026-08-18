@@ -81,6 +81,9 @@ public class ConfigConstants
     /** RSS 请求 User-Agent，部分站点拒绝默认 UA */
     public static final String BLOG_FEED_USER_AGENT = "blog.feed.userAgent";
 
+    /** 博客站点公共 URL 基址，AI 博客 Tool 据此拼文章公开链接（如 https://www.wyantao.com） */
+    public static final String BLOG_SITE_URL = "blog.site.url";
+
     /** 验证码开关 */
     public static final String CAPTCHA_ENABLED = "sys.account.captchaEnabled";
 

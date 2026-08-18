@@ -205,6 +205,20 @@
                 <version>${howe.version}</version>
             </dependency>
 
+            <!-- 管理员助手模块 -->
+            <dependency>
+                <groupId>com.howe</groupId>
+                <artifactId>module-ai</artifactId>
+                <version>${howe.version}</version>
+            </dependency>
+
+            <!-- 管理员助手领域契约与公共层（AI 域子集） -->
+            <dependency>
+                <groupId>com.howe</groupId>
+                <artifactId>module-ai-common</artifactId>
+                <version>${howe.version}</version>
+            </dependency>
+
             <!-- 通用工具-->
             <dependency>
                 <groupId>com.howe</groupId>
@@ -250,6 +264,8 @@
         <module>module-quartz</module>
         <module>module-generator</module>
         <module>module-blog</module>
+        <module>module-ai</module>
+        <module>module-ai-common</module>
         <module>module-common</module>
         <module>module-automation</module>
     </modules>
