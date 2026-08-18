@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.quartz.mapper.SysJobLogDetailMapper">
+
+    <resultMap type="SysJobLogDetail" id="SysJobLogDetailResult">
+        <id     property="detailId"  column="detail_id" />
+        <result property="jobLogId"   column="job_log_id" />
+        <result property="stepNo"     column="step_no" />
+        <result property="stepName"   column="step_name" />
+        <result property="status"     column="status" />
+        <result property="message"    column="message" />
+        <result property="errorInfo"  column="error_info" />
+        <result property="startTime"  column="start_time" />
+        <result property="endTime"    column="end_time" />
+        <result property="durationMs" column="duration_ms" />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+
+    <select id="selectDetailList" parameterType="Long" resultMap="SysJobLogDetailResult">
+        select detail_id, job_log_id, step_no, step_name, status, message,
+               error_info, start_time, end_time, duration_ms, create_time
+        from sys_job_log_detail
+        where job_log_id = #{jobLogId}
+        order by step_no asc, detail_id asc
+    </select>
+
+    <insert id="insertDetail" parameterType="SysJobLogDetail"
+            useGeneratedKeys="true" keyProperty="detailId">
+        insert into sys_job_log_detail(
+            job_log_id, step_no, step_name, status, message, error_info,
+            start_time, end_time, duration_ms, create_time
+        ) values (
+            #{jobLogId}, #{stepNo}, #{stepName}, #{status}, #{message}, #{errorInfo},
+            #{startTime}, #{endTime}, #{durationMs}, sysdate()
+        )
+    </insert>
+
+    <update id="updateDetail" parameterType="SysJobLogDetail">
+        update sys_job_log_detail
+        set status = #{status},
+            message = #{message},
+            error_info = #{errorInfo},
+            end_time = #{endTime},
+            duration_ms = #{durationMs}
+        where detail_id = #{detailId}
+          and job_log_id = #{jobLogId}
+    </update>
+
+    <delete id="deleteByJobLogIds" parameterType="Long">
+        delete from sys_job_log_detail
+        where job_log_id in
+        <foreach collection="array" item="jobLogId" open="(" separator="," close=")">
+            #{jobLogId}
+        </foreach>
+    </delete>
+
+    <delete id="cleanDetails">
+        truncate table sys_job_log_detail
+    </delete>
+
+</mapper>

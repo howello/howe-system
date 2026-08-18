@@ -34,6 +34,13 @@ public interface ISysJobLogService
     public void addJobLog(SysJobLog jobLog);
 
     /**
+     * 更新任务日志
+     *
+     * @param jobLog 调度日志信息
+     */
+    public void updateJobLog(SysJobLog jobLog);
+
+    /**
      * 批量删除调度日志信息
      *
      * @param logIds 需要删除的日志ID

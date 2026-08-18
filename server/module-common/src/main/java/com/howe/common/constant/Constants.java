@@ -51,6 +51,11 @@ public class Constants
     public static final String FAIL = "1";
 
     /**
+     * 调度任务执行中标识
+     */
+    public static final String RUNNING = "2";
+
+    /**
      * 登录成功
      */
     public static final String LOGIN_SUCCESS = "Success";
@@ -163,7 +168,7 @@ public class Constants
     /**
      * 定时任务白名单配置（仅允许访问的包名，如其他需要可以自行添加）
      */
-    public static final String[] JOB_WHITELIST_STR = { "com.howe.quartz.task" };
+    public static final String[] JOB_WHITELIST_STR = { "com.howe.quartz.task", "com.howe.automation.task" };
 
     /**
      * 定时任务违规的字符

@@ -1,7 +1,7 @@
 # 生产部署编排：直接拉取 CI 构建好的镜像，不在服务器上编译
 #
-# 与 docker-compose.yml 的唯一区别是去掉了 build 段、改用远程镜像，
-# 其余（容器名、端口、挂载、环境变量）必须与之保持一致。
+# app/web 与 docker-compose.yml 的区别是去掉 build 段、改用远程镜像；
+# 生产额外提供独立的 Playwright browser 服务，app 通过内部 WebSocket 连接。
 #
 # 用法：
 #   docker compose -f docker-compose.prod.yml pull
@@ -22,6 +22,9 @@ services: # 容器服务定义
       TZ: ${TZ} # 应用时区
       SERVER_PORT: ${APP_PORT} # 服务端口
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE} # 激活配置环境
+      # 生产环境通过内部 Playwright WebSocket 使用独立 browser 服务
+      AUTOMATION_BROWSER_MODE: remote
+      AUTOMATION_BROWSER_ENDPOINT: ${AUTOMATION_BROWSER_ENDPOINT:-ws://browser:3000/}
     ports: # 后端端口映射（默认仅本机访问）
       - "${BIND_HOST}:${APP_PORT}:${APP_PORT}"
     volumes: # 后端日志与外部配置挂载
@@ -29,6 +32,30 @@ services: # 容器服务定义
       # 外部配置目录：优先级高于镜像内打包的 application.yml，改后重启容器即生效
       - ./server/config:/app/config
     user: "0:0" # 以 root 运行避免日志目录权限问题（生产环境建议用命名卷）
+
+  browser: # Playwright 远程浏览器，仅供 app 内部连接
+    image: mcr.microsoft.com/playwright:v1.62.0-noble
+    container_name: ${PROJECT_NAME}-browser
+    restart: unless-stopped
+    command: ["npx", "--yes", "playwright@1.62.0", "run-server", "--host", "0.0.0.0", "--port", "3000"]
+    expose:
+      - "3000"
+    init: true
+    ipc: host
+    shm_size: "1gb"
+    mem_limit: "1g"
+    cpus: "1.0"
+    environment:
+      TZ: ${TZ}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          node -e "fetch('http://127.0.0.1:3000').then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
 
   web: # 前端应用服务
     # 镜像由 .github/workflows/build-web.yml 构建推送

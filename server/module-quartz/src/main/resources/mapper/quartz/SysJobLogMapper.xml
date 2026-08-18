@@ -71,7 +71,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         truncate table sys_job_log
     </update>
 
- 	<insert id="insertJobLog" parameterType="SysJobLog">
+	<insert id="insertJobLog" parameterType="SysJobLog"
+		useGeneratedKeys="true" keyProperty="jobLogId">
  		insert into sys_job_log(
  			<if test="jobLogId != null and jobLogId != 0">job_log_id,</if>
  			<if test="jobName != null and jobName != ''">job_name,</if>
@@ -96,5 +97,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
  			sysdate()
  		)
 	</insert>
+
+	<update id="updateJobLog" parameterType="SysJobLog">
+		update sys_job_log
+		set job_message = #{jobMessage},
+			status = #{status},
+			exception_info = #{exceptionInfo},
+			end_time = #{endTime}
+		where job_log_id = #{jobLogId}
+	</update>
 
 </mapper>

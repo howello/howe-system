@@ -60,6 +60,12 @@
             <artifactId>module-blog</artifactId>
         </dependency>
 
+        <!-- 浏览器自动化模块 -->
+        <dependency>
+            <groupId>com.howe</groupId>
+            <artifactId>module-automation</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>
