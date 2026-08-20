@@ -16,12 +16,15 @@ services: # 容器服务定义
     image: kilimaca/howe-system-app:${APP_TAG:-latest}
     container_name: ${PROJECT_NAME}-app # 后端容器名称（Nginx 反代按此名解析，不可改）
     restart: unless-stopped # 容器重启策略
+    networks:
+      - shared_net
     env_file: # 从 .env 注入业务环境变量
       - .env
     environment: # 部署固定项（覆盖 .env 中同名键）
       TZ: ${TZ} # 应用时区
       SERVER_PORT: ${APP_PORT} # 服务端口
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE} # 激活配置环境
+      JAVA_OPTS: "-Xms256m -Xmx512m -XX:MaxMetaspaceSize=128m -XX:+UseG1GC"
     ports: # 后端端口映射（默认仅本机访问）
       - "${BIND_HOST}:${APP_PORT}:${APP_PORT}"
     volumes: # 后端日志与外部配置挂载
@@ -36,6 +39,8 @@ services: # 容器服务定义
     image: kilimaca/howe-system-web:${WEB_TAG:-latest}
     container_name: ${PROJECT_NAME}-web # 前端容器名称
     restart: unless-stopped # 容器重启策略
+    networks:
+      - shared_net
     environment: # Nginx 模板渲染变量
       TZ: ${TZ} # 容器时区
       WEB_PORT: ${WEB_PORT} # 前端监听端口
@@ -45,3 +50,8 @@ services: # 容器服务定义
       - "${BIND_HOST}:${WEB_PORT}:${WEB_PORT}"
     depends_on: # 前端依赖后端
       - app
+
+# 顶层声明：同样使用外部网络
+networks:
+  shared_net:
+    external: true   # 再次声明，指向同一个已存在的网络
