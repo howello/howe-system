@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import type { JobLogQueryParams, SysJobLog, AjaxResult, TableDataInfo } from '@/types'
+import type { JobLogQueryParams, SysJobLog, SysJobLogDetail, AjaxResult, TableDataInfo } from '@/types'
 
 // 查询调度日志列表
 export function listJobLog(query: JobLogQueryParams): Promise<TableDataInfo<SysJobLog[]>> {
@@ -23,6 +23,14 @@ export function cleanJobLog(): Promise<AjaxResult> {
   return request({
     url: '/monitor/jobLog/clean',
     method: 'delete'
+  })
+}
+
+// 查询一次调度执行的步骤明细
+export function listJobLogDetails(jobLogId: number): Promise<AjaxResult<SysJobLogDetail[]>> {
+  return request({
+    url: `/monitor/jobLog/${jobLogId}/details`,
+    method: 'get'
   })
 }
 

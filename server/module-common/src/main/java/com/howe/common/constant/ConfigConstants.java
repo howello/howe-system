@@ -123,4 +123,22 @@ public class ConfigConstants
 
     /** waline 请求超时（毫秒，默认 30000） */
     public static final String BLOG_WALINE_TIMEOUT = "blog.waline.timeout";
+
+    /** 浏览器自动化连接方式：local 应用内启动本地 Chromium / remote 连接远程 Playwright WebSocket（已废弃，生产改本地持久 Chromium） */
+    public static final String AUTOMATION_BROWSER_MODE = "automation.browser.mode";
+
+    /** 远程 Playwright server WebSocket 地址，mode=remote 时必填（已废弃，不再使用） */
+    public static final String AUTOMATION_BROWSER_ENDPOINT = "automation.browser.endpoint";
+
+    /** 是否以 headless 模式启动本地浏览器 */
+    public static final String AUTOMATION_BROWSER_HEADLESS = "automation.browser.headless";
+
+    /** 全局持久浏览器 profile 目录（UserDataDir），所有任务共用，挂宿主机卷持久保存登录态 */
+    public static final String AUTOMATION_BROWSER_PROFILE_DIR = "automation.browser.profileDir";
+
+    /** 页面默认操作超时（毫秒，默认 10000） */
+    public static final String AUTOMATION_BROWSER_TIMEOUT_MS = "automation.browser.timeoutMs";
+
+    /** 页面导航超时（毫秒，默认 30000） */
+    public static final String AUTOMATION_BROWSER_NAVIGATION_TIMEOUT_MS = "automation.browser.navigationTimeoutMs";
 }

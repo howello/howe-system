@@ -16,18 +16,24 @@ services: # 容器服务定义
     image: kilimaca/howe-system-app:${APP_TAG:-latest}
     container_name: ${PROJECT_NAME}-app # 后端容器名称（Nginx 反代按此名解析，不可改）
     restart: unless-stopped # 容器重启策略
+    networks:
+      - shared_net
     env_file: # 从 .env 注入业务环境变量
       - .env
     environment: # 部署固定项（覆盖 .env 中同名键）
       TZ: ${TZ} # 应用时区
       SERVER_PORT: ${APP_PORT} # 服务端口
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE} # 激活配置环境
+      JAVA_OPTS: "-Xms256m -Xmx512m -XX:MaxMetaspaceSize=128m -XX:+UseG1GC"
+      # 全局持久浏览器 profile 由 app 容器内本地 Chromium 使用；profileDir 参数值应指向 /app/browser-profile
     ports: # 后端端口映射（默认仅本机访问）
       - "${BIND_HOST}:${APP_PORT}:${APP_PORT}"
     volumes: # 后端日志与外部配置挂载
       - ./server/logs:/app/logs
       # 外部配置目录：优先级高于镜像内打包的 application.yml，改后重启容器即生效
       - ./server/config:/app/config
+      # 全局持久浏览器 profile：宿主机目录，容器重建不丢登录态
+      - ./server/data/browser-profile:/app/browser-profile
     user: "0:0" # 以 root 运行避免日志目录权限问题（生产环境建议用命名卷）
 
   web: # 前端应用服务
@@ -35,6 +41,8 @@ services: # 容器服务定义
     # 注意 VITE_APP_TITLE 已在 CI 构建期烘进静态产物，此处及 .env 中再改无效
     image: kilimaca/howe-system-web:${WEB_TAG:-latest}
     container_name: ${PROJECT_NAME}-web # 前端容器名称
+    networks:
+      - shared_net
     restart: unless-stopped # 容器重启策略
     environment: # Nginx 模板渲染变量
       TZ: ${TZ} # 容器时区
@@ -45,3 +53,8 @@ services: # 容器服务定义
       - "${BIND_HOST}:${WEB_PORT}:${WEB_PORT}"
     depends_on: # 前端依赖后端
       - app
+
+# 顶层声明：同样使用外部网络
+networks:
+  shared_net:
+    external: true   # 再次声明，指向同一个已存在的网络

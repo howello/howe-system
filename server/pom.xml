@@ -34,6 +34,7 @@
         <aws-sdk.version>2.46.21</aws-sdk.version>
         <hutool.version>5.8.36</hutool.version>
         <rome.version>2.1.0</rome.version>
+        <playwright.version>1.62.0</playwright.version>
     </properties>
 
     <!-- 依赖声明 -->
@@ -225,6 +226,20 @@
                 <version>${howe.version}</version>
             </dependency>
 
+            <!-- 浏览器自动化 -->
+            <dependency>
+                <groupId>com.howe</groupId>
+                <artifactId>module-automation</artifactId>
+                <version>${howe.version}</version>
+            </dependency>
+
+            <!-- Playwright Java -->
+            <dependency>
+                <groupId>com.microsoft.playwright</groupId>
+                <artifactId>playwright</artifactId>
+                <version>${playwright.version}</version>
+            </dependency>
+
         </dependencies>
     </dependencyManagement>
 
@@ -252,6 +267,7 @@
         <module>module-ai</module>
         <module>module-ai-common</module>
         <module>module-common</module>
+        <module>module-automation</module>
     </modules>
     <packaging>pom</packaging>
 

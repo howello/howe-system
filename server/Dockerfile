@@ -10,6 +10,7 @@ COPY module-system/pom.xml module-system/
 COPY module-quartz/pom.xml module-quartz/
 COPY module-generator/pom.xml module-generator/
 COPY module-blog/pom.xml module-blog/
+COPY module-automation/pom.xml module-automation/
 COPY module-admin/pom.xml module-admin/
 RUN mvn -B dependency:go-offline -q || true
 

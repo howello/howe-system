@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>server</artifactId>
+        <groupId>com.howe</groupId>
+        <version>3.9.2</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>module-automation</artifactId>
+
+    <description>
+        浏览器自动化任务
+    </description>
+
+    <dependencies>
+        <!-- 通用工具、参数配置（ConfigUtils）与基础运行能力 -->
+        <dependency>
+            <groupId>com.howe</groupId>
+            <artifactId>module-common</artifactId>
+        </dependency>
+
+        <!-- Playwright Java；浏览器二进制由部署环境提供 -->
+        <dependency>
+            <groupId>com.microsoft.playwright</groupId>
+            <artifactId>playwright</artifactId>
+        </dependency>
+
+        <!-- 测试：任务上下文契约与浏览器集成 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

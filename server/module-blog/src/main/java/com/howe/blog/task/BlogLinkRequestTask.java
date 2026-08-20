@@ -1,6 +1,8 @@
 package com.howe.blog.task;
 
+import cn.hutool.core.util.StrUtil;
 import com.howe.blog.service.WalineLinkSyncService;
+import com.howe.common.task.TaskLogContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -29,9 +31,10 @@ public class BlogLinkRequestTask {
      * @param windowMinutes 时间窗口（分钟），由 quartz invoke_target 参数传入
      */
     public void sync(Integer windowMinutes) {
-        log.info("开始同步 waline 友链申请留言，窗口={}分钟", windowMinutes);
-        WalineLinkSyncService.WalineLinkSyncResult result = walineLinkSyncService.sync(windowMinutes);
-        log.info("waline 友链同步完成：新增{}条，跳过{}条，翻{}页",
-                result.newCount(), result.skipCount(), result.pageCount());
+        try (TaskLogContext.TaskStep step = TaskLogContext.startStep("开始同步 waline 友链申请留言，窗口={}分钟", windowMinutes)){
+            WalineLinkSyncService.WalineLinkSyncResult result = walineLinkSyncService.sync(windowMinutes);
+            step.success(StrUtil.format("waline 友链同步完成：新增{}条，跳过{}条，翻{}页",
+                result.newCount(), result.skipCount(), result.pageCount()));
+        }
     }
 }

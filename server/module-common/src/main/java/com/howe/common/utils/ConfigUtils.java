@@ -100,6 +100,30 @@ public class ConfigUtils
     }
 
     /**
+     * 读取浮点配置
+     *
+     * @param configKey 参数键名
+     * @param defaultValue 缺省值
+     * @return 参数值
+     */
+    public static double getDouble(String configKey, double defaultValue)
+    {
+        String value = getString(configKey);
+        if (StringUtils.isEmpty(value))
+        {
+            return defaultValue;
+        }
+        try
+        {
+            return Double.parseDouble(value);
+        }
+        catch (NumberFormatException e)
+        {
+            return defaultValue;
+        }
+    }
+
+    /**
      * 取原始值
      *
      * <p>

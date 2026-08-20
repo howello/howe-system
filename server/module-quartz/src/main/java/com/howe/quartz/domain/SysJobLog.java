@@ -43,9 +43,9 @@ public class SysJobLog extends BaseEntity
     @Schema(description = "日志信息", example = "系统默认（无参） 总共耗时：3毫秒")
     private String jobMessage;
 
-    /** 执行状态（0正常 1失败） */
-    @Excel(name = "执行状态", readConverterExp = "0=正常,1=失败")
-    @Schema(description = "执行状态（0正常 1失败）", example = "0")
+    /** 执行状态（0正常 1失败 2执行中） */
+    @Excel(name = "执行状态", readConverterExp = "0=正常,1=失败,2=执行中")
+    @Schema(description = "执行状态（0正常 1失败 2执行中）", example = "0")
     private String status;
 
     /** 异常信息 */

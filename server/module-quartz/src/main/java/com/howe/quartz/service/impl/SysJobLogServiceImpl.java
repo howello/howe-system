@@ -3,8 +3,10 @@ package com.howe.quartz.service.impl;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import com.howe.quartz.domain.SysJobLog;
 import com.howe.quartz.mapper.SysJobLogMapper;
+import com.howe.quartz.service.ISysJobLogDetailService;
 import com.howe.quartz.service.ISysJobLogService;
 
 /**
@@ -17,6 +19,9 @@ public class SysJobLogServiceImpl implements ISysJobLogService
 {
     @Autowired
     private SysJobLogMapper jobLogMapper;
+
+    @Autowired
+    private ISysJobLogDetailService detailService;
 
     /**
      * 获取quartz调度器日志的计划任务
@@ -54,14 +59,27 @@ public class SysJobLogServiceImpl implements ISysJobLogService
     }
 
     /**
+     * 更新任务日志
+     *
+     * @param jobLog 调度日志信息
+     */
+    @Override
+    public void updateJobLog(SysJobLog jobLog)
+    {
+        jobLogMapper.updateJobLog(jobLog);
+    }
+
+    /**
      * 批量删除调度日志信息
      *
      * @param logIds 需要删除的数据ID
      * @return 结果
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int deleteJobLogByIds(Long[] logIds)
     {
+        detailService.deleteByJobLogIds(logIds);
         return jobLogMapper.deleteJobLogByIds(logIds);
     }
 
@@ -71,8 +89,10 @@ public class SysJobLogServiceImpl implements ISysJobLogService
      * @param jobId 调度日志ID
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int deleteJobLogById(Long jobId)
     {
+        detailService.deleteByJobLogIds(new Long[] { jobId });
         return jobLogMapper.deleteJobLogById(jobId);
     }
 
@@ -80,8 +100,10 @@ public class SysJobLogServiceImpl implements ISysJobLogService
      * 清空任务日志
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void cleanJobLog()
     {
+        detailService.cleanDetails();
         jobLogMapper.cleanJobLog();
     }
 }

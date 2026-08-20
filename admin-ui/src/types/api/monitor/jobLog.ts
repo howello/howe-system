@@ -29,6 +29,21 @@ export interface SysJobLog extends BaseEntity {
   jobMessage?: string;
   /** 异常信息 */
   exceptionInfo?: string;
-  /** 状态（0正常 1失败） */
-  status?: '0' | '1';
+  /** 状态（0正常 1失败 2执行中） */
+  status?: '0' | '1' | '2';
+}
+
+/** 定时任务步骤明细 */
+export interface SysJobLogDetail {
+  detailId?: number;
+  jobLogId?: number;
+  stepNo?: number;
+  stepName?: string;
+  status?: 'RUNNING' | 'SUCCESS' | 'FAILED' | 'SKIPPED' | 'NEEDS_AUTH';
+  message?: string;
+  errorInfo?: string;
+  startTime?: string;
+  endTime?: string;
+  durationMs?: number;
+  createTime?: string;
 }

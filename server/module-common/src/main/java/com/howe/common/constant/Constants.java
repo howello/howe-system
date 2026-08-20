@@ -1,15 +1,15 @@
 package com.howe.common.constant;
 
-import java.util.Locale;
 import io.jsonwebtoken.Claims;
+
+import java.util.Locale;
 
 /**
  * 通用常量信息
  *
  * @author howe
  */
-public class Constants
-{
+public class Constants {
     /**
      * UTF-8 字符集
      */
@@ -49,6 +49,11 @@ public class Constants
      * 通用失败标识
      */
     public static final String FAIL = "1";
+
+    /**
+     * 调度任务执行中标识
+     */
+    public static final String RUNNING = "2";
 
     /**
      * 登录成功
@@ -158,24 +163,23 @@ public class Constants
     /**
      * 自动识别json对象白名单配置（仅允许解析的包名，范围越小越安全）
      */
-    public static final String[] JSON_WHITELIST_STR = { "com.howe" };
+    public static final String[] JSON_WHITELIST_STR = {"com.howe"};
 
     /**
      * 定时任务白名单配置（仅允许访问的包名，如其他需要可以自行添加）
      */
-    public static final String[] JOB_WHITELIST_STR = { "com.howe.quartz.task" };
+    public static final String[] JOB_WHITELIST_STR = {"com.howe.quartz.task", "com.howe.automation.task", "com.howe.blog.task"};
 
     /**
      * 定时任务违规的字符
      */
-    public static final String[] JOB_ERROR_STR = { "java.net.URL", "javax.naming.InitialContext", "org.yaml.snakeyaml",
-            "org.springframework", "org.apache", "com.howe.common.utils.file", "com.howe.common.config", "com.howe.generator" };
+    public static final String[] JOB_ERROR_STR = {"java.net.URL", "javax.naming.InitialContext", "org.yaml.snakeyaml",
+        "org.springframework", "org.apache", "com.howe.common.utils.file", "com.howe.common.config", "com.howe.generator"};
 
     /**
      * 部门相关常量
      */
-    public static class Dept
-    {
+    public static class Dept {
         /**
          * 全部数据权限
          */

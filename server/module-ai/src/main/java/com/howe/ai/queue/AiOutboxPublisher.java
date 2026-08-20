@@ -1,12 +1,10 @@
 package com.howe.ai.queue;
 
-import java.util.Map;
-import java.util.Objects;
-
-import org.springframework.scheduling.annotation.Scheduled;
+import com.howe.ai.persistence.AiFactPersistenceService;
 import org.springframework.stereotype.Service;
 
-import com.howe.ai.persistence.AiFactPersistenceService;
+import java.util.Map;
+import java.util.Objects;
 
 /** 将 MySQL Outbox 可靠投递到 Redis Stream；状态更新只在投递成功后发生。 */
 @Service
@@ -19,7 +17,7 @@ public class AiOutboxPublisher {
         this.queue = Objects.requireNonNull(queue, "AI 任务队列未配置");
     }
 
-    @Scheduled(fixedDelayString = "${ai.worker.outbox-delay-ms:1000}")
+    //@Scheduled(fixedDelayString = "${ai.worker.outbox-delay-ms:1000}")
     public int publishPendingScheduled() {
         return publishPending(100);
     }

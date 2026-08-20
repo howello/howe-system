@@ -17,6 +17,7 @@ import com.howe.common.core.page.TableDataInfo;
 import com.howe.common.enums.BusinessType;
 import com.howe.common.utils.poi.ExcelUtil;
 import com.howe.quartz.domain.SysJobLog;
+import com.howe.quartz.service.ISysJobLogDetailService;
 import com.howe.quartz.service.ISysJobLogService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -34,6 +35,9 @@ public class SysJobLogController extends BaseController
 {
     @Autowired
     private ISysJobLogService jobLogService;
+
+    @Autowired
+    private ISysJobLogDetailService detailService;
 
     /**
      * 查询定时任务调度日志列表
@@ -71,6 +75,17 @@ public class SysJobLogController extends BaseController
     public AjaxResult getInfo(@Parameter(description = "调度日志编号") @PathVariable Long jobLogId)
     {
         return success(jobLogService.selectJobLogById(jobLogId));
+    }
+
+    /**
+     * 查询一次调度执行的步骤明细
+     */
+    @PreAuthorize("@ss.hasPermi('monitor:job:query')")
+    @Operation(summary = "查询调度步骤明细", description = "根据调度日志编号查询关键步骤明细")
+    @GetMapping(value = "/{jobLogId}/details")
+    public AjaxResult details(@Parameter(description = "调度日志编号") @PathVariable Long jobLogId)
+    {
+        return success(detailService.selectDetailList(jobLogId));
     }
 
 
