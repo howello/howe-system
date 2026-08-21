@@ -5,8 +5,8 @@
 -- 列表分页、搜索、排序走这张表，正文按需实时从 GitHub 拉取。
 -- 索引通过「手动同步」和 GitHub push webhook 两种方式与仓库对齐。
 --
--- 库名 ry-vue，字符集 utf8mb4。执行方式：
---   mysql -u root -p ry-vue < blog_20260730.sql
+-- 库名 howe-system，字符集 utf8mb4。执行方式：
+--   mysql -u root -p howe-system < blog_20260730.sql
 -- ----------------------------
 
 -- ----------------------------

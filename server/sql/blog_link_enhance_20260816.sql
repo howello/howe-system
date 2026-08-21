@@ -5,8 +5,8 @@
 --   1. sys_config 三条：waline url/pageSize/timeout
 --   2. sys_job 一条：定时任务（默认停用）
 --
--- 库名 ry-vue，字符集 utf8mb4。执行方式：
---   mysql -u root -p ry-vue < blog_link_enhance_20260816.sql
+-- 库名 howe-system，字符集 utf8mb4。执行方式：
+--   mysql -u root -p howe-system < blog_link_enhance_20260816.sql
 --
 -- 执行后如果服务已在运行，需去「系统管理 > 参数设置」点一次「刷新缓存」。
 -- ----------------------------

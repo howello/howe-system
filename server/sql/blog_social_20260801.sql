@@ -7,8 +7,8 @@
 --   blog_feed_item  朋友圈抓取条目，只存标题/作者/链接/摘要/发布时间，不存正文
 --   blog_talk       说说，正文存 markdown 原文
 --
--- 库名 ry-vue，字符集 utf8mb4。执行方式：
---   mysql -u root -p ry-vue < blog_social_20260801.sql
+-- 库名 howe-system，字符集 utf8mb4。执行方式：
+--   mysql -u root -p howe-system < blog_social_20260801.sql
 --
 -- 执行后如果服务已在运行，需去「系统管理 > 参数设置」点一次「刷新缓存」，
 -- 并去「系统管理 > 字典管理」确认 blog_link_group 已生效。
