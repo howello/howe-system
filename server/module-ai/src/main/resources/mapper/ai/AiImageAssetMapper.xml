@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.ai.persistence.mapper.AiImageAssetMapper">
+    <resultMap type="AiImageAsset" id="AiImageAssetResult">
+        <result property="id"         column="id"          />
+        <result property="callLogId"  column="call_log_id" />
+        <result property="objectKey"  column="object_key"  />
+        <result property="url"        column="url"         />
+        <result property="width"      column="width"       />
+        <result property="height"     column="height"      />
+        <result property="sizeBytes"  column="size_bytes"  />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+
+    <insert id="insertAiImageAsset" parameterType="AiImageAsset" useGeneratedKeys="true" keyProperty="id">
+        insert into ai_image_asset (call_log_id, object_key, url, width, height, size_bytes, create_time)
+        values (#{callLogId}, #{objectKey}, #{url}, #{width}, #{height}, #{sizeBytes}, sysdate())
+    </insert>
+
+    <select id="selectByCallLogId" parameterType="Long" resultMap="AiImageAssetResult">
+        select id, call_log_id, object_key, url, width, height, size_bytes, create_time
+        from ai_image_asset
+        where call_log_id = #{callLogId}
+        order by id asc
+    </select>
+</mapper>

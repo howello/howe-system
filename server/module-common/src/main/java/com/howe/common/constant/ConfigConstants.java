@@ -120,4 +120,48 @@ public class ConfigConstants
 
     /** waline 请求超时（毫秒，默认 30000） */
     public static final String BLOG_WALINE_TIMEOUT = "blog.waline.timeout";
+
+    /** AI 模块总开关，关闭时所有 AI 调用直接抛 AI_DISABLED */
+    public static final String AI_ENABLED = "ai.enabled";
+
+    /** 全局默认对话模型 ID */
+    public static final String AI_DEFAULT_CHAT_MODEL = "ai.default.chat.model";
+
+    /** 全局默认视觉模型 ID */
+    public static final String AI_DEFAULT_VISION_MODEL = "ai.default.vision.model";
+
+    /** 全局默认文生图模型 ID */
+    public static final String AI_DEFAULT_IMAGE_MODEL = "ai.default.image.model";
+
+    /** 全局默认向量模型 ID */
+    public static final String AI_DEFAULT_EMBEDDING_MODEL = "ai.default.embedding.model";
+
+    /** 是否启用降级链 */
+    public static final String AI_FALLBACK_ENABLED = "ai.fallback.enabled";
+
+    /** 同模型瞬时错误重试次数 */
+    public static final String AI_RETRY_MAX = "ai.retry.max";
+
+    /** 重试退避基数（毫秒） */
+    public static final String AI_RETRY_BACKOFF_MS = "ai.retry.backoffMs";
+
+    /** 对话超时（毫秒） */
+    public static final String AI_TIMEOUT_CHAT = "ai.timeout.chat";
+
+    /** 文生图超时（毫秒） */
+    public static final String AI_TIMEOUT_IMAGE = "ai.timeout.image";
+
+    /** 单次最多生成张数 */
+    public static final String AI_IMAGE_MAX_COUNT = "ai.image.maxCount";
+
+    /**
+     * 风格后缀模板的键名前缀
+     *
+     * <p>完整键名形如 {@code ai.image.styleSuffix.recipe.photo}，
+     * 由本前缀加业务方传入的 style key 拼成，因此只登记前缀。</p>
+     */
+    public static final String AI_IMAGE_STYLE_SUFFIX_PREFIX = "ai.image.styleSuffix.";
+
+    /** 调用记录保留天数 */
+    public static final String AI_LOG_RETENTION_DAYS = "ai.log.retentionDays";
 }

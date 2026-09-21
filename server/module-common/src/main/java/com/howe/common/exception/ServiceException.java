@@ -3,9 +3,12 @@ package com.howe.common.exception;
 /**
  * 业务异常
  *
+ * <p>不声明为 final：AI 调用网关的 {@code AiException} 需要继承它，
+ * 才能被 {@code GlobalExceptionHandler} 按业务异常处理、把可读 message 与错误码返回给前端。</p>
+ *
  * @author howe
  */
-public final class ServiceException extends RuntimeException
+public class ServiceException extends RuntimeException
 {
     private static final long serialVersionUID = 1L;
 

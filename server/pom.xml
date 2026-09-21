@@ -34,6 +34,12 @@
         <aws-sdk.version>2.46.21</aws-sdk.version>
         <hutool.version>5.8.36</hutool.version>
         <rome.version>2.1.0</rome.version>
+        <!-- Spring AI 与 Spring AI Alibaba：AI 调用网关的模型调用底座。
+             三者必须成对升级：SAA extensions 1.1.2.1 内部依赖 Spring AI 1.1.2，
+             错配会出现 ChatModel 接口不兼容。 -->
+        <spring-ai.version>1.1.2</spring-ai.version>
+        <spring-ai-alibaba.version>1.1.2.0</spring-ai-alibaba.version>
+        <spring-ai-alibaba-extensions.version>1.1.2.1</spring-ai-alibaba-extensions.version>
     </properties>
 
     <!-- 依赖声明 -->
@@ -63,6 +69,35 @@
                 <groupId>cn.hutool</groupId>
                 <artifactId>hutool-bom</artifactId>
                 <version>${hutool.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Spring AI：模型调用能力底座（ChatModel / ImageModel / EmbeddingModel） -->
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Spring AI Alibaba 核心（Agent / Graph 等）。本项目只用模型适配，
+                 引它是为了与官方推荐的版本组合保持一致 -->
+            <dependency>
+                <groupId>com.alibaba.cloud.ai</groupId>
+                <artifactId>spring-ai-alibaba-bom</artifactId>
+                <version>${spring-ai-alibaba.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Spring AI Alibaba 扩展：DashScope（通义千问 / 通义万相）模型实现。
+                 它内部依赖 Spring AI 1.1.2，必须与上面的 spring-ai-bom 成对 -->
+            <dependency>
+                <groupId>com.alibaba.cloud.ai</groupId>
+                <artifactId>spring-ai-alibaba-extensions-bom</artifactId>
+                <version>${spring-ai-alibaba-extensions.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -204,6 +239,13 @@
                 <version>${howe.version}</version>
             </dependency>
 
+            <!-- AI 调用网关-->
+            <dependency>
+                <groupId>com.howe</groupId>
+                <artifactId>module-ai</artifactId>
+                <version>${howe.version}</version>
+            </dependency>
+
             <!-- 通用工具-->
             <dependency>
                 <groupId>com.howe</groupId>
@@ -235,6 +277,7 @@
         <module>module-quartz</module>
         <module>module-generator</module>
         <module>module-blog</module>
+        <module>module-ai</module>
         <module>module-common</module>
     </modules>
     <packaging>pom</packaging>

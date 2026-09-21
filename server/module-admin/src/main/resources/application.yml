@@ -14,6 +14,12 @@ howe:
   addressEnabled: false
   # 验证码类型 math 数字计算 char 字符验证
   captchaType: math
+  # AI 调用网关
+  ai:
+    # 渠道密钥（ai_channel.api_key）的主密钥：Base64 编码的 16/24/32 字节，
+    # 用于 AES-GCM 加解密。只从环境变量读，不写死在这里、也不入库。
+    # 生成方式：openssl rand -base64 32
+    secret-key: ${AI_SECRET_KEY:}
 
 # 开发环境配置
 server:
@@ -108,7 +114,6 @@ mybatis:
   mapperLocations: classpath*:mapper/**/*Mapper.xml
   # 加载全局的配置文件
   configLocation: classpath:mybatis/mybatis-config.xml
-
 # PageHelper分页插件
 pagehelper:
   helperDialect: mysql

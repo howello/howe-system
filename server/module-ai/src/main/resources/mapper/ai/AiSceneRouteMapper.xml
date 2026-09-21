@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.ai.persistence.mapper.AiSceneRouteMapper">
+    <resultMap type="AiSceneRoute" id="AiSceneRouteResult">
+        <result property="id"                   column="id"                      />
+        <result property="scene"                column="scene"                   />
+        <result property="capability"           column="capability"              />
+        <result property="primaryModelId"       column="primary_model_id"        />
+        <result property="fallbackModelIds"     column="fallback_model_ids"      />
+        <result property="routeParams"          column="params"                  />
+        <result property="enabled"              column="enabled"                 />
+        <result property="remark"               column="remark"                  />
+        <result property="createBy"             column="create_by"               />
+        <result property="createTime"           column="create_time"             />
+        <result property="updateBy"             column="update_by"               />
+        <result property="updateTime"           column="update_time"             />
+        <result property="primaryModelName"     column="primary_model_name"      />
+        <result property="primaryModelDisplayName" column="primary_model_display_name" />
+    </resultMap>
+
+    <sql id="selectAiSceneRouteVo">
+        select r.id, r.scene, r.capability, r.primary_model_id, r.fallback_model_ids, r.params,
+               r.enabled, r.remark, r.create_by, r.create_time, r.update_by, r.update_time,
+               m.model_name as primary_model_name, m.display_name as primary_model_display_name
+        from ai_scene_route r
+        left join ai_model m on m.id = r.primary_model_id
+    </sql>
+
+    <select id="selectAiSceneRouteList" parameterType="AiSceneRoute" resultMap="AiSceneRouteResult">
+        <include refid="selectAiSceneRouteVo"/>
+        <where>
+            <if test="scene != null and scene != ''">
+                AND r.scene like concat('%', #{scene}, '%')
+            </if>
+            <if test="capability != null and capability != ''">
+                AND r.capability = #{capability}
+            </if>
+            <if test="enabled != null">
+                AND r.enabled = #{enabled}
+            </if>
+        </where>
+        order by r.scene asc, r.id asc
+    </select>
+
+    <select id="selectAiSceneRouteById" parameterType="Long" resultMap="AiSceneRouteResult">
+        <include refid="selectAiSceneRouteVo"/>
+        where r.id = #{id}
+    </select>
+
+    <select id="selectByScene" resultMap="AiSceneRouteResult">
+        <include refid="selectAiSceneRouteVo"/>
+        where r.scene = #{scene} and r.capability = #{capability} and r.enabled = 1
+        limit 1
+    </select>
+
+    <select id="selectEnabledList" resultMap="AiSceneRouteResult">
+        <include refid="selectAiSceneRouteVo"/>
+        where r.enabled = 1
+        order by r.scene asc, r.id asc
+    </select>
+
+    <select id="countByModelId" parameterType="Long" resultType="int">
+        select count(1) from ai_scene_route
+        where primary_model_id = #{modelId} or json_contains(fallback_model_ids, cast(#{modelId} as json))
+    </select>
+
+    <insert id="insertAiSceneRoute" parameterType="AiSceneRoute" useGeneratedKeys="true" keyProperty="id">
+        insert into ai_scene_route (
+            scene, capability, primary_model_id, fallback_model_ids, params, enabled,
+            remark, create_by, create_time
+        ) values (
+            #{scene}, #{capability}, #{primaryModelId}, #{fallbackModelIds}, #{routeParams}, #{enabled},
+            #{remark}, #{createBy}, sysdate()
+        )
+    </insert>
+
+    <update id="updateAiSceneRoute" parameterType="AiSceneRoute">
+        update ai_scene_route
+        <set>
+            <if test="scene != null and scene != ''">scene = #{scene},</if>
+            <if test="capability != null and capability != ''">capability = #{capability},</if>
+            <if test="primaryModelId != null">primary_model_id = #{primaryModelId},</if>
+            fallback_model_ids = #{fallbackModelIds},
+            params = #{routeParams},
+            <if test="enabled != null">enabled = #{enabled},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </set>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteAiSceneRouteByIds" parameterType="Long">
+        delete from ai_scene_route where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>server</artifactId>
+        <groupId>com.howe</groupId>
+        <version>3.9.2</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>module-ai</artifactId>
+
+    <description>
+        AI 调用网关：对业务模块暴露 AiClient 门面，统一承担模型选择、渠道切换、
+        密钥管理、重试降级、流式输出、图片转存与用量记录
+    </description>
+
+    <dependencies>
+
+        <!-- 通用工具：配置读取、对象存储、分页与统一响应 -->
+        <dependency>
+            <groupId>com.howe</groupId>
+            <artifactId>module-common</artifactId>
+        </dependency>
+
+        <!-- 本模块自带后台控制器，流式接口用 SseEmitter（在 spring-webmvc 里，
+             module-common 只引到 spring-web）。运行时由 module-admin 的
+             spring-boot-starter-web 提供，这里只是让编译期能解析到该类 -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webmvc</artifactId>
+        </dependency>
+
+        <!-- OpenAI 兼容协议的模型实现。这里引的是模型库而非 Boot starter：
+             多渠道要在运行时按渠道参数自行构建模型实例，starter 的自动装配
+             会在没有配置 spring.ai.* 时干扰启动，这里不需要它 -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-openai</artifactId>
+        </dependency>
+
+        <!-- DashScope（通义千问 / 通义万相 / text-embedding）模型实现 -->
+        <dependency>
+            <groupId>com.alibaba.cloud.ai</groupId>
+            <artifactId>spring-ai-alibaba-dashscope</artifactId>
+        </dependency>
+
+    </dependencies>
+
+</project>

@@ -60,6 +60,12 @@
             <artifactId>module-blog</artifactId>
         </dependency>
 
+        <!-- AI 调用网关-->
+        <dependency>
+            <groupId>com.howe</groupId>
+            <artifactId>module-ai</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>
