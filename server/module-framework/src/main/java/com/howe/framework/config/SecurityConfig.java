@@ -1,5 +1,6 @@
 package com.howe.framework.config;
 
+import jakarta.servlet.DispatcherType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -104,6 +105,12 @@ public class SecurityConfig
                     // 静态资源，可匿名访问
                     .requestMatchers(HttpMethod.GET, "/", "/*.html", "/**.html", "/**.css", "/**.js", "/profile/**").permitAll()
                     .requestMatchers("/swagger-ui.html", "/v3/api-docs/**", "/swagger-ui/**", "/druid/**").permitAll()
+                    // 异步派发放行：SSE / DeferredResult 这类异步接口完成时，容器会重新派发一次请求。
+                    // JwtAuthenticationTokenFilter 与 SecurityContextHolderFilter 都是 OncePerRequestFilter，
+                    // 默认跳过异步派发，此时链上没有认证上下文；而 AuthorizationFilter 不跳过，
+                    // 会把这次派发判成 Access Denied（响应通常已提交，只留下一堆 ERROR 栈）。
+                    // 异步派发只能由容器发起、外部无法伪造，且首次派发已经鉴权过，所以这里放行是安全的。
+                    .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                     // 除上面外的所有请求全部需要鉴权认证
                     .anyRequest().authenticated();
             })

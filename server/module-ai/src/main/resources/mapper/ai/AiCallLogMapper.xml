@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.ai.persistence.mapper.AiCallLogMapper">
+    <resultMap type="AiCallLog" id="AiCallLogResult">
+        <result property="id"            column="id"             />
+        <result property="traceId"       column="trace_id"       />
+        <result property="scene"         column="scene"          />
+        <result property="capability"    column="capability"     />
+        <result property="providerCode"  column="provider_code"  />
+        <result property="channelId"     column="channel_id"     />
+        <result property="modelId"       column="model_id"       />
+        <result property="attempt"       column="attempt"        />
+        <result property="inputTokens"   column="input_tokens"   />
+        <result property="outputTokens"  column="output_tokens"  />
+        <result property="imageCount"    column="image_count"    />
+        <result property="elapsedMs"     column="elapsed_ms"     />
+        <result property="status"        column="status"         />
+        <result property="errorCode"     column="error_code"     />
+        <result property="requestDigest" column="request_digest" />
+        <result property="operator"      column="operator"       />
+        <result property="createTime"    column="create_time"    />
+    </resultMap>
+
+    <sql id="selectAiCallLogVo">
+        select id, trace_id, scene, capability, provider_code, channel_id, model_id, attempt,
+               input_tokens, output_tokens, image_count, elapsed_ms, status, error_code,
+               request_digest, operator, create_time
+        from ai_call_log
+    </sql>
+
+    <select id="selectAiCallLogList" parameterType="AiCallLog" resultMap="AiCallLogResult">
+        <include refid="selectAiCallLogVo"/>
+        <where>
+            <if test="scene != null and scene != ''">
+                AND scene like concat('%', #{scene}, '%')
+            </if>
+            <if test="capability != null and capability != ''">
+                AND capability = #{capability}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="traceId != null and traceId != ''">
+                AND trace_id = #{traceId}
+            </if>
+            <if test="params.beginTime != null and params.beginTime != ''">
+                AND create_time &gt;= #{params.beginTime}
+            </if>
+            <if test="params.endTime != null and params.endTime != ''">
+                AND create_time &lt;= #{params.endTime}
+            </if>
+        </where>
+        order by id desc
+    </select>
+
+    <select id="selectAiCallLogById" parameterType="Long" resultMap="AiCallLogResult">
+        <include refid="selectAiCallLogVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertAiCallLog" parameterType="AiCallLog" useGeneratedKeys="true" keyProperty="id">
+        insert into ai_call_log (
+            trace_id, scene, capability, provider_code, channel_id, model_id, attempt,
+            input_tokens, output_tokens, image_count, elapsed_ms, status, error_code,
+            request_digest, operator, create_time
+        ) values (
+            #{traceId}, #{scene}, #{capability}, #{providerCode}, #{channelId}, #{modelId}, #{attempt},
+            #{inputTokens}, #{outputTokens}, #{imageCount}, #{elapsedMs}, #{status}, #{errorCode},
+            #{requestDigest}, #{operator}, sysdate()
+        )
+    </insert>
+
+    <delete id="deleteBefore">
+        delete from ai_call_log where create_time &lt; #{before}
+    </delete>
+
+    <select id="selectStats" resultType="com.howe.ai.persistence.domain.vo.AiCallLogStats">
+        select
+        <choose>
+            <when test="groupBy == 'day'">
+                date_format(create_time, '%Y-%m-%d') as groupKey,
+            </when>
+            <when test="groupBy == 'model'">
+                cast(model_id as char) as groupKey,
+            </when>
+            <otherwise>
+                scene as groupKey,
+            </otherwise>
+        </choose>
+        count(1) as totalCount,
+        sum(case when status = 'SUCCESS' then 1 else 0 end) as successCount,
+        sum(case when status = 'FAILED' then 1 else 0 end) as failedCount,
+        ifnull(sum(input_tokens), 0) as inputTokens,
+        ifnull(sum(output_tokens), 0) as outputTokens,
+        ifnull(sum(image_count), 0) as imageCount,
+        ifnull(round(avg(elapsed_ms)), 0) as avgElapsedMs
+        from ai_call_log
+        <where>
+            <if test="beginTime != null">
+                AND create_time &gt;= #{beginTime}
+            </if>
+            <if test="endTime != null">
+                AND create_time &lt;= #{endTime}
+            </if>
+            <if test="scene != null and scene != ''">
+                AND scene = #{scene}
+            </if>
+        </where>
+        group by groupKey
+        order by totalCount desc
+    </select>
+</mapper>

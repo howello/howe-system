@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.ai.persistence.mapper.AiProviderMapper">
+    <resultMap type="AiProvider" id="AiProviderResult">
+        <result property="id"             column="id"               />
+        <result property="code"           column="code"             />
+        <result property="name"           column="name"             />
+        <result property="protocol"       column="protocol"         />
+        <result property="defaultBaseUrl" column="default_base_url" />
+        <result property="supports"       column="supports"         />
+        <result property="enabled"        column="enabled"          />
+        <result property="sort"           column="sort"             />
+        <result property="remark"         column="remark"           />
+        <result property="createBy"       column="create_by"        />
+        <result property="createTime"     column="create_time"      />
+        <result property="updateBy"       column="update_by"        />
+        <result property="updateTime"     column="update_time"      />
+    </resultMap>
+
+    <sql id="selectAiProviderVo">
+        select id, code, name, protocol, default_base_url, supports, enabled, sort,
+               remark, create_by, create_time, update_by, update_time
+        from ai_provider
+    </sql>
+
+    <select id="selectAiProviderList" parameterType="AiProvider" resultMap="AiProviderResult">
+        <include refid="selectAiProviderVo"/>
+        <where>
+            <if test="code != null and code != ''">
+                AND code like concat('%', #{code}, '%')
+            </if>
+            <if test="name != null and name != ''">
+                AND name like concat('%', #{name}, '%')
+            </if>
+            <if test="protocol != null and protocol != ''">
+                AND protocol = #{protocol}
+            </if>
+            <if test="enabled != null">
+                AND enabled = #{enabled}
+            </if>
+        </where>
+        order by sort asc, id asc
+    </select>
+
+    <select id="selectAiProviderById" parameterType="Long" resultMap="AiProviderResult">
+        <include refid="selectAiProviderVo"/>
+        where id = #{id}
+    </select>
+
+    <select id="selectAiProviderByCode" parameterType="String" resultMap="AiProviderResult">
+        <include refid="selectAiProviderVo"/>
+        where code = #{code}
+    </select>
+
+    <select id="selectEnabledList" resultMap="AiProviderResult">
+        <include refid="selectAiProviderVo"/>
+        where enabled = 1
+        order by sort asc, id asc
+    </select>
+
+    <insert id="insertAiProvider" parameterType="AiProvider" useGeneratedKeys="true" keyProperty="id">
+        insert into ai_provider (
+            code, name, protocol, default_base_url, supports, enabled, sort,
+            remark, create_by, create_time
+        ) values (
+            #{code}, #{name}, #{protocol}, #{defaultBaseUrl}, #{supports}, #{enabled}, #{sort},
+            #{remark}, #{createBy}, sysdate()
+        )
+    </insert>
+
+    <update id="updateAiProvider" parameterType="AiProvider">
+        update ai_provider
+        <set>
+            <if test="code != null and code != ''">code = #{code},</if>
+            <if test="name != null and name != ''">name = #{name},</if>
+            <if test="protocol != null and protocol != ''">protocol = #{protocol},</if>
+            <if test="defaultBaseUrl != null">default_base_url = #{defaultBaseUrl},</if>
+            <if test="supports != null">supports = #{supports},</if>
+            <if test="enabled != null">enabled = #{enabled},</if>
+            <if test="sort != null">sort = #{sort},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </set>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteAiProviderByIds" parameterType="Long">
+        delete from ai_provider where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

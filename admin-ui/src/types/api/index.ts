@@ -33,6 +33,13 @@ export * from "./blog/link";
 export * from "./blog/feed";
 export * from "./blog/talk";
 
+// AI 调用网关
+export * from "./ai/channel";
+export * from "./ai/model";
+export * from "./ai/route";
+export * from "./ai/calllog";
+export * from "./ai/playground";
+
 // 首页工作台
 export * from "./home/stats";
 
