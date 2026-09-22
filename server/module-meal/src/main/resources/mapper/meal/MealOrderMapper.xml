@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.meal.mapper.MealOrderMapper">
+
+    <resultMap type="MealOrder" id="MealOrderResult">
+        <result property="orderId"     column="order_id"     />
+        <result property="orderNo"     column="order_no"     />
+        <result property="deptId"      column="dept_id"      />
+        <result property="userId"      column="user_id"      />
+        <result property="userName"    column="user_name"    />
+        <result property="status"      column="status"       />
+        <result property="totalCount"  column="total_count"  />
+        <result property="orderRemark" column="order_remark" />
+        <result property="acceptBy"    column="accept_by"    />
+        <result property="acceptTime"  column="accept_time"  />
+        <result property="finishBy"    column="finish_by"    />
+        <result property="finishTime"  column="finish_time"  />
+        <result property="cancelTime"  column="cancel_time"  />
+        <result property="delFlag"     column="del_flag"     />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"  column="create_time"  />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"  column="update_time"  />
+        <result property="remark"      column="remark"       />
+    </resultMap>
+
+    <resultMap type="MealOrderItem" id="MealOrderItemResult">
+        <result property="itemId"    column="item_id"    />
+        <result property="orderId"   column="order_id"   />
+        <result property="dishId"    column="dish_id"    />
+        <result property="dishName"  column="dish_name"  />
+        <result property="dishCover" column="dish_cover" />
+        <result property="count"     column="count"      />
+        <result property="remark"    column="remark"     />
+    </resultMap>
+
+    <sql id="selectMealOrderVo">
+        select d.order_id, d.order_no, d.dept_id, d.user_id, d.user_name, d.status,
+               d.total_count, d.order_remark, d.accept_by, d.accept_time,
+               d.finish_by, d.finish_time, d.cancel_time, d.del_flag,
+               d.create_by, d.create_time, d.update_by, d.update_time, d.remark
+        from meal_order d
+    </sql>
+
+    <!--
+      厨师端与管理端的订单查询：数据范围由 @DataScope 注入的 ${params.dataScope} 控制，
+      家庭之间互相看不到对方的订单。表别名必须是 d，与注解里的 deptAlias 对应。
+    -->
+    <select id="selectMealOrderList" parameterType="MealOrder" resultMap="MealOrderResult">
+        <include refid="selectMealOrderVo"/>
+        <where>
+            d.del_flag = '0'
+            <if test="status != null and status != ''">
+                AND d.status = #{status}
+            </if>
+            <if test="statusList != null and statusList.size() > 0">
+                AND d.status in
+                <foreach item="s" collection="statusList" open="(" separator="," close=")">
+                    #{s}
+                </foreach>
+            </if>
+            <if test="userId != null">
+                AND d.user_id = #{userId}
+            </if>
+            <if test="userName != null and userName != ''">
+                AND d.user_name like concat('%', #{userName}, '%')
+            </if>
+            <if test="orderNo != null and orderNo != ''">
+                AND d.order_no like concat('%', #{orderNo}, '%')
+            </if>
+            <if test="params.beginTime != null and params.beginTime != ''">
+                AND date_format(d.create_time, '%y%m%d') &gt;= date_format(#{params.beginTime}, '%y%m%d')
+            </if>
+            <if test="params.endTime != null and params.endTime != ''">
+                AND date_format(d.create_time, '%y%m%d') &lt;= date_format(#{params.endTime}, '%y%m%d')
+            </if>
+        </where>
+        ${params.dataScope}
+        order by d.create_time desc
+    </select>
+
+    <!-- 点餐人自己的订单：强制按 user_id 过滤，不依赖数据权限 -->
+    <select id="selectMyOrderList" parameterType="MealOrder" resultMap="MealOrderResult">
+        <include refid="selectMealOrderVo"/>
+        <where>
+            d.del_flag = '0'
+            AND d.user_id = #{userId}
+            <if test="status != null and status != ''">
+                AND d.status = #{status}
+            </if>
+            <if test="statusList != null and statusList.size() > 0">
+                AND d.status in
+                <foreach item="s" collection="statusList" open="(" separator="," close=")">
+                    #{s}
+                </foreach>
+            </if>
+        </where>
+        order by d.create_time desc
+    </select>
+
+    <select id="selectMealOrderById" parameterType="Long" resultMap="MealOrderResult">
+        <include refid="selectMealOrderVo"/>
+        where d.order_id = #{orderId} and d.del_flag = '0'
+    </select>
+
+    <select id="selectItemsByOrderId" parameterType="Long" resultMap="MealOrderItemResult">
+        select item_id, order_id, dish_id, dish_name, dish_cover, count, remark
+        from meal_order_item
+        where order_id = #{orderId}
+        order by item_id asc
+    </select>
+
+    <select id="selectItemsByOrderIds" parameterType="Long" resultMap="MealOrderItemResult">
+        select item_id, order_id, dish_id, dish_name, dish_cover, count, remark
+        from meal_order_item
+        where order_id in
+        <foreach item="orderId" collection="array" open="(" separator="," close=")">
+            #{orderId}
+        </foreach>
+        order by item_id asc
+    </select>
+
+    <insert id="insertMealOrder" parameterType="MealOrder" useGeneratedKeys="true" keyProperty="orderId">
+        insert into meal_order (
+            order_no, dept_id, user_id, user_name, status, total_count, order_remark,
+            del_flag, create_by, create_time, remark
+        ) values (
+            #{orderNo}, #{deptId}, #{userId}, #{userName}, #{status}, #{totalCount}, #{orderRemark},
+            '0', #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <insert id="insertOrderItems" parameterType="java.util.List">
+        insert into meal_order_item (order_id, dish_id, dish_name, dish_cover, count, remark)
+        values
+        <foreach item="item" collection="items" separator=",">
+            (#{item.orderId}, #{item.dishId}, #{item.dishName}, #{item.dishCover}, #{item.count}, #{item.remark})
+        </foreach>
+    </insert>
+
+    <!--
+      状态流转只改状态相关字段，且 where 带上「当前状态」由 Service 传入的期望值约束，
+      避免并发下两个厨师同时点「接单」把已完成订单改回制作中。
+    -->
+    <update id="updateMealOrderStatus" parameterType="MealOrder">
+        update meal_order
+        <set>
+            status = #{status},
+            <if test="acceptBy != null and acceptBy != ''">accept_by = #{acceptBy}, accept_time = sysdate(),</if>
+            <if test="finishBy != null and finishBy != ''">finish_by = #{finishBy}, finish_time = sysdate(),</if>
+            <if test="cancelTime != null">cancel_time = sysdate(),</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </set>
+        where order_id = #{orderId} and del_flag = '0'
+        <if test="expectedStatus != null and expectedStatus != ''">
+            and status = #{expectedStatus}
+        </if>
+    </update>
+
+    <update id="deleteMealOrderByIds" parameterType="Long">
+        update meal_order set del_flag = '2', update_time = sysdate()
+        where del_flag = '0' and order_id in
+        <foreach item="orderId" collection="array" open="(" separator="," close=")">
+            #{orderId}
+        </foreach>
+    </update>
+
+    <!-- 订单号流水：逻辑删除的订单仍占用订单号，所以这里不加 del_flag 条件 -->
+    <select id="selectMaxOrderNo" resultType="String">
+        select max(order_no) from meal_order where order_no like concat(#{prefix}, '%')
+    </select>
+
+</mapper>

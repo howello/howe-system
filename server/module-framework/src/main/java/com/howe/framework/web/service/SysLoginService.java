@@ -68,7 +68,7 @@ public class SysLoginService
         validateTurnstile(loginBody.getUsername(), loginBody.getTurnstileToken());
         // 验证码校验
         validateCaptcha(loginBody.getUsername(), loginBody.getCode(), loginBody.getUuid());
-        return doLogin(loginBody.getUsername(), loginBody.getPassword());
+        return doLogin(loginBody.getUsername(), loginBody.getPassword(), loginBody.getClient());
     }
 
     /**
@@ -84,13 +84,17 @@ public class SysLoginService
     {
         // 验证码校验
         validateCaptcha(username, code, uuid);
-        return doLogin(username, password);
+        return doLogin(username, password, Constants.CLIENT_ADMIN);
     }
 
     /**
      * 走完 Spring Security 的认证流程并发 token
+     *
+     * @param username 用户名
+     * @param password 密码
+     * @param client   登录客户端，决定本次会话的有效期
      */
-    private String doLogin(String username, String password)
+    private String doLogin(String username, String password, String client)
     {
         // 登录前置校验
         loginPreCheck(username, password);
@@ -123,6 +127,10 @@ public class SysLoginService
         AsyncManager.me().execute(AsyncFactory.recordLogininfor(username, Constants.LOGIN_SUCCESS, MessageUtils.message("user.login.success")));
         LoginUser loginUser = (LoginUser) authentication.getPrincipal();
         recordLoginInfo(loginUser.getUserId());
+        // 按客户端决定本次会话的有效期：点餐端 30 天，管理端 30 分钟
+        loginUser.setExpireMinutes(Constants.CLIENT_MEAL.equals(client)
+                ? tokenService.getMealExpireTime()
+                : tokenService.getExpireTime());
         // 生成token
         return tokenService.createToken(loginUser);
     }

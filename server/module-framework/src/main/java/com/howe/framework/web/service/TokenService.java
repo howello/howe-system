@@ -46,11 +46,22 @@ public class TokenService
     @Value("${token.expireTime}")
     private int expireTime;
 
+    // 点餐端令牌有效期（默认43200分钟 = 30天）
+    @Value("${token.mealExpireTime:43200}")
+    private int mealExpireTime;
+
     protected static final long MILLIS_SECOND = 1000;
 
     protected static final long MILLIS_MINUTE = 60 * MILLIS_SECOND;
 
-    private static final Long MILLIS_MINUTE_TWENTY = 20 * 60 * 1000L;
+    /**
+     * 续期阈值：剩余有效期低于本次会话总时长的三分之一时滑动续期
+     *
+     * <p>以前写死「剩余不足 20 分钟」，那是按 30 分钟会话调的；点餐端会话长达 30 天时，
+     * 这个阈值等于「最后 20 分钟才续」，正常使用永远不会触发，也就永远不会滑动。
+     * 改成按比例后，30 天会话每 20 天续一次，30 分钟会话每 20 分钟续一次。</p>
+     */
+    private static final int RENEW_THRESHOLD_DIVISOR = 3;
 
     @Autowired
     private RedisCache redisCache;
@@ -126,33 +137,70 @@ public class TokenService
     }
 
     /**
-     * 验证令牌有效期，相差不足20分钟，自动刷新缓存
+     * 验证令牌有效期，剩余不足本次会话时长的三分之一时自动刷新缓存
      *
      * @param loginUser 登录信息
      * @return 令牌
      */
     public void verifyToken(LoginUser loginUser)
     {
-        long expireTime = loginUser.getExpireTime();
+        long expireAt = loginUser.getExpireTime();
         long currentTime = System.currentTimeMillis();
-        if (expireTime - currentTime <= MILLIS_MINUTE_TWENTY)
+        long renewThreshold = resolveExpireMinutes(loginUser) * MILLIS_MINUTE / RENEW_THRESHOLD_DIVISOR;
+        if (expireAt - currentTime <= renewThreshold)
         {
             refreshToken(loginUser);
         }
     }
 
     /**
-     * 刷新令牌有效期
+     * 刷新令牌有效期，长度取本次会话自己的有效期
      *
      * @param loginUser 登录信息
      */
     public void refreshToken(LoginUser loginUser)
     {
+        int minutes = resolveExpireMinutes(loginUser);
         loginUser.setLoginTime(System.currentTimeMillis());
-        loginUser.setExpireTime(loginUser.getLoginTime() + expireTime * MILLIS_MINUTE);
+        loginUser.setExpireTime(loginUser.getLoginTime() + minutes * MILLIS_MINUTE);
         // 根据uuid将loginUser缓存
         String userKey = getTokenKey(loginUser.getToken());
-        redisCache.setCacheObject(userKey, loginUser, expireTime, TimeUnit.MINUTES);
+        redisCache.setCacheObject(userKey, loginUser, minutes, TimeUnit.MINUTES);
+    }
+
+    /**
+     * 本次会话的有效期（分钟）
+     *
+     * <p>以登录时写入的 {@code expireMinutes} 为准，没有时（历史会话）退回管理端的 {@code token.expireTime}，
+     * 保证升级前签发的会话不会因为读不到新字段而被延长。</p>
+     *
+     * @param loginUser 登录信息
+     * @return 有效期（分钟）
+     */
+    private int resolveExpireMinutes(LoginUser loginUser)
+    {
+        Integer minutes = loginUser.getExpireMinutes();
+        return (minutes != null && minutes > 0) ? minutes : expireTime;
+    }
+
+    /**
+     * 管理端会话有效期（分钟）
+     *
+     * @return 分钟数
+     */
+    public int getExpireTime()
+    {
+        return expireTime;
+    }
+
+    /**
+     * 点餐端会话有效期（分钟）
+     *
+     * @return 分钟数
+     */
+    public int getMealExpireTime()
+    {
+        return mealExpireTime;
     }
 
     /**

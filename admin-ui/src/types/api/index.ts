@@ -40,6 +40,13 @@ export * from "./ai/route";
 export * from "./ai/calllog";
 export * from "./ai/playground";
 
+// 家庭点餐
+export * from "./meal/category";
+export * from "./meal/dish";
+export * from "./meal/order";
+export * from "./meal/review";
+export * from "./meal/proposal";
+
 // 首页工作台
 export * from "./home/stats";
 

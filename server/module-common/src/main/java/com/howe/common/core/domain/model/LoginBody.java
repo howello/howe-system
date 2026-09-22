@@ -45,6 +45,25 @@ public class LoginBody
     @Schema(description = "Cloudflare Turnstile 人机校验令牌，仅在参数配置 sys.turnstile.enabled 开启时才校验，未开启时可不传")
     private String turnstileToken;
 
+    /**
+     * 登录客户端
+     *
+     * <p>点餐端传 {@code meal}，会话有效期取 {@code token.mealExpireTime}（默认 30 天）；
+     * 不传或传其它值按管理端处理，取 {@code token.expireTime}（默认 30 分钟）。</p>
+     */
+    @Schema(description = "登录客户端（admin 管理端 / meal 点餐端），决定会话有效期；不传按管理端处理", example = "meal")
+    private String client;
+
+    public String getClient()
+    {
+        return client;
+    }
+
+    public void setClient(String client)
+    {
+        this.client = client;
+    }
+
     public String getUsername()
     {
         return username;
