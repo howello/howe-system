@@ -1,8 +1,9 @@
 -- ----------------------------------------------------------------------------
--- AI 调用网关 初始化脚本
+-- AI 调用网关 初始化脚本（module-ai）
 --
 -- 库：howe-system，字符集 utf8mb4
--- 执行：mysql -u root -p howe-system < ai_20260918.sql
+-- 执行：mysql -u root -p howe-system < ai.sql
+-- 依赖：需先执行 base.sql（本脚本会向 sys_config / sys_menu 写入数据）
 --
 -- 建六张表：
 --   ai_provider     服务商（协议 + 默认接入点），只读基础数据，由本脚本初始化

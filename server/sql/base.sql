@@ -1,3 +1,18 @@
+-- ============================================================
+-- base.sql — 系统基准脚本
+--
+-- 内容：系统管理 / 系统监控 / 字典 / 参数等核心表的建表与初始数据，
+--       以及系统级参数（验证码、人机校验、首页统计）。
+--
+-- 库名 howe-system，字符集 utf8mb4。执行方式：
+--   mysql -u root -p howe-system < base.sql
+--
+-- 执行顺序：base.sql 先执行，再按需执行各模块脚本（blog.sql / ai.sql / meal.sql）。
+-- 各模块脚本依赖本文件创建的 sys_menu / sys_role / sys_dict_* / sys_config 等表。
+--
+-- 幂等：建表用 drop + create（会清空同名表）；菜单/字典/参数为全量初始化数据。
+-- ============================================================
+
 -- ----------------------------
 -- 1、部门表
 -- ----------------------------
@@ -576,3 +591,33 @@ create table sys_notice_read (
   primary key (read_id),
   unique key uk_user_notice (user_id, notice_id)   comment '同一用户同一公告只记录一次'
 ) engine=innodb auto_increment=1 comment='公告已读记录表';
+
+
+-- ----------------------------
+-- 17、系统级参数（验证码类型 / 人机校验 / 首页统计）
+--
+-- 原分散在 optimize_20260731.sql、home_20260810.sql，整理进基准脚本。
+-- sys.account.captchaEnabled 已在上面「参数配置表」初始化，此处不重复插入。
+-- 执行后若服务已在运行，去「系统管理 > 参数设置」点一次「刷新缓存」。
+-- ----------------------------
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
+values('账号自助-验证码类型', 'sys.account.captchaType', 'math', 'Y', 'admin', sysdate(), '', null, 'char 扭曲字符 / math 算术运算 / line 线段干扰 / circle 圆圈干扰 / shear 扭曲干扰 / gif 动态图形 / random 每次随机');
+
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
+values('人机校验-开关', 'sys.turnstile.enabled', 'false', 'Y', 'admin', sysdate(), '', null, '是否启用 Cloudflare Turnstile 真人校验，登录与注册均生效');
+
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
+values('人机校验-站点密钥', 'sys.turnstile.siteKey', '', 'Y', 'admin', sysdate(), '', null, 'Site Key，会随 /captchaImage 下发给前端渲染组件，可公开');
+
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
+values('人机校验-服务端密钥', 'sys.turnstile.secretKey', '', 'Y', 'admin', sysdate(), '', null, 'Secret Key，只在后端校验时使用，切勿下发前端');
+
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
+values('人机校验-校验地址', 'sys.turnstile.verifyUrl', 'https://challenges.cloudflare.com/turnstile/v0/siteverify', 'Y', 'admin', sysdate(), '', null, 'Cloudflare 官方校验端点，一般不用改');
+
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
+values('人机校验-超时时间', 'sys.turnstile.timeout', '5000', 'Y', 'admin', sysdate(), '', null, '调用 Cloudflare 校验接口的超时毫秒数，超时按校验失败处理');
+
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
+values('首页-统计缓存TTL', 'sys.home.statsCacheTtl', '600', 'Y', 'admin', sysdate(), '', null, '首页博客统计聚合结果 Redis 缓存秒数，默认 600（10 分钟）；参数页修改即时生效，无需重启');
+
