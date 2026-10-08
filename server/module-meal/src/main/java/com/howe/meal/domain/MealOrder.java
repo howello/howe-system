@@ -1,6 +1,7 @@
 package com.howe.meal.domain;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.howe.common.core.domain.BaseEntity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -58,8 +59,13 @@ public class MealOrder extends BaseEntity {
     @Schema(description = "整体备注（口味要求等）", example = "少放辣")
     private String orderRemark;
 
-    @Schema(description = "接单人", example = "爸爸")
+    @Schema(description = "接单人")
     private String acceptBy;
+
+    /** 接单厨师用户ID，历史订单可能为空 */
+    @JsonIgnore
+    @Schema(description = "接单人用户ID", accessMode = Schema.AccessMode.READ_ONLY)
+    private Long acceptUserId;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Schema(description = "接单时间")

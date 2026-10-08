@@ -9,6 +9,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -36,6 +37,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public class CacheController
 {
     @Autowired
+    @Qualifier("stringRedisTemplate")
     private RedisTemplate<String, String> redisTemplate;
 
     private final static List<SysCache> caches = new ArrayList<SysCache>();

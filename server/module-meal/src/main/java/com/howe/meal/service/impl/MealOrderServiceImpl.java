@@ -14,6 +14,8 @@ import com.howe.meal.mapper.MealDishMapper;
 import com.howe.meal.mapper.MealOrderMapper;
 import com.howe.meal.mapper.MealReviewMapper;
 import com.howe.meal.service.IMealOrderService;
+import com.howe.meal.service.IMealNotifyService;
+import com.howe.meal.service.ITransactionCommitExecutor;
 import com.howe.meal.util.MealScopeGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -44,7 +46,8 @@ public class MealOrderServiceImpl implements IMealOrderService {
     private final MealOrderMapper mealOrderMapper;
     private final MealDishMapper mealDishMapper;
     private final MealReviewMapper mealReviewMapper;
-
+    private final IMealNotifyService mealNotifyService;
+    private final ITransactionCommitExecutor transactionCommitExecutor;
     @Override
     @DataScope(deptAlias = "d")
     public List<MealOrder> selectMealOrderList(MealOrder mealOrder) {
@@ -137,6 +140,8 @@ public class MealOrderServiceImpl implements IMealOrderService {
 
         items.forEach(item -> item.setOrderId(order.getOrderId()));
         mealOrderMapper.insertOrderItems(items);
+        transactionCommitExecutor.afterCommit(() -> mealNotifyService.pushNewOrderToChefs(order.getDeptId(),
+                order.getOrderId(), order.getOrderNo(), order.getUserName(), order.getTotalCount()));
         return order.getOrderId();
     }
 
@@ -147,27 +152,39 @@ public class MealOrderServiceImpl implements IMealOrderService {
         if (!MealOrder.STATUS_WAITING.equals(order.getStatus())) {
             throw new ServiceException("订单已被接单，不能取消");
         }
-        return changeStatus(orderId, MealOrder.STATUS_CANCELED, MealOrder.STATUS_WAITING, null, null);
+        return changeStatus(orderId, MealOrder.STATUS_CANCELED, MealOrder.STATUS_WAITING, null, null, null);
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int acceptOrder(Long orderId) {
         MealOrder order = requireOrder(orderId);
         MealScopeGuard.assertSameDept(order.getDeptId(), "订单");
         if (!MealOrder.STATUS_WAITING.equals(order.getStatus())) {
             throw new ServiceException("该订单不是待接单状态");
         }
-        return changeStatus(orderId, MealOrder.STATUS_COOKING, MealOrder.STATUS_WAITING, currentNickName(), null);
+        int rows = changeStatus(orderId, MealOrder.STATUS_COOKING, MealOrder.STATUS_WAITING,
+                currentNickName(), null, SecurityUtils.getUserId());
+        transactionCommitExecutor.afterCommit(() -> mealNotifyService.push("notify:user:" + order.getUserId(),
+                "ORDER_ACCEPTED", order.getOrderId(), "厨师已接单", "厨师已接单，正在准备您的餐点",
+                notificationExtra(order.getOrderNo())));
+        return rows;
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int finishOrder(Long orderId) {
         MealOrder order = requireOrder(orderId);
         MealScopeGuard.assertSameDept(order.getDeptId(), "订单");
         if (!MealOrder.STATUS_COOKING.equals(order.getStatus())) {
             throw new ServiceException("该订单不是制作中状态");
         }
-        return changeStatus(orderId, MealOrder.STATUS_FINISHED, MealOrder.STATUS_COOKING, null, currentNickName());
+        int rows = changeStatus(orderId, MealOrder.STATUS_FINISHED, MealOrder.STATUS_COOKING,
+                null, currentNickName(), null);
+        transactionCommitExecutor.afterCommit(() -> mealNotifyService.push("notify:user:" + order.getUserId(),
+                "ORDER_COMPLETED", order.getOrderId(), "订单已完成", "您的订单已完成",
+                notificationExtra(order.getOrderNo())));
+        return rows;
     }
 
     @Override
@@ -188,12 +205,14 @@ public class MealOrderServiceImpl implements IMealOrderService {
     /**
      * 状态流转：where 里带上期望的当前状态，两个厨师同时点「接单」时只有一个能成功
      */
-    private int changeStatus(Long orderId, String target, String expected, String acceptBy, String finishBy) {
+    private int changeStatus(Long orderId, String target, String expected, String acceptBy, String finishBy,
+            Long acceptUserId) {
         MealOrder update = new MealOrder();
         update.setOrderId(orderId);
         update.setStatus(target);
         update.setExpectedStatus(expected);
         update.setAcceptBy(acceptBy);
+        update.setAcceptUserId(acceptUserId);
         update.setFinishBy(finishBy);
         if (MealOrder.STATUS_CANCELED.equals(target)) {
             update.setCancelTime(new Date());
@@ -204,6 +223,12 @@ public class MealOrderServiceImpl implements IMealOrderService {
             throw new ServiceException("订单状态已变化，请刷新后重试");
         }
         return rows;
+    }
+
+    private Map<String, Object> notificationExtra(String orderNo) {
+        Map<String, Object> extra = new java.util.HashMap<>();
+        extra.put("orderNo", orderNo);
+        return extra;
     }
 
     private MealOrder requireOrder(Long orderId) {

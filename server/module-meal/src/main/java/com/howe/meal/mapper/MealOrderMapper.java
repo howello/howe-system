@@ -41,6 +41,22 @@ public interface MealOrderMapper {
     MealOrder selectMealOrderById(Long orderId);
 
     /**
+     * 查询具有厨师角色的家庭成员用户ID。
+     *
+     * @param deptId 所属家庭ID
+     * @return 厨师用户ID集合
+     */
+    List<Long> selectChefUserIdsByDeptId(@Param("deptId") Long deptId);
+
+    /**
+     * 查询具有家庭管理员角色的家庭成员用户ID。
+     *
+     * @param deptId 所属家庭ID
+     * @return 管理员用户ID集合
+     */
+    List<Long> selectManagerUserIdsByDeptId(@Param("deptId") Long deptId);
+
+    /**
      * 查询订单明细
      *
      * @param orderId 订单ID

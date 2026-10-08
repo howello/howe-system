@@ -14,6 +14,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="totalCount"  column="total_count"  />
         <result property="orderRemark" column="order_remark" />
         <result property="acceptBy"    column="accept_by"    />
+        <result property="acceptUserId" column="accept_user_id" />
         <result property="acceptTime"  column="accept_time"  />
         <result property="finishBy"    column="finish_by"    />
         <result property="finishTime"  column="finish_time"  />
@@ -38,7 +39,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <sql id="selectMealOrderVo">
         select d.order_id, d.order_no, d.dept_id, d.user_id, d.user_name, d.status,
-               d.total_count, d.order_remark, d.accept_by, d.accept_time,
+               d.total_count, d.order_remark, d.accept_by, d.accept_user_id, d.accept_time,
                d.finish_by, d.finish_time, d.cancel_time, d.del_flag,
                d.create_by, d.create_time, d.update_by, d.update_time, d.remark
         from meal_order d
@@ -105,6 +106,32 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where d.order_id = #{orderId} and d.del_flag = '0'
     </select>
 
+    <select id="selectChefUserIdsByDeptId" resultType="Long">
+        select distinct u.user_id
+        from sys_user u
+        inner join sys_user_role ur on ur.user_id = u.user_id
+        inner join sys_role r on r.role_id = ur.role_id
+        where u.dept_id = #{deptId}
+          and u.del_flag = '0'
+          and u.status = '0'
+          and r.role_key = 'meal_chef'
+          and r.status = '0'
+          and r.del_flag = '0'
+    </select>
+
+    <select id="selectManagerUserIdsByDeptId" resultType="Long">
+        select distinct u.user_id
+        from sys_user u
+        inner join sys_user_role ur on ur.user_id = u.user_id
+        inner join sys_role r on r.role_id = ur.role_id
+        where u.dept_id = #{deptId}
+          and u.del_flag = '0'
+          and u.status = '0'
+          and r.role_key = 'meal_manager'
+          and r.status = '0'
+          and r.del_flag = '0'
+    </select>
+
     <select id="selectItemsByOrderId" parameterType="Long" resultMap="MealOrderItemResult">
         select item_id, order_id, dish_id, dish_name, dish_cover, count, remark
         from meal_order_item
@@ -149,6 +176,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <set>
             status = #{status},
             <if test="acceptBy != null and acceptBy != ''">accept_by = #{acceptBy}, accept_time = sysdate(),</if>
+            <if test="acceptUserId != null">accept_user_id = #{acceptUserId},</if>
             <if test="finishBy != null and finishBy != ''">finish_by = #{finishBy}, finish_time = sysdate(),</if>
             <if test="cancelTime != null">cancel_time = sysdate(),</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>

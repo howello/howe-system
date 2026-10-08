@@ -11,6 +11,7 @@ import org.aspectj.lang.reflect.MethodSignature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
@@ -35,7 +36,7 @@ public class RateLimiterAspect {
     private RedisScript<Long> limitScript;
 
     @Autowired
-    public void setRedisTemplate1(RedisTemplate<Object, Object> redisTemplate) {
+    public void setRedisTemplate1(@Qualifier("redisTemplate") RedisTemplate<Object, Object> redisTemplate) {
         this.redisTemplate = redisTemplate;
     }
 

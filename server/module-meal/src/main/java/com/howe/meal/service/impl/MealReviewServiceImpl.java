@@ -10,6 +10,8 @@ import com.howe.meal.domain.MealReview;
 import com.howe.meal.mapper.MealOrderMapper;
 import com.howe.meal.mapper.MealReviewMapper;
 import com.howe.meal.service.IMealReviewService;
+import com.howe.meal.service.IMealNotifyService;
+import com.howe.meal.service.ITransactionCommitExecutor;
 import com.howe.meal.util.MealScopeGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,8 @@ public class MealReviewServiceImpl implements IMealReviewService {
 
     private final MealReviewMapper mealReviewMapper;
     private final MealOrderMapper mealOrderMapper;
+    private final IMealNotifyService mealNotifyService;
+    private final ITransactionCommitExecutor transactionCommitExecutor;
 
     @Override
     @DataScope(deptAlias = "d")
@@ -68,7 +72,13 @@ public class MealReviewServiceImpl implements IMealReviewService {
             mealReview.setAnonymous("0");
         }
         mealReview.setCreateBy(SecurityUtils.getUsername());
-        return mealReviewMapper.insertMealReview(mealReview);
+        int rows = mealReviewMapper.insertMealReview(mealReview);
+        if (order.getAcceptUserId() != null) {
+            transactionCommitExecutor.afterCommit(() -> mealNotifyService.push("notify:chef:" + order.getAcceptUserId(),
+                    "ORDER_RATED", order.getOrderId(), "收到新评价", "您的订单收到一条新评价",
+                    notificationExtra(order.getOrderNo(), mealReview.getScore())));
+        }
+        return rows;
     }
 
     @Override
@@ -87,6 +97,13 @@ public class MealReviewServiceImpl implements IMealReviewService {
             }
         }
         return mealReviewMapper.deleteMealReviewByIds(reviewIds);
+    }
+
+    private java.util.Map<String, Object> notificationExtra(String orderNo, Integer score) {
+        java.util.Map<String, Object> extra = new java.util.HashMap<>();
+        extra.put("orderNo", orderNo);
+        extra.put("score", score);
+        return extra;
     }
 
     private String currentNickName() {

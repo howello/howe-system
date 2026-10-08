@@ -1,16 +1,19 @@
 package com.howe.common.core.redis;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.BoundSetOperations;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
 /**
@@ -23,7 +26,61 @@ import org.springframework.stereotype.Component;
 public class RedisCache
 {
     @Autowired
+    @Qualifier("redisTemplate")
     public RedisTemplate redisTemplate;
+
+    @Autowired(required = false)
+    @Qualifier("notificationRedisTemplate")
+    private RedisTemplate<String, String> notificationRedisTemplate;
+
+    @Autowired(required = false)
+    @Qualifier("notifyPollScript")
+    private DefaultRedisScript<List> notifyPollScript;
+
+    @Autowired(required = false)
+    @Qualifier("notifyPushScript")
+    private DefaultRedisScript<Long> notifyPushScript;
+
+    /**
+     * 保留全局通知 ID 并原子写入队列及过期时间。
+     *
+     * @param queueKey 通知队列键
+     * @param idKey 全局 ID 保留键
+     * @param member 通知 JSON
+     * @param score 创建时间戳
+     * @param timeout 过期时长
+     * @param unit 过期单位
+     * @return ID 可用并成功写入时返回 true
+     */
+    public boolean addNotificationIfAbsent(final String queueKey, final String idKey, final String member,
+            final double score, final long timeout, final TimeUnit unit)
+    {
+        if (notificationRedisTemplate == null || notifyPushScript == null)
+        {
+            throw new IllegalStateException("通知 RedisTemplate 未配置");
+        }
+        Long result = (Long) notificationRedisTemplate.execute(notifyPushScript,
+                Collections.singletonList(queueKey), member, Double.toString(score),
+                Long.toString(unit.toSeconds(timeout)), idKey);
+        return result != null && result == 1L;
+    }
+
+    /**
+     * 原子读取并清空通知队列。
+     *
+     * @param key 通知队列键
+     * @return 通知 JSON 字符串集合
+     */
+    public List<String> pollNotifications(final String key)
+    {
+        if (notificationRedisTemplate == null || notifyPollScript == null)
+        {
+            throw new IllegalStateException("通知 Redis 执行环境未配置");
+        }
+        List<String> result = notificationRedisTemplate.execute(notifyPollScript,
+                Collections.singletonList(key));
+        return result == null ? Collections.emptyList() : result;
+    }
 
     /**
      * 缓存基本的对象，Integer、String、实体类等
