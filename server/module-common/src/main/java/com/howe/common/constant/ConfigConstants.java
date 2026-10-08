@@ -81,6 +81,12 @@ public class ConfigConstants
     /** RSS 请求 User-Agent，部分站点拒绝默认 UA */
     public static final String BLOG_FEED_USER_AGENT = "blog.feed.userAgent";
 
+    /** 朋友圈 RSS 同步任务开关（module-quartz 移除后替代原 sys_job 启停） */
+    public static final String BLOG_FEED_SYNC_ENABLED = "blog.feed.syncEnabled";
+
+    /** waline 友链同步任务开关（module-quartz 移除后替代原 sys_job 启停） */
+    public static final String BLOG_LINK_SYNC_ENABLED = "blog.link.syncEnabled";
+
     /** 验证码开关 */
     public static final String CAPTCHA_ENABLED = "sys.account.captchaEnabled";
 

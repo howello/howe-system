@@ -167,17 +167,6 @@ public class Constants
     public static final String[] JSON_WHITELIST_STR = { "com.howe" };
 
     /**
-     * 定时任务白名单配置（仅允许访问的包名，如其他需要可以自行添加）
-     */
-    public static final String[] JOB_WHITELIST_STR = { "com.howe.quartz.task" };
-
-    /**
-     * 定时任务违规的字符
-     */
-    public static final String[] JOB_ERROR_STR = { "java.net.URL", "javax.naming.InitialContext", "org.yaml.snakeyaml",
-            "org.springframework", "org.apache", "com.howe.common.utils.file", "com.howe.common.config", "com.howe.generator" };
-
-    /**
      * 部门相关常量
      */
     public static class Dept

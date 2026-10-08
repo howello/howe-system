@@ -202,18 +202,3 @@ values('说说修改', @talkMenuId, '3', '#', '', 1, 0, 'F', '0', '0', 'blog:tal
 
 insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 values('说说删除', @talkMenuId, '4', '#', '', 1, 0, 'F', '0', '0', 'blog:talk:remove', '#', 'admin', sysdate(), '');
-
--- ----------------------------
--- 7、定时任务
---
--- invoke_target 填 bean 名而非全限定类名：JobInvokeUtil 对不含包名的 target
--- 走 SpringUtils.getBean(beanName) 按运行时 bean 名解析，因此 blogFeedTask
--- 定义在 module-blog 即可被 module-quartz 调用，无需任何模块间依赖。
---
--- concurrent='1' 禁止并发，防止上一轮未跑完又被触发。
--- status='1' 默认停用——未配置订阅源时启用只会空跑，配置好后再去界面启用。
--- ----------------------------
-delete from sys_job where invoke_target = 'blogFeedTask.sync()';
-
-insert into sys_job (job_name, job_group, invoke_target, cron_expression, misfire_policy, concurrent, status, create_by, create_time, remark)
-values('博客朋友圈RSS同步', 'DEFAULT', 'blogFeedTask.sync()', '0 0 */2 * * ?', '3', '1', '1', 'admin', sysdate(), '每2小时抓取一次订阅源；默认停用，配置好订阅源后在界面启用');
