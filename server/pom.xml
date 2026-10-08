@@ -246,6 +246,13 @@
                 <version>${howe.version}</version>
             </dependency>
 
+            <!-- 家庭点餐-->
+            <dependency>
+                <groupId>com.howe</groupId>
+                <artifactId>module-meal</artifactId>
+                <version>${howe.version}</version>
+            </dependency>
+
             <!-- 通用工具-->
             <dependency>
                 <groupId>com.howe</groupId>
@@ -278,6 +285,7 @@
         <module>module-generator</module>
         <module>module-blog</module>
         <module>module-ai</module>
+        <module>module-meal</module>
         <module>module-common</module>
     </modules>
     <packaging>pom</packaging>

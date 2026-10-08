@@ -105,6 +105,10 @@ token:
   secret: ${JWT_SECRET:abcdefghijklmnopqrstuvwxyz}
   # 令牌有效期（默认30分钟）
   expireTime: ${JWT_EXPIRATION:30}
+  # 点餐端令牌有效期（默认43200分钟 = 30天）。点餐端登录时传 client=meal 才会用到，
+  # 管理端不受影响；配合「剩余不足 TTL 三分之一就续期」的滑动策略，
+  # 只要 20 天内打开过一次就不会掉线。
+  mealExpireTime: ${JWT_MEAL_EXPIRATION:43200}
 
 # MyBatis配置
 mybatis:

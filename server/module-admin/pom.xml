@@ -66,6 +66,12 @@
             <artifactId>module-ai</artifactId>
         </dependency>
 
+        <!-- 家庭点餐-->
+        <dependency>
+            <groupId>com.howe</groupId>
+            <artifactId>module-meal</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>

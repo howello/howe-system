@@ -105,6 +105,12 @@ public class Constants
      */
     public static final String TOKEN_PREFIX = "Bearer ";
 
+    /** 登录客户端：管理端（默认），会话有效期取 token.expireTime */
+    public static final String CLIENT_ADMIN = "admin";
+
+    /** 登录客户端：点餐端，会话有效期取 token.mealExpireTime */
+    public static final String CLIENT_MEAL = "meal";
+
     /**
      * 令牌前缀
      */

@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.meal.mapper.MealProposalMapper">
+
+    <resultMap type="MealProposal" id="MealProposalResult">
+        <result property="proposalId"   column="proposal_id"   />
+        <result property="deptId"       column="dept_id"       />
+        <result property="userId"       column="user_id"       />
+        <result property="userName"     column="user_name"     />
+        <result property="name"         column="name"          />
+        <result property="categoryId"   column="category_id"   />
+        <result property="description"  column="description"   />
+        <result property="image"        column="image"         />
+        <result property="reason"       column="reason"        />
+        <result property="status"       column="status"        />
+        <result property="auditBy"      column="audit_by"      />
+        <result property="auditTime"    column="audit_time"    />
+        <result property="auditRemark"  column="audit_remark"  />
+        <result property="dishId"       column="dish_id"       />
+        <result property="delFlag"      column="del_flag"      />
+        <result property="createBy"     column="create_by"     />
+        <result property="createTime"   column="create_time"   />
+        <result property="updateBy"     column="update_by"     />
+        <result property="updateTime"   column="update_time"   />
+        <result property="remark"       column="remark"        />
+        <result property="categoryName" column="category_name" />
+    </resultMap>
+
+    <sql id="selectMealProposalVo">
+        select d.proposal_id, d.dept_id, d.user_id, d.user_name, d.name, d.category_id,
+               d.description, d.image, d.reason, d.status, d.audit_by, d.audit_time,
+               d.audit_remark, d.dish_id, d.del_flag,
+               d.create_by, d.create_time, d.update_by, d.update_time, d.remark,
+               c.name as category_name
+        from meal_proposal d
+        left join meal_category c on c.category_id = d.category_id and c.del_flag = '0'
+    </sql>
+
+    <!-- 管理端审核列表：数据范围由 @DataScope 注入，表别名 d 与注解的 deptAlias 对应 -->
+    <select id="selectMealProposalList" parameterType="MealProposal" resultMap="MealProposalResult">
+        <include refid="selectMealProposalVo"/>
+        <where>
+            d.del_flag = '0'
+            <if test="status != null and status != ''">
+                AND d.status = #{status}
+            </if>
+            <if test="name != null and name != ''">
+                AND d.name like concat('%', #{name}, '%')
+            </if>
+            <if test="userId != null">
+                AND d.user_id = #{userId}
+            </if>
+        </where>
+        ${params.dataScope}
+        order by d.create_time desc
+    </select>
+
+    <!-- 我的提案：强制按 user_id 过滤，不依赖数据权限 -->
+    <select id="selectMyProposalList" parameterType="MealProposal" resultMap="MealProposalResult">
+        <include refid="selectMealProposalVo"/>
+        <where>
+            d.del_flag = '0'
+            AND d.user_id = #{userId}
+            <if test="status != null and status != ''">
+                AND d.status = #{status}
+            </if>
+        </where>
+        order by d.create_time desc
+    </select>
+
+    <select id="selectMealProposalById" parameterType="Long" resultMap="MealProposalResult">
+        <include refid="selectMealProposalVo"/>
+        where d.proposal_id = #{proposalId} and d.del_flag = '0'
+    </select>
+
+    <insert id="insertMealProposal" parameterType="MealProposal" useGeneratedKeys="true" keyProperty="proposalId">
+        insert into meal_proposal (
+            dept_id, user_id, user_name, name, category_id, description, image, reason,
+            status, del_flag, create_by, create_time, remark
+        ) values (
+            #{deptId}, #{userId}, #{userName}, #{name}, #{categoryId}, #{description}, #{image}, #{reason},
+            '0', '0', #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateMealProposal" parameterType="MealProposal">
+        update meal_proposal
+        <set>
+            <if test="name != null and name != ''">name = #{name},</if>
+            <if test="categoryId != null">category_id = #{categoryId},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="image != null">image = #{image},</if>
+            <if test="reason != null">reason = #{reason},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="auditBy != null and auditBy != ''">audit_by = #{auditBy}, audit_time = sysdate(),</if>
+            <if test="auditRemark != null">audit_remark = #{auditRemark},</if>
+            <if test="dishId != null">dish_id = #{dishId},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </set>
+        where proposal_id = #{proposalId} and del_flag = '0'
+    </update>
+
+    <update id="deleteMealProposalByIds" parameterType="Long">
+        update meal_proposal set del_flag = '2', update_time = sysdate()
+        where del_flag = '0' and proposal_id in
+        <foreach item="proposalId" collection="array" open="(" separator="," close=")">
+            #{proposalId}
+        </foreach>
+    </update>
+
+</mapper>

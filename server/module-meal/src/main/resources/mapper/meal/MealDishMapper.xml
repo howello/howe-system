@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.meal.mapper.MealDishMapper">
+
+    <resultMap type="MealDish" id="MealDishResult">
+        <result property="dishId"       column="dish_id"       />
+        <result property="deptId"       column="dept_id"       />
+        <result property="categoryId"   column="category_id"   />
+        <result property="name"         column="name"          />
+        <result property="cover"        column="cover"         />
+        <result property="description"  column="description"   />
+        <result property="tags"         column="tags"          />
+        <result property="duration"     column="duration"      />
+        <result property="level"        column="level"         />
+        <result property="serve"        column="serve"         />
+        <result property="kcal"         column="kcal"          />
+        <result property="ingredients"  column="ingredients"   />
+        <result property="steps"        column="steps"         />
+        <result property="tips"         column="tips"          />
+        <result property="status"       column="status"        />
+        <result property="sort"         column="sort"          />
+        <result property="source"       column="source"        />
+        <result property="delFlag"      column="del_flag"      />
+        <result property="createBy"     column="create_by"     />
+        <result property="createTime"   column="create_time"   />
+        <result property="updateBy"     column="update_by"     />
+        <result property="updateTime"   column="update_time"   />
+        <result property="remark"       column="remark"        />
+        <result property="categoryName" column="category_name" />
+    </resultMap>
+
+    <sql id="selectMealDishVo">
+        select d.dish_id, d.dept_id, d.category_id, d.name, d.cover, d.description, d.tags,
+               d.duration, d.level, d.serve, d.kcal, d.ingredients, d.steps, d.tips,
+               d.status, d.sort, d.source, d.del_flag,
+               d.create_by, d.create_time, d.update_by, d.update_time, d.remark,
+               c.name as category_name
+        from meal_dish d
+        left join meal_category c on c.category_id = d.category_id and c.del_flag = '0'
+    </sql>
+
+    <!--
+      公共菜谱（dept_id = 0）与当前家庭的私有菜一起返回。
+      与分类同理，不用 @DataScope，否则公共菜谱会被数据权限过滤掉。
+    -->
+    <select id="selectMealDishList" parameterType="MealDish" resultMap="MealDishResult">
+        <include refid="selectMealDishVo"/>
+        <where>
+            d.del_flag = '0'
+            <if test="deptId != null">
+                AND (d.dept_id = #{deptId} or d.dept_id = 0)
+            </if>
+            <if test="categoryId != null">
+                AND d.category_id = #{categoryId}
+            </if>
+            <if test="status != null and status != ''">
+                AND d.status = #{status}
+            </if>
+            <if test="name != null and name != ''">
+                AND d.name like concat('%', #{name}, '%')
+            </if>
+            <!-- 关键词同时匹配菜名与用料，点餐端搜索「牛肉」也能命中用料里有牛肉的菜 -->
+            <if test="keyword != null and keyword != ''">
+                AND (d.name like concat('%', #{keyword}, '%')
+                     or d.ingredients like concat('%', #{keyword}, '%'))
+            </if>
+        </where>
+        order by d.sort asc, d.dish_id desc
+    </select>
+
+    <select id="selectMealDishById" parameterType="Long" resultMap="MealDishResult">
+        <include refid="selectMealDishVo"/>
+        where d.dish_id = #{dishId} and d.del_flag = '0'
+    </select>
+
+    <insert id="insertMealDish" parameterType="MealDish" useGeneratedKeys="true" keyProperty="dishId">
+        insert into meal_dish (
+            dept_id, category_id, name, cover, description, tags,
+            duration, level, serve, kcal, ingredients, steps, tips,
+            status, sort, source, del_flag, create_by, create_time, remark
+        ) values (
+            #{deptId}, #{categoryId}, #{name}, #{cover}, #{description}, #{tags},
+            #{duration}, #{level}, #{serve}, #{kcal}, #{ingredients}, #{steps}, #{tips},
+            #{status}, #{sort}, #{source}, '0', #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateMealDish" parameterType="MealDish">
+        update meal_dish
+        <set>
+            <if test="deptId != null">dept_id = #{deptId},</if>
+            <if test="categoryId != null">category_id = #{categoryId},</if>
+            <if test="name != null and name != ''">name = #{name},</if>
+            <if test="cover != null">cover = #{cover},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="tags != null">tags = #{tags},</if>
+            <if test="duration != null">duration = #{duration},</if>
+            <if test="level != null">level = #{level},</if>
+            <if test="serve != null">serve = #{serve},</if>
+            <if test="kcal != null">kcal = #{kcal},</if>
+            <if test="ingredients != null">ingredients = #{ingredients},</if>
+            <if test="steps != null">steps = #{steps},</if>
+            <if test="tips != null">tips = #{tips},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="sort != null">sort = #{sort},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </set>
+        where dish_id = #{dishId} and del_flag = '0'
+    </update>
+
+    <update id="deleteMealDishByIds" parameterType="Long">
+        update meal_dish set del_flag = '2', update_time = sysdate()
+        where del_flag = '0' and dish_id in
+        <foreach item="dishId" collection="array" open="(" separator="," close=")">
+            #{dishId}
+        </foreach>
+    </update>
+
+</mapper>

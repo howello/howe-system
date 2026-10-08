@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.meal.mapper.MealReviewMapper">
+
+    <resultMap type="MealReview" id="MealReviewResult">
+        <result property="reviewId"   column="review_id"   />
+        <result property="orderId"    column="order_id"    />
+        <result property="deptId"     column="dept_id"     />
+        <result property="userId"     column="user_id"     />
+        <result property="userName"   column="user_name"   />
+        <result property="score"      column="score"       />
+        <result property="content"    column="content"     />
+        <result property="images"     column="images"      />
+        <result property="anonymous"  column="anonymous"   />
+        <result property="delFlag"    column="del_flag"    />
+        <result property="createBy"   column="create_by"   />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy"   column="update_by"   />
+        <result property="updateTime" column="update_time" />
+        <result property="remark"     column="remark"      />
+        <result property="orderNo"    column="order_no"    />
+        <result property="dishNames"  column="dish_names"  />
+    </resultMap>
+
+    <sql id="selectMealReviewVo">
+        select d.review_id, d.order_id, d.dept_id, d.user_id, d.user_name, d.score,
+               d.content, d.images, d.anonymous, d.del_flag,
+               d.create_by, d.create_time, d.update_by, d.update_time, d.remark,
+               o.order_no as order_no,
+               (select group_concat(i.dish_name order by i.item_id separator '、')
+                  from meal_order_item i where i.order_id = d.order_id) as dish_names
+        from meal_review d
+        left join meal_order o on o.order_id = d.order_id
+    </sql>
+
+    <!-- 管理端：数据范围由 @DataScope 注入，表别名 d 与注解的 deptAlias 对应 -->
+    <select id="selectMealReviewList" parameterType="MealReview" resultMap="MealReviewResult">
+        <include refid="selectMealReviewVo"/>
+        <where>
+            d.del_flag = '0'
+            <if test="orderId != null">
+                AND d.order_id = #{orderId}
+            </if>
+            <if test="userId != null">
+                AND d.user_id = #{userId}
+            </if>
+            <if test="score != null">
+                AND d.score = #{score}
+            </if>
+            <if test="params.beginTime != null and params.beginTime != ''">
+                AND date_format(d.create_time, '%y%m%d') &gt;= date_format(#{params.beginTime}, '%y%m%d')
+            </if>
+            <if test="params.endTime != null and params.endTime != ''">
+                AND date_format(d.create_time, '%y%m%d') &lt;= date_format(#{params.endTime}, '%y%m%d')
+            </if>
+        </where>
+        ${params.dataScope}
+        order by d.create_time desc
+    </select>
+
+    <!-- 我的评价：强制按 user_id 过滤，不依赖数据权限 -->
+    <select id="selectMyReviewList" parameterType="MealReview" resultMap="MealReviewResult">
+        <include refid="selectMealReviewVo"/>
+        <where>
+            d.del_flag = '0'
+            AND d.user_id = #{userId}
+        </where>
+        order by d.create_time desc
+    </select>
+
+    <select id="selectMealReviewById" parameterType="Long" resultMap="MealReviewResult">
+        <include refid="selectMealReviewVo"/>
+        where d.review_id = #{reviewId} and d.del_flag = '0'
+    </select>
+
+    <select id="selectMealReviewByOrderId" parameterType="Long" resultMap="MealReviewResult">
+        <include refid="selectMealReviewVo"/>
+        where d.order_id = #{orderId} and d.del_flag = '0'
+        limit 1
+    </select>
+
+    <select id="selectReviewedOrderIds" parameterType="Long" resultType="Long">
+        select order_id from meal_review
+        where del_flag = '0' and order_id in
+        <foreach item="orderId" collection="array" open="(" separator="," close=")">
+            #{orderId}
+        </foreach>
+    </select>
+
+    <insert id="insertMealReview" parameterType="MealReview" useGeneratedKeys="true" keyProperty="reviewId">
+        insert into meal_review (
+            order_id, dept_id, user_id, user_name, score, content, images, anonymous,
+            del_flag, create_by, create_time, remark
+        ) values (
+            #{orderId}, #{deptId}, #{userId}, #{userName}, #{score}, #{content}, #{images}, #{anonymous},
+            '0', #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="deleteMealReviewByIds" parameterType="Long">
+        update meal_review set del_flag = '2', update_time = sysdate()
+        where del_flag = '0' and review_id in
+        <foreach item="reviewId" collection="array" open="(" separator="," close=")">
+            #{reviewId}
+        </foreach>
+    </update>
+
+</mapper>

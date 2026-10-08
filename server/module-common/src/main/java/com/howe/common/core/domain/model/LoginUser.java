@@ -49,6 +49,15 @@ public class LoginUser implements UserDetails
     private Long expireTime;
 
     /**
+     * 本次会话的有效期（分钟）
+     *
+     * <p>登录时按客户端写入：管理端 30 分钟，点餐端 30 天。刷新缓存与判断续期阈值时
+     * 都以它为准，因此同一套 TokenService 能同时服务两种有效期的会话。</p>
+     */
+    @Schema(description = "本次会话的有效期（分钟），管理端 30、点餐端 43200", accessMode = Schema.AccessMode.READ_ONLY, example = "30")
+    private Integer expireMinutes;
+
+    /**
      * 登录IP地址
      */
     @Schema(description = "登录IP地址", accessMode = Schema.AccessMode.READ_ONLY, example = "127.0.0.1")
@@ -249,6 +258,16 @@ public class LoginUser implements UserDetails
     public void setExpireTime(Long expireTime)
     {
         this.expireTime = expireTime;
+    }
+
+    public Integer getExpireMinutes()
+    {
+        return expireMinutes;
+    }
+
+    public void setExpireMinutes(Integer expireMinutes)
+    {
+        this.expireMinutes = expireMinutes;
     }
 
     public Set<String> getPermissions()
