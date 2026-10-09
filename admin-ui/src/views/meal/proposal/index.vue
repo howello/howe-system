@@ -50,8 +50,9 @@
       </el-table-column>
       <el-table-column label="审核意见" align="left" prop="auditRemark" :show-overflow-tooltip="true" min-width="160" />
       <el-table-column label="提交时间" align="center" prop="createTime" width="170" />
-      <el-table-column label="操作" align="center" width="180" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="240" class-name="small-padding fixed-width">
         <template #default="scope">
+          <el-button link type="primary" icon="View" @click="handleDetail(scope.row)">详情</el-button>
           <el-button
             v-if="scope.row.status === '0'"
             link
@@ -101,6 +102,37 @@
         </div>
       </template>
     </el-dialog>
+
+    <el-dialog title="提案详情" v-model="detailOpen" width="600px" append-to-body>
+      <el-descriptions v-if="detail" :column="1" border>
+        <el-descriptions-item label="参考图">
+          <el-image
+            v-if="detail.image"
+            :src="detail.image"
+            :preview-src-list="[detail.image]"
+            fit="cover"
+            style="width: 80px; height: 80px; border-radius: 6px"
+            preview-teleported
+          />
+          <span v-else>—</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="菜名">{{ detail.name || "—" }}</el-descriptions-item>
+        <el-descriptions-item label="提交人">{{ detail.userName || "—" }}</el-descriptions-item>
+        <el-descriptions-item label="建议分类">{{ detail.categoryNames || "—" }}</el-descriptions-item>
+        <el-descriptions-item label="简介">{{ detail.description || "—" }}</el-descriptions-item>
+        <el-descriptions-item label="想吃的理由">{{ detail.reason || "—" }}</el-descriptions-item>
+        <el-descriptions-item label="状态">
+          <el-tag :type="statusTag(detail.status)" size="small">{{ statusText(detail.status) }}</el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="审核意见">{{ detail.auditRemark || "—" }}</el-descriptions-item>
+        <el-descriptions-item label="提交时间">{{ detail.createTime || "—" }}</el-descriptions-item>
+      </el-descriptions>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="detailOpen = false">关 闭</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -118,7 +150,9 @@ const STATUS_TEXT: Record<string, string> = {
 
 const proposalList = ref<MealProposal[]>([])
 const current = ref<MealProposal | null>(null)
+const detail = ref<MealProposal | null>(null)
 const open = ref<boolean>(false)
+const detailOpen = ref<boolean>(false)
 const loading = ref<boolean>(true)
 const submitting = ref<boolean>(false)
 const showSearch = ref<boolean>(true)
@@ -176,6 +210,11 @@ function resetQuery() {
 function handleSelectionChange(selection: MealProposal[]) {
   ids.value = selection.map((item) => item.proposalId as number)
   multiple.value = !selection.length
+}
+
+function handleDetail(row: MealProposal) {
+  detail.value = row
+  detailOpen.value = true
 }
 
 function handleAudit(row: MealProposal, status: string) {

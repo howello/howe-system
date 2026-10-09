@@ -34,6 +34,19 @@
       <el-col :span="1.5">
         <el-button type="danger" plain icon="Delete" :disabled="multiple" @click="handleDelete()" v-hasPermi="['meal:dish:remove']">删除</el-button>
       </el-col>
+      <el-col :span="1.5">
+        <el-button
+          type="warning"
+          plain
+          icon="MagicStick"
+          :disabled="multiple"
+          :loading="batchAiLoading"
+          @click="handleBatchAi"
+          v-hasPermi="['meal:dish:edit']"
+        >
+          AI 优化
+        </el-button>
+      </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
@@ -109,7 +122,17 @@
           <el-checkbox v-model="asPublic">建为平台公共菜谱（所有家庭可见）</el-checkbox>
         </el-form-item>
         <el-form-item label="封面地址" prop="cover">
-          <el-input v-model="form.cover" placeholder="选填，图片地址（/common/upload 返回的 URL）" />
+          <div class="cover-field">
+            <el-input v-model="form.cover" placeholder="选填，图片地址（/common/upload 返回的 URL）" />
+            <el-image
+              v-if="form.cover"
+              :src="form.cover"
+              :preview-src-list="[form.cover]"
+              fit="cover"
+              class="cover-thumb"
+              preview-teleported
+            />
+          </div>
         </el-form-item>
         <el-form-item label="简介" prop="description">
           <el-input v-model="form.description" placeholder="一句话简介" maxlength="500" />
@@ -190,7 +213,7 @@
 <script setup lang="ts" name="MealDish">
 import { getDish, listDish, addDish, updateDish, delDish, aiGenerateDish } from "@/api/meal/dish"
 import { listCategory } from "@/api/meal/category"
-import type { MealDish, MealDishQueryParams } from "@/types/api/meal/dish"
+import type { MealDish, MealDishQueryParams, MealDishAiCurrent } from "@/types/api/meal/dish"
 import type { MealCategory } from "@/types/api/meal/category"
 import useUserStore from "@/store/modules/user"
 
@@ -205,6 +228,7 @@ const open = ref<boolean>(false)
 const loading = ref<boolean>(true)
 const submitting = ref<boolean>(false)
 const aiLoading = ref<boolean>(false)
+const batchAiLoading = ref<boolean>(false)
 const showSearch = ref<boolean>(true)
 const ids = ref<number[]>([])
 const single = ref<boolean>(true)
@@ -372,6 +396,77 @@ function handleAiGenerate() {
     })
 }
 
+/** 批量 AI 优化：对选中的多个菜品逐个补齐空字段并自动保存 */
+function handleBatchAi() {
+  const selected = dishList.value.filter((item: MealDish) => ids.value.includes(item.dishId as number))
+  if (!selected.length) {
+    proxy.$modal.msgWarning("请先选择菜品")
+    return
+  }
+  proxy.$modal
+    .confirm(`将对选中的 ${selected.length} 个菜品逐个执行 AI 补齐并自动保存，是否继续？`)
+    .then(() => runBatchAi(selected))
+    .catch(() => {})
+}
+
+/** 依次处理每个菜品：拉取详情 → AI 补齐空字段 → 自动提交；单条失败不中断 */
+async function runBatchAi(rows: MealDish[]) {
+  batchAiLoading.value = true
+  let success = 0
+  const failed: string[] = []
+  for (const row of rows) {
+    try {
+      const detailResp: any = await getDish(row.dishId as number)
+      const dish: MealDish = detailResp.data || row
+      const current: MealDishAiCurrent = {
+        categoryIds: dish.categoryIds && dish.categoryIds.length ? dish.categoryIds : undefined,
+        description: dish.description || undefined,
+        cover: dish.cover || undefined,
+        tags: dish.tags || undefined,
+        duration: dish.duration || undefined,
+        level: dish.level || undefined,
+        serve: dish.serve || undefined,
+        kcal: dish.kcal || undefined,
+        ingredients: dish.ingredients || undefined,
+        steps: dish.steps || undefined,
+        tips: dish.tips || undefined
+      }
+      const aiResp: any = await aiGenerateDish({ name: dish.name as string, current })
+      const result = aiResp.data || {}
+      const fields = result.fields || {}
+      Object.keys(fields).forEach((key) => {
+        const value = fields[key]
+        if (value !== undefined && value !== null && value !== "") {
+          ;(dish as any)[key] = value
+        }
+      })
+      if (result.cover) {
+        dish.cover = result.cover
+      }
+      if (
+        result.matchedCategoryIds &&
+        result.matchedCategoryIds.length &&
+        !(dish.categoryIds && dish.categoryIds.length)
+      ) {
+        dish.categoryIds = result.matchedCategoryIds
+      }
+      // 修改时不清空/变更归属，与单条编辑保持一致
+      dish.deptId = undefined
+      await updateDish(dish)
+      success++
+    } catch (e) {
+      failed.push(row.name || String(row.dishId))
+    }
+  }
+  batchAiLoading.value = false
+  getList()
+  if (failed.length) {
+    proxy.$modal.msgWarning(`AI 优化完成：成功 ${success} 个，失败 ${failed.length} 个（${failed.join("、")}）`)
+  } else {
+    proxy.$modal.msgSuccess(`AI 优化完成：成功 ${success} 个`)
+  }
+}
+
 /** 三列 JSON 在提交前做一次格式校验，避免脏数据进库后前端解析失败 */
 function validateJson(label: string, raw?: string): boolean {
   if (!raw) {
@@ -439,5 +534,24 @@ loadCategories()
   margin-left: 12px;
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+
+.cover-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.cover-field .el-input {
+  flex: 1;
+}
+
+.cover-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  cursor: pointer;
 }
 </style>
