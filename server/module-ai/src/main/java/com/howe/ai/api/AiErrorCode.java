@@ -3,7 +3,7 @@ package com.howe.ai.api;
 /**
  * AI 调用错误码
  *
- * <p>业务模块只需 {@code catch (AiException e)} 然后按 {@code e.getCode()} 分支。
+ * <p>业务模块只需 {@code catch (AiException e)} 然后按 {@code e.getAiErrorCode()} 分支。
  * 错误码决定后续行为：可降级的错误会先尝试备用模型，不可降级的错误直接抛给调用方。</p>
  *
  * @author howe
