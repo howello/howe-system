@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.meal.mapper.MealCategoryRefMapper">
+
+    <!--
+      菜品 / 提案与分类的多对多关联，biz_type 区分：1=菜品 2=提案。
+      调用方需保证 categoryIds 非空，否则会拼出空的 values 导致语法错误。
+    -->
+    <insert id="insertMealCategoryRefs" parameterType="MealCategoryRef">
+        insert into meal_category_ref (biz_type, biz_id, category_id) values
+        <foreach collection="categoryIds" item="categoryId" separator=",">
+            (#{bizType}, #{bizId}, #{categoryId})
+        </foreach>
+    </insert>
+
+    <delete id="deleteMealCategoryRefs">
+        delete from meal_category_ref
+        where biz_type = #{bizType} and biz_id in
+        <foreach collection="bizIds" item="bizId" open="(" separator="," close=")">
+            #{bizId}
+        </foreach>
+    </delete>
+
+    <select id="selectCategoryIds" resultType="java.lang.Long">
+        select category_id from meal_category_ref
+        where biz_type = #{bizType} and biz_id = #{bizId}
+        order by category_id
+    </select>
+
+    <select id="selectRefsByBizIds" resultType="MealCategoryRef">
+        select biz_id as bizId, category_id as categoryId
+        from meal_category_ref
+        where biz_type = #{bizType} and biz_id in
+        <foreach collection="bizIds" item="bizId" open="(" separator="," close=")">
+            #{bizId}
+        </foreach>
+    </select>
+
+    <select id="countByCategoryId" parameterType="Long" resultType="int">
+        select count(1) from meal_category_ref where category_id = #{categoryId}
+    </select>
+
+</mapper>

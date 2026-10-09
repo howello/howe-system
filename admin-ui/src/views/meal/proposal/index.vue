@@ -41,7 +41,7 @@
       </el-table-column>
       <el-table-column label="菜名" align="left" prop="name" :show-overflow-tooltip="true" min-width="140" />
       <el-table-column label="提交人" align="center" prop="userName" width="100" />
-      <el-table-column label="建议分类" align="center" prop="categoryName" width="110" />
+      <el-table-column label="建议分类" align="center" prop="categoryNames" :show-overflow-tooltip="true" min-width="110" />
       <el-table-column label="想吃的理由" align="left" prop="reason" :show-overflow-tooltip="true" min-width="180" />
       <el-table-column label="状态" align="center" width="90">
         <template #default="scope">

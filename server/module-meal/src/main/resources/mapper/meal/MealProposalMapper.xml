@@ -10,7 +10,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="userId"       column="user_id"       />
         <result property="userName"     column="user_name"     />
         <result property="name"         column="name"          />
-        <result property="categoryId"   column="category_id"   />
         <result property="description"  column="description"   />
         <result property="image"        column="image"         />
         <result property="reason"       column="reason"        />
@@ -25,17 +24,22 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="updateBy"     column="update_by"     />
         <result property="updateTime"   column="update_time"   />
         <result property="remark"       column="remark"        />
-        <result property="categoryName" column="category_name" />
+        <result property="categoryNames" column="category_names" />
     </resultMap>
 
+    <!--
+      期望分类名走子查询拼接：提案与分类是多对多（meal_category_ref, biz_type=2）。
+    -->
     <sql id="selectMealProposalVo">
-        select d.proposal_id, d.dept_id, d.user_id, d.user_name, d.name, d.category_id,
+        select d.proposal_id, d.dept_id, d.user_id, d.user_name, d.name,
                d.description, d.image, d.reason, d.status, d.audit_by, d.audit_time,
                d.audit_remark, d.dish_id, d.del_flag,
                d.create_by, d.create_time, d.update_by, d.update_time, d.remark,
-               c.name as category_name
+               (select group_concat(c.name order by c.sort separator '、')
+                  from meal_category_ref r
+                  join meal_category c on c.category_id = r.category_id and c.del_flag = '0'
+                 where r.biz_type = 2 and r.biz_id = d.proposal_id) as category_names
         from meal_proposal d
-        left join meal_category c on c.category_id = d.category_id and c.del_flag = '0'
     </sql>
 
     <!-- 管理端审核列表：数据范围由 @DataScope 注入，表别名 d 与注解的 deptAlias 对应 -->
@@ -77,10 +81,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertMealProposal" parameterType="MealProposal" useGeneratedKeys="true" keyProperty="proposalId">
         insert into meal_proposal (
-            dept_id, user_id, user_name, name, category_id, description, image, reason,
+            dept_id, user_id, user_name, name, description, image, reason,
             status, del_flag, create_by, create_time, remark
         ) values (
-            #{deptId}, #{userId}, #{userName}, #{name}, #{categoryId}, #{description}, #{image}, #{reason},
+            #{deptId}, #{userId}, #{userName}, #{name}, #{description}, #{image}, #{reason},
             '0', '0', #{createBy}, sysdate(), #{remark}
         )
     </insert>
@@ -89,7 +93,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         update meal_proposal
         <set>
             <if test="name != null and name != ''">name = #{name},</if>
-            <if test="categoryId != null">category_id = #{categoryId},</if>
             <if test="description != null">description = #{description},</if>
             <if test="image != null">image = #{image},</if>
             <if test="reason != null">reason = #{reason},</if>

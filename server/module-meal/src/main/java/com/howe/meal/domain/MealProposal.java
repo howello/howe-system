@@ -9,6 +9,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.util.Date;
+import java.util.List;
 
 /**
  * 点餐-新菜提案对象 meal_proposal
@@ -48,8 +49,8 @@ public class MealProposal extends BaseEntity {
     @Size(max = 128, message = "菜名长度不能超过128个字符")
     private String name;
 
-    @Schema(description = "期望分类", example = "1")
-    private Long categoryId;
+    @Schema(description = "期望分类ID列表", example = "[1, 3]")
+    private List<Long> categoryIds;
 
     @Schema(description = "菜品介绍", example = "麻辣鲜香，牛肉滑嫩")
     @Size(max = 500, message = "菜品介绍长度不能超过500个字符")
@@ -82,7 +83,7 @@ public class MealProposal extends BaseEntity {
     @Schema(description = "删除标记（0存在 2删除）", example = "0")
     private String delFlag;
 
-    /** 查询用：分类名称（不落库） */
-    @Schema(description = "期望分类名称（查询结果附带，不落库）")
-    private String categoryName;
+    /** 查询用：分类名称（顿号拼接，不落库） */
+    @Schema(description = "期望分类名称（查询结果附带，顿号拼接，不落库）")
+    private String categoryNames;
 }

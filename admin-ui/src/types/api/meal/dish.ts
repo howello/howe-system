@@ -16,6 +16,7 @@ export interface MealDishQueryParams extends PageDomain {
  * 点餐-菜品
  *
  * deptId = 0 表示平台公共菜谱，所有家庭可见。
+ * 菜品与分类是多对多：categoryIds 为关联分类，categoryNames 为顿号拼接的展示名。
  * ingredients / steps / tips 在库里是 json，接口层按 JSON 字符串收发。
  */
 export interface MealDish extends BaseEntity {
@@ -23,10 +24,10 @@ export interface MealDish extends BaseEntity {
   dishId?: number;
   /** 所属家庭ID（0=公共菜谱） */
   deptId?: number;
-  /** 分类ID */
-  categoryId?: number;
-  /** 分类名称（列表附带） */
-  categoryName?: string;
+  /** 关联分类ID列表 */
+  categoryIds?: number[];
+  /** 分类名称（列表附带，顿号拼接） */
+  categoryNames?: string;
   /** 菜名 */
   name?: string;
   /** 封面图地址 */

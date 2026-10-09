@@ -50,7 +50,7 @@
           <a class="link-type" style="cursor: pointer" @click="handleUpdate(scope.row)">{{ scope.row.name }}</a>
         </template>
       </el-table-column>
-      <el-table-column label="分类" align="center" prop="categoryName" width="100" />
+      <el-table-column label="分类" align="center" prop="categoryNames" :show-overflow-tooltip="true" min-width="120" />
       <el-table-column label="归属" align="center" width="100">
         <template #default="scope">
           <el-tag :type="scope.row.deptId === 0 ? 'warning' : 'success'" size="small">
@@ -94,8 +94,8 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="分类" prop="categoryId">
-              <el-select v-model="form.categoryId" placeholder="请选择分类" clearable style="width: 100%">
+            <el-form-item label="分类" prop="categoryIds">
+              <el-select v-model="form.categoryIds" placeholder="请选择分类（可多选）" multiple collapse-tags collapse-tags-tooltip clearable style="width: 100%">
                 <el-option v-for="item in categoryOptions" :key="item.categoryId" :label="item.name" :value="item.categoryId" />
               </el-select>
             </el-form-item>
@@ -255,7 +255,7 @@ function reset() {
   form.value = {
     dishId: undefined,
     name: undefined,
-    categoryId: undefined,
+    categoryIds: [],
     cover: undefined,
     description: undefined,
     tags: undefined,

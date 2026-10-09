@@ -53,12 +53,4 @@ public interface MealCategoryMapper {
      * @return 结果
      */
     int deleteMealCategoryByIds(Long[] categoryIds);
-
-    /**
-     * 统计分类下的在用菜品数，删除前校验
-     *
-     * @param categoryId 分类ID
-     * @return 菜品数
-     */
-    int countDishByCategoryId(Long categoryId);
 }

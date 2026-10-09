@@ -4,6 +4,7 @@ import com.howe.common.exception.ServiceException;
 import com.howe.common.utils.SecurityUtils;
 import com.howe.meal.domain.MealCategory;
 import com.howe.meal.mapper.MealCategoryMapper;
+import com.howe.meal.mapper.MealCategoryRefMapper;
 import com.howe.meal.service.IMealCategoryService;
 import com.howe.meal.util.MealScopeGuard;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ import java.util.List;
 public class MealCategoryServiceImpl implements IMealCategoryService {
 
     private final MealCategoryMapper mealCategoryMapper;
+    private final MealCategoryRefMapper mealCategoryRefMapper;
 
     @Override
     public List<MealCategory> selectMealCategoryList(MealCategory mealCategory) {
@@ -89,8 +91,8 @@ public class MealCategoryServiceImpl implements IMealCategoryService {
                 throw new ServiceException("分类不存在");
             }
             MealScopeGuard.assertWritable(exist.getDeptId(), "分类");
-            if (mealCategoryMapper.countDishByCategoryId(categoryId) > 0) {
-                throw new ServiceException("分类「" + exist.getName() + "」下还有菜品，不能删除");
+            if (mealCategoryRefMapper.countByCategoryId(categoryId) > 0) {
+                throw new ServiceException("分类「" + exist.getName() + "」下还有菜品或提案，不能删除");
             }
         }
         return mealCategoryMapper.deleteMealCategoryByIds(categoryIds);

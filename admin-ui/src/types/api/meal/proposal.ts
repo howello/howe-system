@@ -34,10 +34,10 @@ export interface MealProposal extends BaseEntity {
   userName?: string;
   /** 菜名 */
   name?: string;
-  /** 期望分类 */
-  categoryId?: number;
-  /** 期望分类名称（列表附带） */
-  categoryName?: string;
+  /** 期望分类ID列表 */
+  categoryIds?: number[];
+  /** 期望分类名称（列表附带，顿号拼接） */
+  categoryNames?: string;
   /** 菜品介绍 */
   description?: string;
   /** 参考图 */

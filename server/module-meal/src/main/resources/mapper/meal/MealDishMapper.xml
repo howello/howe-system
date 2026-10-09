@@ -7,7 +7,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <resultMap type="MealDish" id="MealDishResult">
         <result property="dishId"       column="dish_id"       />
         <result property="deptId"       column="dept_id"       />
-        <result property="categoryId"   column="category_id"   />
         <result property="name"         column="name"          />
         <result property="cover"        column="cover"         />
         <result property="description"  column="description"   />
@@ -28,17 +27,23 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="updateBy"     column="update_by"     />
         <result property="updateTime"   column="update_time"   />
         <result property="remark"       column="remark"        />
-        <result property="categoryName" column="category_name" />
+        <result property="categoryNames" column="category_names" />
     </resultMap>
 
+    <!--
+      分类名走子查询拼接：菜品与分类是多对多（meal_category_ref, biz_type=1），
+      用 group_concat 一次拼出「热菜、下饭」这样的展示串，避免结果集被 join 放大。
+    -->
     <sql id="selectMealDishVo">
-        select d.dish_id, d.dept_id, d.category_id, d.name, d.cover, d.description, d.tags,
+        select d.dish_id, d.dept_id, d.name, d.cover, d.description, d.tags,
                d.duration, d.level, d.serve, d.kcal, d.ingredients, d.steps, d.tips,
                d.status, d.sort, d.source, d.del_flag,
                d.create_by, d.create_time, d.update_by, d.update_time, d.remark,
-               c.name as category_name
+               (select group_concat(c.name order by c.sort separator '、')
+                  from meal_category_ref r
+                  join meal_category c on c.category_id = r.category_id and c.del_flag = '0'
+                 where r.biz_type = 1 and r.biz_id = d.dish_id) as category_names
         from meal_dish d
-        left join meal_category c on c.category_id = d.category_id and c.del_flag = '0'
     </sql>
 
     <!--
@@ -53,7 +58,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 AND (d.dept_id = #{deptId} or d.dept_id = 0)
             </if>
             <if test="categoryId != null">
-                AND d.category_id = #{categoryId}
+                AND exists (select 1 from meal_category_ref r
+                             where r.biz_type = 1 and r.biz_id = d.dish_id and r.category_id = #{categoryId})
             </if>
             <if test="status != null and status != ''">
                 AND d.status = #{status}
@@ -77,11 +83,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertMealDish" parameterType="MealDish" useGeneratedKeys="true" keyProperty="dishId">
         insert into meal_dish (
-            dept_id, category_id, name, cover, description, tags,
+            dept_id, name, cover, description, tags,
             duration, level, serve, kcal, ingredients, steps, tips,
             status, sort, source, del_flag, create_by, create_time, remark
         ) values (
-            #{deptId}, #{categoryId}, #{name}, #{cover}, #{description}, #{tags},
+            #{deptId}, #{name}, #{cover}, #{description}, #{tags},
             #{duration}, #{level}, #{serve}, #{kcal}, #{ingredients}, #{steps}, #{tips},
             #{status}, #{sort}, #{source}, '0', #{createBy}, sysdate(), #{remark}
         )
@@ -91,7 +97,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         update meal_dish
         <set>
             <if test="deptId != null">dept_id = #{deptId},</if>
-            <if test="categoryId != null">category_id = #{categoryId},</if>
             <if test="name != null and name != ''">name = #{name},</if>
             <if test="cover != null">cover = #{cover},</if>
             <if test="description != null">description = #{description},</if>

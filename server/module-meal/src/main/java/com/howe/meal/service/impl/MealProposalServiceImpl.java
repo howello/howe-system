@@ -5,9 +5,11 @@ import com.howe.common.core.domain.model.LoginUser;
 import com.howe.common.exception.ServiceException;
 import com.howe.common.utils.SecurityUtils;
 import com.howe.common.utils.StringUtils;
+import com.howe.meal.domain.MealCategoryRef;
 import com.howe.meal.domain.MealDish;
 import com.howe.meal.domain.MealProposal;
 import com.howe.meal.domain.dto.MealProposalAuditBody;
+import com.howe.meal.mapper.MealCategoryRefMapper;
 import com.howe.meal.mapper.MealDishMapper;
 import com.howe.meal.mapper.MealProposalMapper;
 import com.howe.meal.service.IMealProposalService;
@@ -29,6 +31,7 @@ public class MealProposalServiceImpl implements IMealProposalService {
 
     private final MealProposalMapper mealProposalMapper;
     private final MealDishMapper mealDishMapper;
+    private final MealCategoryRefMapper mealCategoryRefMapper;
 
     @Override
     @DataScope(deptAlias = "d")
@@ -43,6 +46,7 @@ public class MealProposalServiceImpl implements IMealProposalService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int submitProposal(MealProposal mealProposal) {
         mealProposal.setProposalId(null);
         mealProposal.setDeptId(SecurityUtils.getDeptId());
@@ -51,7 +55,9 @@ public class MealProposalServiceImpl implements IMealProposalService {
         mealProposal.setStatus(MealProposal.STATUS_PENDING);
         mealProposal.setDishId(null);
         mealProposal.setCreateBy(SecurityUtils.getUsername());
-        return mealProposalMapper.insertMealProposal(mealProposal);
+        int rows = mealProposalMapper.insertMealProposal(mealProposal);
+        saveProposalCategories(mealProposal.getProposalId(), mealProposal.getCategoryIds());
+        return rows;
     }
 
     /**
@@ -86,9 +92,10 @@ public class MealProposalServiceImpl implements IMealProposalService {
         update.setUpdateBy(SecurityUtils.getUsername());
 
         if (approved) {
+            // 提案的分类关联复制到即将生成的菜品上
+            List<Long> categoryIds = mealCategoryRefMapper.selectCategoryIds(MealCategoryRef.BIZ_PROPOSAL, proposal.getProposalId());
             MealDish dish = new MealDish();
             dish.setDeptId(proposal.getDeptId());
-            dish.setCategoryId(proposal.getCategoryId());
             dish.setName(proposal.getName());
             dish.setCover(proposal.getImage());
             dish.setDescription(proposal.getDescription());
@@ -97,6 +104,7 @@ public class MealProposalServiceImpl implements IMealProposalService {
             dish.setSource("1");
             dish.setCreateBy(SecurityUtils.getUsername());
             mealDishMapper.insertMealDish(dish);
+            saveDishCategories(dish.getDishId(), categoryIds);
             update.setDishId(dish.getDishId());
         }
 
@@ -122,7 +130,33 @@ public class MealProposalServiceImpl implements IMealProposalService {
                 MealScopeGuard.assertSameDept(exist.getDeptId(), "提案");
             }
         }
+        // 提案逻辑删除，关联表按业务物理清理
+        mealCategoryRefMapper.deleteMealCategoryRefs(MealCategoryRef.BIZ_PROPOSAL, proposalIds);
         return mealProposalMapper.deleteMealProposalByIds(proposalIds);
+    }
+
+    /** 写入提案的分类关联；categoryIds 为空则不做任何事 */
+    private void saveProposalCategories(Long proposalId, List<Long> categoryIds) {
+        if (proposalId == null || categoryIds == null || categoryIds.isEmpty()) {
+            return;
+        }
+        MealCategoryRef ref = new MealCategoryRef();
+        ref.setBizType(MealCategoryRef.BIZ_PROPOSAL);
+        ref.setBizId(proposalId);
+        ref.setCategoryIds(categoryIds);
+        mealCategoryRefMapper.insertMealCategoryRefs(ref);
+    }
+
+    /** 写入菜品的分类关联（提案通过生成菜品时复用）；categoryIds 为空则不做任何事 */
+    private void saveDishCategories(Long dishId, List<Long> categoryIds) {
+        if (dishId == null || categoryIds == null || categoryIds.isEmpty()) {
+            return;
+        }
+        MealCategoryRef ref = new MealCategoryRef();
+        ref.setBizType(MealCategoryRef.BIZ_DISH);
+        ref.setBizId(dishId);
+        ref.setCategoryIds(categoryIds);
+        mealCategoryRefMapper.insertMealCategoryRefs(ref);
     }
 
     private String currentNickName() {
