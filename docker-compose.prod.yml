@@ -24,7 +24,7 @@ services: # 容器服务定义
       TZ: ${TZ} # 应用时区
       SERVER_PORT: ${APP_PORT} # 服务端口
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE} # 激活配置环境
-      JAVA_OPTS: "-Xms256m -Xmx512m -XX:MaxMetaspaceSize=128m -XX:+UseG1GC"
+      JAVA_OPTS: "-Xms256m -Xmx512m -XX:MetaspaceSize=128m -XX:MaxMetaspaceSize=384m -XX:+UseG1GC -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/app/logs"
     ports: # 后端端口映射（默认仅本机访问）
       - "${BIND_HOST}:${APP_PORT}:${APP_PORT}"
     volumes: # 后端日志与外部配置挂载
