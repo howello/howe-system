@@ -6,7 +6,9 @@ import com.howe.common.core.domain.AjaxResult;
 import com.howe.common.core.page.TableDataInfo;
 import com.howe.common.enums.BusinessType;
 import com.howe.meal.domain.MealDish;
+import com.howe.meal.domain.dto.DishAiGenerateRequest;
 import com.howe.meal.service.IMealDishService;
+import com.howe.meal.service.MealDishAiService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -41,6 +43,8 @@ public class MealDishController extends BaseController {
 
     private final IMealDishService mealDishService;
 
+    private final MealDishAiService mealDishAiService;
+
     @Operation(summary = "查询菜品列表", description = "支持按分类、状态、菜名、关键词（菜名或用料）过滤")
     @GetMapping("/list")
     public TableDataInfo list(MealDish mealDish) {
@@ -54,6 +58,13 @@ public class MealDishController extends BaseController {
     public AjaxResult getInfo(@Parameter(description = "菜品ID", required = true)
             @PathVariable("dishId") Long dishId) {
         return success(mealDishService.selectMealDishById(dishId));
+    }
+
+    @Operation(summary = "一键 AI 补齐菜品信息",
+            description = "根据菜名只补齐当前为空的字段，不覆盖已填；分类只从现有分类中匹配；缺封面时生成图片并由 AI 模块转存为永久地址。登录即可调用，点餐端与后台共用。")
+    @PostMapping("/ai-generate")
+    public AjaxResult aiGenerate(@RequestBody DishAiGenerateRequest request) {
+        return success(mealDishAiService.generate(request));
     }
 
     @Operation(summary = "新增菜品")

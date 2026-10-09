@@ -87,6 +87,10 @@
 
     <el-dialog :title="title" v-model="open" width="760px" append-to-body>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
+        <el-form-item label="一键 AI">
+          <el-button type="primary" plain icon="MagicStick" :loading="aiLoading" @click="handleAiGenerate">一键 AI 补齐</el-button>
+          <span class="ai-tip">填写菜名后点击，仅补齐空字段，不覆盖已填内容</span>
+        </el-form-item>
         <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item label="菜名" prop="name">
@@ -184,7 +188,7 @@
 </template>
 
 <script setup lang="ts" name="MealDish">
-import { getDish, listDish, addDish, updateDish, delDish } from "@/api/meal/dish"
+import { getDish, listDish, addDish, updateDish, delDish, aiGenerateDish } from "@/api/meal/dish"
 import { listCategory } from "@/api/meal/category"
 import type { MealDish, MealDishQueryParams } from "@/types/api/meal/dish"
 import type { MealCategory } from "@/types/api/meal/category"
@@ -200,6 +204,7 @@ const categoryOptions = ref<MealCategory[]>([])
 const open = ref<boolean>(false)
 const loading = ref<boolean>(true)
 const submitting = ref<boolean>(false)
+const aiLoading = ref<boolean>(false)
 const showSearch = ref<boolean>(true)
 const ids = ref<number[]>([])
 const single = ref<boolean>(true)
@@ -307,6 +312,66 @@ function handleUpdate(row?: MealDish) {
   })
 }
 
+/** 一键 AI：只补齐当前为空的字段，已填内容不覆盖 */
+function handleAiGenerate() {
+  const name = (form.value.name || "").trim()
+  if (!name) {
+    proxy.$modal.msgWarning("请先填写菜名")
+    return
+  }
+  if (aiLoading.value) {
+    return
+  }
+  aiLoading.value = true
+  const current = {
+    categoryIds: form.value.categoryIds && form.value.categoryIds.length ? form.value.categoryIds : undefined,
+    description: form.value.description || undefined,
+    cover: form.value.cover || undefined,
+    tags: form.value.tags || undefined,
+    duration: form.value.duration || undefined,
+    level: form.value.level || undefined,
+    serve: form.value.serve || undefined,
+    kcal: form.value.kcal || undefined,
+    ingredients: form.value.ingredients || undefined,
+    steps: form.value.steps || undefined,
+    tips: form.value.tips || undefined
+  }
+  const deptId = isAdmin.value && !form.value.dishId && asPublic.value ? 0 : undefined
+  aiGenerateDish({ name, deptId, current })
+    .then((response: any) => {
+      const result = response.data || {}
+      const fields = result.fields || {}
+      Object.keys(fields).forEach((key) => {
+        const value = fields[key]
+        if (value !== undefined && value !== null && value !== "") {
+          ;(form.value as any)[key] = value
+        }
+      })
+      if (result.cover) {
+        form.value.cover = result.cover
+      }
+      // 只在用户没选分类时回填，避免覆盖已选
+      if (
+        result.matchedCategoryIds &&
+        result.matchedCategoryIds.length &&
+        !(form.value.categoryIds && form.value.categoryIds.length)
+      ) {
+        form.value.categoryIds = result.matchedCategoryIds
+      }
+      if (result.unmatchedCategoryNames && result.unmatchedCategoryNames.length) {
+        proxy.$modal.msgWarning(`以下分类不在现有分类中，未回填：${result.unmatchedCategoryNames.join("、")}`)
+      }
+      if (result.imageError) {
+        proxy.$modal.msgWarning(`封面图未生成：${result.imageError}`)
+      } else {
+        proxy.$modal.msgSuccess("已补齐空字段")
+      }
+    })
+    .finally(() => {
+      aiLoading.value = false
+    })
+}
+
 /** 三列 JSON 在提交前做一次格式校验，避免脏数据进库后前端解析失败 */
 function validateJson(label: string, raw?: string): boolean {
   if (!raw) {
@@ -368,3 +433,11 @@ function handleDelete(row?: MealDish) {
 getList()
 loadCategories()
 </script>
+
+<style scoped>
+.ai-tip {
+  margin-left: 12px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+</style>

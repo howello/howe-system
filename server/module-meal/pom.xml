@@ -23,6 +23,12 @@
             <artifactId>module-common</artifactId>
         </dependency>
 
+        <!-- AI 调用网关（菜品一键 AI 补齐）-->
+        <dependency>
+            <groupId>com.howe</groupId>
+            <artifactId>module-ai</artifactId>
+        </dependency>
+
     </dependencies>
 
 </project>

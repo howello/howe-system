@@ -12,6 +12,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="name"         column="name"          />
         <result property="description"  column="description"   />
         <result property="image"        column="image"         />
+        <result property="tags"         column="tags"          />
+        <result property="duration"     column="duration"      />
+        <result property="level"        column="level"         />
+        <result property="ingredients"  column="ingredients"   />
+        <result property="steps"        column="steps"         />
+        <result property="tips"         column="tips"          />
         <result property="reason"       column="reason"        />
         <result property="status"       column="status"        />
         <result property="auditBy"      column="audit_by"      />
@@ -32,7 +38,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     -->
     <sql id="selectMealProposalVo">
         select d.proposal_id, d.dept_id, d.user_id, d.user_name, d.name,
-               d.description, d.image, d.reason, d.status, d.audit_by, d.audit_time,
+               d.description, d.image, d.tags, d.duration, d.level, d.ingredients, d.steps, d.tips,
+               d.reason, d.status, d.audit_by, d.audit_time,
                d.audit_remark, d.dish_id, d.del_flag,
                d.create_by, d.create_time, d.update_by, d.update_time, d.remark,
                (select group_concat(c.name order by c.sort separator '、')
@@ -81,10 +88,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertMealProposal" parameterType="MealProposal" useGeneratedKeys="true" keyProperty="proposalId">
         insert into meal_proposal (
-            dept_id, user_id, user_name, name, description, image, reason,
+            dept_id, user_id, user_name, name, description, image, tags, duration, level,
+            ingredients, steps, tips, reason,
             status, del_flag, create_by, create_time, remark
         ) values (
-            #{deptId}, #{userId}, #{userName}, #{name}, #{description}, #{image}, #{reason},
+            #{deptId}, #{userId}, #{userName}, #{name}, #{description}, #{image}, #{tags}, #{duration}, #{level},
+            #{ingredients}, #{steps}, #{tips}, #{reason},
             '0', '0', #{createBy}, sysdate(), #{remark}
         )
     </insert>

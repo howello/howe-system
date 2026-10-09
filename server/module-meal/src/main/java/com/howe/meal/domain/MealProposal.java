@@ -60,6 +60,27 @@ public class MealProposal extends BaseEntity {
     @Size(max = 500, message = "参考图地址长度不能超过500个字符")
     private String image;
 
+    @Schema(description = "标签，逗号分隔", example = "家常,下饭")
+    @Size(max = 500, message = "标签长度不能超过500个字符")
+    private String tags;
+
+    @Schema(description = "耗时", example = "90 分钟")
+    @Size(max = 64, message = "耗时长度不能超过64个字符")
+    private String duration;
+
+    @Schema(description = "难度", example = "中等")
+    @Size(max = 32, message = "难度长度不能超过32个字符")
+    private String level;
+
+    @Schema(description = "用料清单 JSON，形如 [{\"name\":\"五花肉\",\"amount\":\"600 g\"}]")
+    private String ingredients;
+
+    @Schema(description = "做法步骤 JSON，形如 [\"切块\",\"焯水\"]")
+    private String steps;
+
+    @Schema(description = "小贴士 JSON，形如 [\"小火慢炖\"]")
+    private String tips;
+
     @Schema(description = "想吃的理由", example = "这周想吃点辣的")
     @Size(max = 500, message = "理由长度不能超过500个字符")
     private String reason;

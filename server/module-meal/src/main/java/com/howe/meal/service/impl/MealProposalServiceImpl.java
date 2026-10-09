@@ -99,6 +99,13 @@ public class MealProposalServiceImpl implements IMealProposalService {
             dish.setName(proposal.getName());
             dish.setCover(proposal.getImage());
             dish.setDescription(proposal.getDescription());
+            // 一键 AI 生成的扩展字段随提案带入菜品
+            dish.setTags(proposal.getTags());
+            dish.setDuration(proposal.getDuration());
+            dish.setLevel(proposal.getLevel());
+            dish.setIngredients(proposal.getIngredients());
+            dish.setSteps(proposal.getSteps());
+            dish.setTips(proposal.getTips());
             dish.setStatus("0");
             dish.setSort(0);
             dish.setSource("1");
