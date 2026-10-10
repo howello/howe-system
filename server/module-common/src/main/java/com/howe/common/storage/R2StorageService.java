@@ -53,6 +53,9 @@ public class R2StorageService implements StorageService
     /** 未指定 MIME 类型时的缺省值 */
     private static final String DEFAULT_CONTENT_TYPE = "application/octet-stream";
 
+    /** 静态资源缓存策略：公开、一年长缓存，配合前端本地缓存减少回源流量 */
+    private static final String CACHE_CONTROL = "public, max-age=31536000";
+
     /** 当前缓存客户端对应的凭据指纹 */
     private volatile String cachedFingerprint;
 
@@ -78,6 +81,9 @@ public class R2StorageService implements StorageService
             {
                 request.contentType(contentType);
             }
+            // 写入长缓存头：图片经 R2 公开域名直连，缓存头由对象元数据决定。
+            // 对象键在上传时生成（替换资源用新键），长缓存不会导致更新不生效。
+            request.cacheControl(CACHE_CONTROL);
             String mimeType = StringUtils.isNotEmpty(contentType) ? contentType : DEFAULT_CONTENT_TYPE;
             ContentStreamProvider provider = () -> openTracked(source, opened);
             // 交出内容源而非单个流：重试要二次读取，流式上传因此不必把文件缓冲进内存
