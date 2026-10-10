@@ -55,9 +55,6 @@ services: # 容器服务定义
 # 顶层声明：同样使用外部网络
 networks:
   shared_net:
-    external: true
-networks:
-  shared_net:
     external: true   # 再次声明，指向同一个已存在的网络
   net:
     external: true   # 再次声明，指向同一个已存在的网络
