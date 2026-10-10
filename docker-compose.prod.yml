@@ -18,7 +18,6 @@ services: # 容器服务定义
     restart: unless-stopped # 容器重启策略
     networks:
       - shared_net
-      - net
     env_file: # 从 .env 注入业务环境变量
       - .env
     environment: # 部署固定项（覆盖 .env 中同名键）
@@ -42,6 +41,7 @@ services: # 容器服务定义
     restart: unless-stopped # 容器重启策略
     networks:
       - shared_net
+      - net
     environment: # Nginx 模板渲染变量
       TZ: ${TZ} # 容器时区
       WEB_PORT: ${WEB_PORT} # 前端监听端口
