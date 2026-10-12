@@ -10,6 +10,8 @@ howe:
   # 示例（ Windows配置D:/howe/uploadPath，Linux/容器配置 /app/uploadPath）
   # 存储类型、R2 凭据、博客 GitHub 配置都在「系统管理 > 参数设置」里维护，不写在这里
   profile: ${PROFILE_PATH:D:/howe/uploadPath}
+  # 临时缓存目录：AI 生成图转存补偿的字节暂存等。容器部署必须挂持久卷，重建不丢
+  cacheDir: ${CACHE_PATH:D:/howe/cachePath}
   # 获取ip地址开关
   addressEnabled: false
   # 验证码类型 math 数字计算 char 字符验证

@@ -170,4 +170,19 @@ public class ConfigConstants
 
     /** 调用记录保留天数 */
     public static final String AI_LOG_RETENTION_DAYS = "ai.log.retentionDays";
+
+    /** 生成图转存：请求内重试次数 */
+    public static final String AI_IMAGE_TRANSFER_RETRY_MAX = "ai.image.transfer.retryMax";
+
+    /** 生成图转存：请求内重试退避基数（毫秒） */
+    public static final String AI_IMAGE_TRANSFER_RETRY_BACKOFF_MS = "ai.image.transfer.retryBackoffMs";
+
+    /** 生成图转存补偿：是否启用定时重传 */
+    public static final String AI_IMAGE_TRANSFER_COMPENSATE_ENABLED = "ai.image.transfer.compensateEnabled";
+
+    /** 生成图转存补偿：单条任务最大重传次数 */
+    public static final String AI_IMAGE_TRANSFER_COMPENSATE_MAX_ATTEMPT = "ai.image.transfer.compensateMaxAttempt";
+
+    /** 生成图转存补偿：任务保留时长（分钟），超时丢弃 */
+    public static final String AI_IMAGE_TRANSFER_EXPIRE_MINUTES = "ai.image.transfer.expireMinutes";
 }

@@ -43,6 +43,12 @@ public class DelegatingStorageService implements StorageService
     }
 
     @Override
+    public String urlOf(String key)
+    {
+        return current().urlOf(key);
+    }
+
+    @Override
     public StoredObject fetch(String location)
     {
         return current().fetch(location);

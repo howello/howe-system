@@ -3,6 +3,7 @@ package com.howe.common.core.redis;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -321,5 +322,56 @@ public class RedisCache
     public Collection<String> keys(final String pattern)
     {
         return redisTemplate.keys(pattern);
+    }
+
+    /**
+     * 加入有序集合
+     *
+     * @param key    集合键
+     * @param member 成员
+     * @param score  分值（补偿队列里用作下次重试时间戳）
+     * @return 是否成功
+     */
+    public boolean zAdd(final String key, final String member, final double score)
+    {
+        Boolean added = redisTemplate.opsForZSet().add(key, member, score);
+        return Boolean.TRUE.equals(added);
+    }
+
+    /**
+     * 按分值区间升序取成员
+     *
+     * @param key   集合键
+     * @param min   最小分值（含）
+     * @param max   最大分值（含）
+     * @param count 最多取多少个
+     * @return 成员集合；无匹配时返回空集合
+     */
+    public Set<String> zRangeByScore(final String key, final double min, final double max, final long count)
+    {
+        Set<Object> members = redisTemplate.opsForZSet().rangeByScore(key, min, max, 0, count);
+        if (members == null || members.isEmpty())
+        {
+            return Collections.emptySet();
+        }
+        Set<String> result = new LinkedHashSet<>(members.size());
+        for (Object member : members)
+        {
+            result.add(String.valueOf(member));
+        }
+        return result;
+    }
+
+    /**
+     * 从有序集合移除成员
+     *
+     * @param key     集合键
+     * @param members 成员
+     * @return 是否成功
+     */
+    public boolean zRemove(final String key, final String... members)
+    {
+        Long removed = redisTemplate.opsForZSet().remove(key, (Object[]) members);
+        return removed != null && removed > 0;
     }
 }

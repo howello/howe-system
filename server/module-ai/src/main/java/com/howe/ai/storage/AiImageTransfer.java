@@ -1,6 +1,8 @@
 package com.howe.ai.storage;
 
 import cn.hutool.core.img.ImgUtil;
+import cn.hutool.core.io.IoUtil;
+import cn.hutool.core.thread.ThreadUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.http.HttpRequest;
@@ -8,8 +10,11 @@ import cn.hutool.http.HttpResponse;
 import com.howe.ai.api.AiErrorCode;
 import com.howe.ai.api.AiException;
 import com.howe.ai.api.dto.AiImage;
+import com.howe.common.constant.ConfigConstants;
+import com.howe.common.storage.StorageService;
+import com.howe.common.utils.ConfigUtils;
 import com.howe.common.utils.DateUtils;
-import com.howe.common.utils.file.FileUploadUtils;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -24,13 +29,17 @@ import java.util.Locale;
  * <p>厂商返回的是几小时后就失效的临时地址，直接写进业务数据会导致过几天全站 404，
  * 所以必须下载字节再转存到对象存储，只把永久地址交给业务方。</p>
  *
- * <p>转存失败时抛 {@code TRANSFER_FAILED} 且<b>不返回临时地址</b>——
- * 宁可让用户重试，也不给一个会失效的地址。</p>
+ * <p>转存分两级容错：先对「下载」和「上传」各自做有限次重试（复用已拿到的字节，绝不重新生成）；
+ * 若已拿到字节但上传仍失败，则落一条补偿任务并把 <b>预写的永久地址</b> 作为成功返回——
+ * 定时任务重传成功后，该地址自然生效，业务侧无需回填。</p>
+ *
+ * <p>只有连字节都没拿到（下载失败且无 base64）时才抛 {@code TRANSFER_FAILED}，因为无从补偿。</p>
  *
  * @author howe
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class AiImageTransfer
 {
     /** 生成图在对象存储中的业务目录 */
@@ -42,6 +51,10 @@ public class AiImageTransfer
     /** 下载超时（毫秒） */
     private static final int DOWNLOAD_TIMEOUT_MS = 30000;
 
+    private final StorageService storageService;
+
+    private final AiImageCompensationStore compensationStore;
+
     /**
      * 把厂商返回的图片转存为永久地址
      *
@@ -49,38 +62,155 @@ public class AiImageTransfer
      * @param base64   厂商返回的 base64 内容，与 tempUrl 二选一
      * @param mimeType 期望的 MIME 类型，可为空
      * @return 生成图（永久 url + 对象键 + 尺寸）
-     * @throws AiException 下载或转存失败
+     * @throws AiException 下载失败（无从补偿）时抛出
      */
     public AiImage transfer(String tempUrl, String base64, String mimeType)
     {
-        byte[] data = StrUtil.isNotBlank(base64) ? decodeBase64(base64) : download(tempUrl);
-        if (data.length == 0)
-        {
-            throw new AiException(AiErrorCode.TRANSFER_FAILED, "图片已生成但内容为空，请重试");
-        }
+        byte[] data = downloadWithRetry(tempUrl, base64);
         String extension = resolveExtension(mimeType, tempUrl);
         // 厂商原图动辄 2~3MB，转存前统一压到 500KB 上下
         AiImageCompressor.Compressed compressed = AiImageCompressor.compress(data, extension);
         byte[] uploadBytes = compressed.bytes();
         String uploadExtension = compressed.extension();
-        String objectKey = DateUtils.datePath() + "/" + IdUtil.fastSimpleUUID() + "." + uploadExtension;
-        String url;
+        String objectKey = BIZ_DIR + "/" + DateUtils.datePath() + "/" + IdUtil.fastSimpleUUID() + "." + uploadExtension;
+        String contentType = resolveContentType(uploadExtension);
+        int[] size = resolveSize(compressed, uploadBytes);
+
         try
         {
-            url = FileUploadUtils.uploadBytes(BIZ_DIR, objectKey, uploadBytes, resolveContentType(uploadExtension));
+            String url = uploadWithRetry(objectKey, uploadBytes, contentType);
+            return AiImage.builder()
+                    .url(url)
+                    .key(objectKey)
+                    .width(size == null ? null : size[0])
+                    .height(size == null ? null : size[1])
+                    .build();
         }
         catch (Exception e)
         {
-            log.error("AI 生成图转存失败", e);
-            throw new AiException(AiErrorCode.TRANSFER_FAILED, "图片已生成但保存失败，请重试", e);
+            return fallbackToCompensation(objectKey, uploadBytes, contentType, size, e);
         }
-        int[] size = resolveSize(compressed, uploadBytes);
+    }
+
+    /**
+     * 已拿到字节但上传失败：落补偿任务并返回预写的永久地址
+     *
+     * <p>补偿开关关闭时维持原有行为（直接抛错），避免留下一个永远补不上的占位地址。</p>
+     *
+     * @param objectKey   完整对象键
+     * @param uploadBytes 已压缩的字节
+     * @param contentType Content-Type
+     * @param size        宽高，可为 null
+     * @param cause       上传失败原因
+     * @return 预写地址的生成图
+     */
+    private AiImage fallbackToCompensation(String objectKey, byte[] uploadBytes, String contentType, int[] size,
+            Exception cause)
+    {
+        if (!ConfigUtils.getBoolean(ConfigConstants.AI_IMAGE_TRANSFER_COMPENSATE_ENABLED, true))
+        {
+            throw new AiException(AiErrorCode.TRANSFER_FAILED, "图片已生成但保存失败，请重试", cause);
+        }
+        String reason = StrUtil.blankToDefault(cause.getMessage(), cause.getClass().getSimpleName());
+        int expireMinutes = Math.max(1, ConfigUtils.getInt(ConfigConstants.AI_IMAGE_TRANSFER_EXPIRE_MINUTES, 120));
+        log.error("生成图转存失败，转入补偿重传：key={}", objectKey, cause);
+        compensationStore.enqueue(objectKey, uploadBytes, contentType, expireMinutes, reason);
         return AiImage.builder()
-                .url(url)
-                .key(BIZ_DIR + "/" + objectKey)
+                .url(storageService.urlOf(objectKey))
+                .key(objectKey)
                 .width(size == null ? null : size[0])
                 .height(size == null ? null : size[1])
                 .build();
+    }
+
+    /**
+     * 下载厂商图片（base64 优先），失败按配置重试
+     *
+     * @param tempUrl 临时地址
+     * @param base64  base64 内容
+     * @return 图片字节
+     * @throws AiException 重试后仍失败
+     */
+    private byte[] downloadWithRetry(String tempUrl, String base64)
+    {
+        if (StrUtil.isNotBlank(base64))
+        {
+            byte[] data = decodeBase64(base64);
+            if (data.length == 0)
+            {
+                throw new AiException(AiErrorCode.TRANSFER_FAILED, "图片已生成但内容为空，请重试");
+            }
+            return data;
+        }
+        int retryMax = retryMax();
+        long backoffMs = retryBackoffMs();
+        AiException last = null;
+        for (int attempt = 0; attempt <= retryMax; attempt++)
+        {
+            try
+            {
+                return download(tempUrl);
+            }
+            catch (AiException e)
+            {
+                last = e;
+                if (attempt < retryMax)
+                {
+                    ThreadUtil.sleep(backoffMs * (attempt + 1));
+                }
+            }
+        }
+        throw last == null ? new AiException(AiErrorCode.TRANSFER_FAILED, "下载生成图失败") : last;
+    }
+
+    /**
+     * 上传对象存储，失败按配置重试（复用同一份字节，不重新下载）
+     *
+     * @param objectKey   完整对象键
+     * @param data        已压缩的字节
+     * @param contentType Content-Type
+     * @return 永久地址
+     * @throws AiException 重试后仍失败
+     */
+    private String uploadWithRetry(String objectKey, byte[] data, String contentType)
+    {
+        int retryMax = retryMax();
+        long backoffMs = retryBackoffMs();
+        Exception last = null;
+        for (int attempt = 0; attempt <= retryMax; attempt++)
+        {
+            try
+            {
+                return storageService.store(objectKey, () -> IoUtil.toStream(data), data.length, contentType);
+            }
+            catch (Exception e)
+            {
+                last = e;
+                log.warn("上传生成图失败（第 {} 次）：key={}，原因：{}", attempt + 1, objectKey, e.getMessage());
+                if (attempt < retryMax)
+                {
+                    ThreadUtil.sleep(backoffMs * (attempt + 1));
+                }
+            }
+        }
+        throw new AiException(AiErrorCode.TRANSFER_FAILED,
+                "上传生成图失败：" + (last == null ? "未知错误" : last.getMessage()), last);
+    }
+
+    /**
+     * 转存重试次数
+     */
+    private int retryMax()
+    {
+        return Math.max(0, ConfigUtils.getInt(ConfigConstants.AI_IMAGE_TRANSFER_RETRY_MAX, 3));
+    }
+
+    /**
+     * 转存重试退避基数（毫秒）
+     */
+    private long retryBackoffMs()
+    {
+        return Math.max(0L, ConfigUtils.getInt(ConfigConstants.AI_IMAGE_TRANSFER_RETRY_BACKOFF_MS, 1000));
     }
 
     /**

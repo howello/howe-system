@@ -36,6 +36,9 @@ public class YmlConfig
     /** 上传路径 */
     private static String profile;
 
+    /** 临时缓存目录：转存补偿的字节暂存等 */
+    private static String cacheDir;
+
     /** 获取地址开关 */
     private static boolean addressEnabled;
 
@@ -80,6 +83,16 @@ public class YmlConfig
     public void setProfile(String profile)
     {
         YmlConfig.profile = profile;
+    }
+
+    public static String getCacheDir()
+    {
+        return cacheDir;
+    }
+
+    public void setCacheDir(String cacheDir)
+    {
+        YmlConfig.cacheDir = cacheDir;
     }
 
     public static boolean isAddressEnabled()

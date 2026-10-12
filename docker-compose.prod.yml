@@ -25,12 +25,15 @@ services: # 容器服务定义
       SERVER_PORT: ${APP_PORT} # 服务端口
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE} # 激活配置环境
       JAVA_OPTS: "-Xms256m -Xmx512m -XX:MetaspaceSize=128m -XX:MaxMetaspaceSize=384m -XX:+UseG1GC -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/app/logs"
+      CACHE_PATH: /app/cache # AI 转存补偿的字节暂存目录
     ports: # 后端端口映射（默认仅本机访问）
       - "${BIND_HOST}:${APP_PORT}:${APP_PORT}"
     volumes: # 后端日志与外部配置挂载
       - ./server/logs:/app/logs
       # 外部配置目录：优先级高于镜像内打包的 application.yml，改后重启容器即生效
       - ./server/config:/app/config
+      # AI 转存补偿的字节暂存：必须持久化，否则容器重建会丢待补偿图片
+      - ./server/cache:/app/cache
     user: "0:0" # 以 root 运行避免日志目录权限问题（生产环境建议用命名卷）
 
   web: # 前端应用服务

@@ -36,6 +36,19 @@ public interface StorageService
     String store(String key, ContentSource source, long size, String contentType);
 
     /**
+     * 只按对象键算出可访问地址，不产生任何上传副作用
+     *
+     * <p>
+     * 用于「先写占位地址、后补上传」的场景：地址必须在真正上传之前就能确定，且必须与
+     * {@link #store} 成功后的返回值完全一致，否则业务里会留下两张指向同一对象的地址。
+     * </p>
+     *
+     * @param key 对象键，形如 upload/2026/07/30/xxx.png，不以斜杠开头
+     * @return 可公开访问的地址：R2 返回完整 URL，本地返回 /profile 前缀的相对路径
+     */
+    String urlOf(String key);
+
+    /**
      * 读取文件
      *
      * <p>

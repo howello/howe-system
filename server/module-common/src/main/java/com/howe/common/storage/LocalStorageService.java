@@ -37,12 +37,18 @@ public class LocalStorageService implements StorageService
             String target = YmlConfig.getProfile() + "/" + key;
             FileUtil.mkParentDirs(target);
             FileUtil.writeFromStream(input, FileUtil.touch(target));
-            return Constants.RESOURCE_PREFIX + "/" + key;
+            return urlOf(key);
         }
         catch (Exception e)
         {
             throw new ServiceException("文件写入本地磁盘失败：" + e.getMessage());
         }
+    }
+
+    @Override
+    public String urlOf(String key)
+    {
+        return Constants.RESOURCE_PREFIX + "/" + key;
     }
 
     @Override

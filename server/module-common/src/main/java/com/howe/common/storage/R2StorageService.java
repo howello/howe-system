@@ -90,7 +90,7 @@ public class R2StorageService implements StorageService
             RequestBody body = size >= 0 ? RequestBody.fromContentProvider(provider, size, mimeType)
                     : RequestBody.fromContentProvider(provider, mimeType);
             client().putObject(request.build(), body);
-            return publicUrl() + "/" + objectKey;
+            return urlOf(key);
         }
         catch (S3Exception e)
         {
@@ -110,6 +110,12 @@ public class R2StorageService implements StorageService
         {
             opened.forEach(IoUtil::close);
         }
+    }
+
+    @Override
+    public String urlOf(String key)
+    {
+        return publicUrl() + "/" + withPrefix(key);
     }
 
     /**
