@@ -28,6 +28,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class MealReviewServiceImpl implements IMealReviewService {
 
+    /** 「我的评价」视角：厨师，返回自己接单制作过的订单收到的评价 */
+    private static final String SCOPE_CHEF = "chef";
+
     private final MealReviewMapper mealReviewMapper;
     private final MealOrderMapper mealOrderMapper;
     private final IMealNotifyService mealNotifyService;
@@ -40,7 +43,12 @@ public class MealReviewServiceImpl implements IMealReviewService {
     }
 
     @Override
-    public List<MealReview> selectMyReviewList(MealReview mealReview) {
+    public List<MealReview> selectMyReviewList(MealReview mealReview, String scope) {
+        if (SCOPE_CHEF.equals(scope)) {
+            // 厨师视角：自己接单制作过的订单收到的评价
+            mealReview.setAcceptUserId(SecurityUtils.getUserId());
+            return mealReviewMapper.selectChefReviewList(mealReview);
+        }
         mealReview.setUserId(SecurityUtils.getUserId());
         return mealReviewMapper.selectMyReviewList(mealReview);
     }

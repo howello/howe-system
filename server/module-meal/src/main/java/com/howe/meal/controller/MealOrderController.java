@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -47,11 +48,13 @@ public class MealOrderController extends BaseController {
         return success(mealOrderService.submitOrder(body));
     }
 
-    @Operation(summary = "我的订单", description = "只返回当前登录用户自己的订单")
+    @Operation(summary = "我的订单", description = "默认返回当前登录用户自己下的订单；scope=chef 时返回当前厨师自己接单制作过的订单")
     @GetMapping("/my")
-    public TableDataInfo my(MealOrder mealOrder) {
+    public TableDataInfo my(MealOrder mealOrder,
+            @Parameter(description = "视角：不传为点餐人，chef 为厨师")
+            @RequestParam(value = "scope", required = false) String scope) {
         startPage();
-        return getDataTable(mealOrderService.selectMyOrderList(mealOrder));
+        return getDataTable(mealOrderService.selectMyOrderList(mealOrder, scope));
     }
 
     @Operation(summary = "订单详情", description = "含状态时间轴所需的接单/完成时间与点餐明细；跨家庭读取被拒绝")

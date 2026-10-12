@@ -30,6 +30,14 @@ public interface MealReviewMapper {
     List<MealReview> selectMyReviewList(MealReview mealReview);
 
     /**
+     * 查询某个厨师收到的评价（其接单制作过的订单所获评价）
+     *
+     * @param mealReview 查询条件，acceptUserId 必填
+     * @return 评价集合
+     */
+    List<MealReview> selectChefReviewList(MealReview mealReview);
+
+    /**
      * 按主键查询评价
      *
      * @param reviewId 评价ID

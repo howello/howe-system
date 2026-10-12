@@ -28,12 +28,15 @@ public interface IMealOrderService {
     List<MealOrder> selectKitchenOrderList(MealOrder mealOrder);
 
     /**
-     * 查询某个点餐人自己的订单
+     * 查询「我的订单」
+     *
+     * <p>默认返回当前点餐人自己下的订单；{@code scope="chef"} 时返回当前厨师自己接单制作过的订单。</p>
      *
      * @param mealOrder 查询条件
+     * @param scope     视角：空为点餐人，{@code "chef"} 为厨师
      * @return 订单集合
      */
-    List<MealOrder> selectMyOrderList(MealOrder mealOrder);
+    List<MealOrder> selectMyOrderList(MealOrder mealOrder, String scope);
 
     /**
      * 查询订单详情（含明细，校验归属）

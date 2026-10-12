@@ -1,5 +1,6 @@
 package com.howe.meal.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.howe.common.core.domain.BaseEntity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
@@ -65,4 +66,14 @@ public class MealReview extends BaseEntity {
     /** 查询用：该订单的菜名，顿号分隔（不落库） */
     @Schema(description = "订单菜名，顿号分隔（查询结果附带，不落库）", example = "红烧肉、扬州炒饭")
     private String dishNames;
+
+    /**
+     * 查询用：接单厨师用户ID（不落库）。
+     *
+     * <p>厨师端「收到的评价」按此过滤——评价挂在订单上，订单的 {@code accept_user_id}
+     * 才是「谁做的这顿饭」。</p>
+     */
+    @JsonIgnore
+    @Schema(description = "接单厨师用户ID（查询过滤用，不落库）", accessMode = Schema.AccessMode.READ_ONLY)
+    private Long acceptUserId;
 }

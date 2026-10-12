@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -41,11 +42,13 @@ public class MealReviewController extends BaseController {
         return toAjax(mealReviewService.submitReview(mealReview));
     }
 
-    @Operation(summary = "我的评价")
+    @Operation(summary = "我的评价", description = "默认返回当前登录用户自己写的评价；scope=chef 时返回当前厨师接单制作过的订单收到的评价")
     @GetMapping("/my")
-    public TableDataInfo my(MealReview mealReview) {
+    public TableDataInfo my(MealReview mealReview,
+            @Parameter(description = "视角：不传为点餐人，chef 为厨师")
+            @RequestParam(value = "scope", required = false) String scope) {
         startPage();
-        return getDataTable(mealReviewService.selectMyReviewList(mealReview));
+        return getDataTable(mealReviewService.selectMyReviewList(mealReview, scope));
     }
 
     @Operation(summary = "查询评价列表（管理端）", description = "受数据权限约束")

@@ -33,6 +33,14 @@ public interface MealOrderMapper {
     List<MealOrder> selectMyOrderList(MealOrder mealOrder);
 
     /**
+     * 查询某个厨师自己接单制作过的订单
+     *
+     * @param mealOrder 查询条件，acceptUserId 必填
+     * @return 订单集合
+     */
+    List<MealOrder> selectCookedOrderList(MealOrder mealOrder);
+
+    /**
      * 按主键查询订单
      *
      * @param orderId 订单ID

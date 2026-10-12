@@ -101,6 +101,25 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by d.create_time desc
     </select>
 
+    <!-- 厨师制作过的订单：强制按 accept_user_id 过滤，不依赖数据权限；取消单不会被接单故天然不含 -->
+    <select id="selectCookedOrderList" parameterType="MealOrder" resultMap="MealOrderResult">
+        <include refid="selectMealOrderVo"/>
+        <where>
+            d.del_flag = '0'
+            AND d.accept_user_id = #{acceptUserId}
+            <if test="status != null and status != ''">
+                AND d.status = #{status}
+            </if>
+            <if test="statusList != null and statusList.size() > 0">
+                AND d.status in
+                <foreach item="s" collection="statusList" open="(" separator="," close=")">
+                    #{s}
+                </foreach>
+            </if>
+        </where>
+        order by d.create_time desc
+    </select>
+
     <select id="selectMealOrderById" parameterType="Long" resultMap="MealOrderResult">
         <include refid="selectMealOrderVo"/>
         where d.order_id = #{orderId} and d.del_flag = '0'

@@ -70,6 +70,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by d.create_time desc
     </select>
 
+    <!-- 厨师收到的评价：评价挂在订单上，按订单的接单厨师 accept_user_id 过滤 -->
+    <select id="selectChefReviewList" parameterType="MealReview" resultMap="MealReviewResult">
+        <include refid="selectMealReviewVo"/>
+        <where>
+            d.del_flag = '0'
+            AND o.accept_user_id = #{acceptUserId}
+        </where>
+        order by d.create_time desc
+    </select>
+
     <select id="selectMealReviewById" parameterType="Long" resultMap="MealReviewResult">
         <include refid="selectMealReviewVo"/>
         where d.review_id = #{reviewId} and d.del_flag = '0'

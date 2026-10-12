@@ -19,12 +19,16 @@ public interface IMealReviewService {
     List<MealReview> selectMealReviewList(MealReview mealReview);
 
     /**
-     * 查询某个评价人自己的评价
+     * 查询「我的评价」
+     *
+     * <p>默认返回当前点餐人自己写的评价；{@code scope="chef"} 时返回当前厨师
+     * 接单制作过的订单所收到的评价。</p>
      *
      * @param mealReview 查询条件
+     * @param scope      视角：空为点餐人，{@code "chef"} 为厨师
      * @return 评价集合
      */
-    List<MealReview> selectMyReviewList(MealReview mealReview);
+    List<MealReview> selectMyReviewList(MealReview mealReview, String scope);
 
     /**
      * 提交评价（限本人已完成且未评价的订单）

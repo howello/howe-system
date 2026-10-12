@@ -41,6 +41,9 @@ public class MealOrderServiceImpl implements IMealOrderService {
     /** 订单号前缀：M + yyyyMMdd */
     private static final String ORDER_NO_PREFIX = "M";
 
+    /** 「我的订单」视角：厨师，返回自己接单制作过的订单 */
+    private static final String SCOPE_CHEF = "chef";
+
     private static final long MILLIS_MINUTE = 60 * 1000L;
 
     private final MealOrderMapper mealOrderMapper;
@@ -63,12 +66,19 @@ public class MealOrderServiceImpl implements IMealOrderService {
     }
 
     @Override
-    public List<MealOrder> selectMyOrderList(MealOrder mealOrder) {
-        mealOrder.setUserId(SecurityUtils.getUserId());
-        List<MealOrder> orders = mealOrderMapper.selectMyOrderList(mealOrder);
-        // 列表卡片要展示菜品缩略图与「N 道菜」，明细必须一起带上
+    public List<MealOrder> selectMyOrderList(MealOrder mealOrder, String scope) {
+        List<MealOrder> orders;
+        if (SCOPE_CHEF.equals(scope)) {
+            // 厨师视角：自己接过单、制作过的订单，而不是自己点的
+            mealOrder.setAcceptUserId(SecurityUtils.getUserId());
+            orders = mealOrderMapper.selectCookedOrderList(mealOrder);
+        } else {
+            mealOrder.setUserId(SecurityUtils.getUserId());
+            orders = mealOrderMapper.selectMyOrderList(mealOrder);
+            // 列表卡片要展示菜品缩略图与「N 道菜」，明细必须一起带上
+            fillReviewed(orders);
+        }
         fillItems(orders);
-        fillReviewed(orders);
         return orders;
     }
 
