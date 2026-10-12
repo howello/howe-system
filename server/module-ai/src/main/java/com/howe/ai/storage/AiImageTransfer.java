@@ -59,18 +59,22 @@ public class AiImageTransfer
             throw new AiException(AiErrorCode.TRANSFER_FAILED, "图片已生成但内容为空，请重试");
         }
         String extension = resolveExtension(mimeType, tempUrl);
-        String objectKey = DateUtils.datePath() + "/" + IdUtil.fastSimpleUUID() + "." + extension;
+        // 厂商原图动辄 2~3MB，转存前统一压到 500KB 上下
+        AiImageCompressor.Compressed compressed = AiImageCompressor.compress(data, extension);
+        byte[] uploadBytes = compressed.bytes();
+        String uploadExtension = compressed.extension();
+        String objectKey = DateUtils.datePath() + "/" + IdUtil.fastSimpleUUID() + "." + uploadExtension;
         String url;
         try
         {
-            url = FileUploadUtils.uploadBytes(BIZ_DIR, objectKey, data, resolveContentType(extension, mimeType));
+            url = FileUploadUtils.uploadBytes(BIZ_DIR, objectKey, uploadBytes, resolveContentType(uploadExtension));
         }
         catch (Exception e)
         {
             log.error("AI 生成图转存失败", e);
             throw new AiException(AiErrorCode.TRANSFER_FAILED, "图片已生成但保存失败，请重试", e);
         }
-        int[] size = readSize(data);
+        int[] size = resolveSize(compressed, uploadBytes);
         return AiImage.builder()
                 .url(url)
                 .key(BIZ_DIR + "/" + objectKey)
@@ -186,16 +190,27 @@ public class AiImageTransfer
      * 解析上传时使用的 Content-Type
      *
      * @param extension 后缀名
-     * @param mimeType  期望的 MIME 类型
      * @return Content-Type
      */
-    private String resolveContentType(String extension, String mimeType)
+    private String resolveContentType(String extension)
     {
-        if (StrUtil.isNotBlank(mimeType) && mimeType.startsWith("image/"))
-        {
-            return mimeType;
-        }
         return "jpg".equals(extension) ? "image/jpeg" : "image/" + extension;
+    }
+
+    /**
+     * 取图片宽高：压缩结果已带尺寸则直接复用，否则重新读取
+     *
+     * @param compressed 压缩结果
+     * @param data       最终上传的字节
+     * @return 宽高数组
+     */
+    private int[] resolveSize(AiImageCompressor.Compressed compressed, byte[] data)
+    {
+        if (compressed.width() != null && compressed.height() != null)
+        {
+            return new int[] { compressed.width(), compressed.height() };
+        }
+        return readSize(data);
     }
 
     /**
