@@ -196,7 +196,12 @@ delete from sys_config where config_key in (
   'ai.image.styleSuffix.recipe.illustration',
   'ai.image.styleSuffix.recipe.watercolor',
   'ai.image.styleSuffix.recipe.minimal',
-  'ai.log.retentionDays'
+  'ai.log.retentionDays',
+  'ai.image.transfer.retryMax',
+  'ai.image.transfer.retryBackoffMs',
+  'ai.image.transfer.compensateEnabled',
+  'ai.image.transfer.compensateMaxAttempt',
+  'ai.image.transfer.expireMinutes'
 );
 
 insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
@@ -266,6 +271,26 @@ values ('AI-风格后缀-极简', 'ai.image.styleSuffix.recipe.minimal',
 insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
 values ('AI-调用记录保留天数', 'ai.log.retentionDays', '30', 'Y', 'admin', sysdate(),
         '超过天数的调用记录可清理，单位天');
+
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+values ('AI-转存重试次数', 'ai.image.transfer.retryMax', '3', 'Y', 'admin', sysdate(),
+        '生成图下载/上传的请求内重试次数，复用已拿到字节，不会重新生成');
+
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+values ('AI-转存重试退避', 'ai.image.transfer.retryBackoffMs', '1000', 'Y', 'admin', sysdate(),
+        '第 n 次重试等待 n 倍基数，单位毫秒');
+
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+values ('AI-转存补偿开关', 'ai.image.transfer.compensateEnabled', 'true', 'Y', 'admin', sysdate(),
+        '关闭后转存失败直接报错，不入队重传、也不写占位地址');
+
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+values ('AI-转存补偿最大次数', 'ai.image.transfer.compensateMaxAttempt', '30', 'Y', 'admin', sysdate(),
+        '定时重传的最大次数，超过即放弃');
+
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+values ('AI-转存补偿保留时长', 'ai.image.transfer.expireMinutes', '120', 'Y', 'admin', sysdate(),
+        '待补偿任务的保留时长，单位分钟，超时丢弃');
 
 -- ----------------------------------------------------------------------------
 -- 9. 菜单与按钮权限
