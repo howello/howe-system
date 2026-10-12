@@ -100,9 +100,7 @@ public class MealReviewServiceImpl implements IMealReviewService {
             if (exist == null) {
                 throw new ServiceException("评价不存在或已删除");
             }
-            if (!SecurityUtils.isAdmin()) {
-                MealScopeGuard.assertSameDept(exist.getDeptId(), "评价");
-            }
+            MealScopeGuard.assertSameDept(exist.getDeptId(), "评价");
         }
         return mealReviewMapper.deleteMealReviewByIds(reviewIds);
     }

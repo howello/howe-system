@@ -6,13 +6,13 @@ import com.howe.common.exception.ServiceException;
 import com.howe.common.utils.SecurityUtils;
 import com.howe.common.utils.StringUtils;
 import com.howe.meal.domain.MealCategoryRef;
-import com.howe.meal.domain.MealDish;
 import com.howe.meal.domain.MealProposal;
 import com.howe.meal.domain.dto.MealProposalAuditBody;
 import com.howe.meal.mapper.MealCategoryRefMapper;
-import com.howe.meal.mapper.MealDishMapper;
 import com.howe.meal.mapper.MealProposalMapper;
 import com.howe.meal.service.IMealProposalService;
+import com.howe.meal.service.ITransactionCommitExecutor;
+import com.howe.meal.service.MealProposalAuditService;
 import com.howe.meal.util.MealScopeGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,6 +23,9 @@ import java.util.List;
 /**
  * 点餐-新菜提案 服务层实现
  *
+ * <p>提交提案后由 {@link MealProposalAuditService} 在事务提交后异步做 AI 自动审核；
+ * 人工审核支持对已通过/已驳回的提案改判（复用其 {@code dish_id}，不重复建菜品）。</p>
+ *
  * @author howe
  */
 @Service
@@ -30,8 +33,9 @@ import java.util.List;
 public class MealProposalServiceImpl implements IMealProposalService {
 
     private final MealProposalMapper mealProposalMapper;
-    private final MealDishMapper mealDishMapper;
     private final MealCategoryRefMapper mealCategoryRefMapper;
+    private final MealProposalAuditService mealProposalAuditService;
+    private final ITransactionCommitExecutor transactionCommitExecutor;
 
     @Override
     @DataScope(deptAlias = "d")
@@ -57,12 +61,15 @@ public class MealProposalServiceImpl implements IMealProposalService {
         mealProposal.setCreateBy(SecurityUtils.getUsername());
         int rows = mealProposalMapper.insertMealProposal(mealProposal);
         saveProposalCategories(mealProposal.getProposalId(), mealProposal.getCategoryIds());
+        // 事务提交后异步触发 AI 自动审核，提交请求不等待 AI
+        Long proposalId = mealProposal.getProposalId();
+        transactionCommitExecutor.afterCommit(() -> mealProposalAuditService.submitAiAudit(proposalId));
         return rows;
     }
 
     /**
-     * 审核通过时自动往 meal_dish 落一条菜品（source = 1），并把生成的 dishId 回写提案，
-     * 让「已通过」的提案能直接指向点餐区里的那道菜。
+     * 人工审核：允许对任意状态（待审核/已通过/已驳回）改判。
+     * 通过时若提案尚无菜品则用现有字段新建，已有菜品则重新上架；驳回时把已有菜品下架，均不重复创建菜品。
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -77,42 +84,31 @@ public class MealProposalServiceImpl implements IMealProposalService {
         if (proposal == null) {
             throw new ServiceException("提案不存在或已删除");
         }
-        if (!SecurityUtils.isAdmin()) {
-            MealScopeGuard.assertSameDept(proposal.getDeptId(), "提案");
-        }
-        if (!MealProposal.STATUS_PENDING.equals(proposal.getStatus())) {
-            throw new ServiceException("该提案已经审核过了");
-        }
+        MealScopeGuard.assertSameDept(proposal.getDeptId(), "提案");
 
         MealProposal update = new MealProposal();
         update.setProposalId(proposal.getProposalId());
         update.setStatus(body.getStatus());
+        // 期望状态：与 AI 自动审核并发时只有一个能改动成功
+        update.setExpectedStatus(proposal.getStatus());
         update.setAuditBy(currentNickName());
         update.setAuditRemark(body.getAuditRemark());
         update.setUpdateBy(SecurityUtils.getUsername());
 
         if (approved) {
-            // 提案的分类关联复制到即将生成的菜品上
-            List<Long> categoryIds = mealCategoryRefMapper.selectCategoryIds(MealCategoryRef.BIZ_PROPOSAL, proposal.getProposalId());
-            MealDish dish = new MealDish();
-            dish.setDeptId(proposal.getDeptId());
-            dish.setName(proposal.getName());
-            dish.setCover(proposal.getImage());
-            dish.setDescription(proposal.getDescription());
-            // 一键 AI 生成的扩展字段随提案带入菜品
-            dish.setTags(proposal.getTags());
-            dish.setDuration(proposal.getDuration());
-            dish.setLevel(proposal.getLevel());
-            dish.setIngredients(proposal.getIngredients());
-            dish.setSteps(proposal.getSteps());
-            dish.setTips(proposal.getTips());
-            dish.setStatus("0");
-            dish.setSort(0);
-            dish.setSource("1");
-            dish.setCreateBy(SecurityUtils.getUsername());
-            mealDishMapper.insertMealDish(dish);
-            saveDishCategories(dish.getDishId(), categoryIds);
-            update.setDishId(dish.getDishId());
+            if (proposal.getDishId() == null) {
+                // 尚未生成菜品：用提案现有字段新建并回写菜品ID
+                List<Long> categoryIds = mealCategoryRefMapper.selectCategoryIds(MealCategoryRef.BIZ_PROPOSAL,
+                        proposal.getProposalId());
+                update.setDishId(
+                        mealProposalAuditService.createDishFromProposal(proposal, categoryIds, currentNickName()));
+            } else {
+                // 已生成过菜品：重新上架，不重复创建
+                mealProposalAuditService.setDishStatus(proposal.getDishId(), "0");
+            }
+        } else if (proposal.getDishId() != null) {
+            // 驳回已上架的提案：把对应菜品下架
+            mealProposalAuditService.setDishStatus(proposal.getDishId(), "1");
         }
 
         int rows = mealProposalMapper.updateMealProposal(update);
@@ -133,9 +129,7 @@ public class MealProposalServiceImpl implements IMealProposalService {
             if (exist == null) {
                 throw new ServiceException("提案不存在或已删除");
             }
-            if (!SecurityUtils.isAdmin()) {
-                MealScopeGuard.assertSameDept(exist.getDeptId(), "提案");
-            }
+            MealScopeGuard.assertSameDept(exist.getDeptId(), "提案");
         }
         // 提案逻辑删除，关联表按业务物理清理
         mealCategoryRefMapper.deleteMealCategoryRefs(MealCategoryRef.BIZ_PROPOSAL, proposalIds);
@@ -150,18 +144,6 @@ public class MealProposalServiceImpl implements IMealProposalService {
         MealCategoryRef ref = new MealCategoryRef();
         ref.setBizType(MealCategoryRef.BIZ_PROPOSAL);
         ref.setBizId(proposalId);
-        ref.setCategoryIds(categoryIds);
-        mealCategoryRefMapper.insertMealCategoryRefs(ref);
-    }
-
-    /** 写入菜品的分类关联（提案通过生成菜品时复用）；categoryIds 为空则不做任何事 */
-    private void saveDishCategories(Long dishId, List<Long> categoryIds) {
-        if (dishId == null || categoryIds == null || categoryIds.isEmpty()) {
-            return;
-        }
-        MealCategoryRef ref = new MealCategoryRef();
-        ref.setBizType(MealCategoryRef.BIZ_DISH);
-        ref.setBizId(dishId);
         ref.setCategoryIds(categoryIds);
         mealCategoryRefMapper.insertMealCategoryRefs(ref);
     }

@@ -50,11 +50,11 @@
       </el-table-column>
       <el-table-column label="审核意见" align="left" prop="auditRemark" :show-overflow-tooltip="true" min-width="160" />
       <el-table-column label="提交时间" align="center" prop="createTime" width="170" />
-      <el-table-column label="操作" align="center" width="240" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="260" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="View" @click="handleDetail(scope.row)">详情</el-button>
           <el-button
-            v-if="scope.row.status === '0'"
+            v-if="scope.row.status !== '1'"
             link
             type="primary"
             icon="Check"
@@ -64,7 +64,7 @@
             通过
           </el-button>
           <el-button
-            v-if="scope.row.status === '0'"
+            v-if="scope.row.status !== '2'"
             link
             type="danger"
             icon="Close"
@@ -89,10 +89,23 @@
           <el-input v-model="auditRemark" type="textarea" :rows="3" placeholder="通过时可以写「已上架，周末做给你们吃」" />
         </el-form-item>
         <el-alert
+          v-if="current?.status && current.status !== '0'"
+          type="warning"
+          :closable="false"
+          title="该提案已有审核结果，本次操作将人工改判。"
+          style="margin-bottom: 12px"
+        />
+        <el-alert
           v-if="auditStatus === '1'"
           type="info"
           :closable="false"
-          title="通过后会自动在菜品表生成一条菜品（来源=新菜通过），并回写到点餐区。"
+          title="通过时：已有菜品会重新上架，没有菜品则用提案现有信息新建一条菜品（来源=新菜通过）。"
+        />
+        <el-alert
+          v-else
+          type="info"
+          :closable="false"
+          title="驳回时：若该提案已生成菜品，会把对应菜品下架。"
         />
       </el-form>
       <template #footer>

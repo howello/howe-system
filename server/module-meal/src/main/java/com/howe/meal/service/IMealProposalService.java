@@ -36,7 +36,8 @@ public interface IMealProposalService {
     int submitProposal(MealProposal mealProposal);
 
     /**
-     * 审核提案，通过时自动生成菜品并回写菜品ID
+     * 人工审核提案：允许对任意状态改判。
+     * 通过时若无菜品则新建、已有菜品则重新上架；驳回时把已有菜品下架，均不重复创建菜品。
      *
      * @param body 审核入参
      * @return 结果

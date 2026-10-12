@@ -45,7 +45,7 @@ public class MealCategoryServiceImpl implements IMealCategoryService {
             throw new ServiceException("分类不存在");
         }
         boolean isPublic = category.getDeptId() != null && category.getDeptId().longValue() == 0L;
-        if (!isPublic && !SecurityUtils.isAdmin()) {
+        if (!isPublic) {
             MealScopeGuard.assertSameDept(category.getDeptId(), "分类");
         }
         return category;

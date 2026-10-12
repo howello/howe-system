@@ -31,7 +31,9 @@ public class MealDishServiceImpl implements IMealDishService {
 
     @Override
     public List<MealDish> selectMealDishList(MealDish mealDish) {
-        if (mealDish.getDeptId() == null) {
+        // 平台管理员不套用部门过滤：未显式指定部门时可看到所有家庭的菜品（含 AI 审核上架的菜）；
+        // 家庭账号仍只看「本家庭 + 公共」。
+        if (mealDish.getDeptId() == null && !SecurityUtils.isAdmin()) {
             mealDish.setDeptId(SecurityUtils.getDeptId());
         }
         List<MealDish> list = mealDishMapper.selectMealDishList(mealDish);
@@ -50,7 +52,7 @@ public class MealDishServiceImpl implements IMealDishService {
             throw new ServiceException("菜品不存在或已删除");
         }
         boolean isPublic = dish.getDeptId() != null && dish.getDeptId().longValue() == 0L;
-        if (!isPublic && !SecurityUtils.isAdmin()) {
+        if (!isPublic) {
             MealScopeGuard.assertSameDept(dish.getDeptId(), "菜品");
         }
         // 回填关联分类，供管理端编辑表单多选回显

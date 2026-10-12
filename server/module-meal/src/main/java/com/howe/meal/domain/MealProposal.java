@@ -101,6 +101,10 @@ public class MealProposal extends BaseEntity {
     @Schema(description = "通过后生成的菜品ID", example = "12")
     private Long dishId;
 
+    /** 状态流转用：期望的当前状态，作为 where 条件防止 AI 自动审核与人工审核并发覆盖（不落库） */
+    @Schema(description = "期望的当前状态（审核并发保护，不落库）")
+    private String expectedStatus;
+
     @Schema(description = "删除标记（0存在 2删除）", example = "0")
     private String delFlag;
 

@@ -36,7 +36,7 @@ public class MealProposalController extends BaseController {
 
     private final IMealProposalService mealProposalService;
 
-    @Operation(summary = "提交新菜提案")
+    @Operation(summary = "提交新菜提案", description = "提交后由后台异步执行 AI 自动审核，通过时自动补齐字段并上架")
     @Log(title = "点餐提案", businessType = BusinessType.INSERT)
     @PostMapping
     public AjaxResult add(@Valid @RequestBody MealProposal mealProposal) {
@@ -58,7 +58,8 @@ public class MealProposalController extends BaseController {
         return getDataTable(mealProposalService.selectMealProposalList(mealProposal));
     }
 
-    @Operation(summary = "审核提案", description = "通过时自动在菜品表生成一条菜品（source=1）并回写菜品ID")
+    @Operation(summary = "人工审核提案",
+            description = "允许对任意状态改判：通过时无菜品则生成、已有菜品则重新上架；驳回时把已有菜品下架，不重复建菜品")
     @PreAuthorize("@ss.hasPermi('meal:proposal:audit')")
     @Log(title = "点餐提案", businessType = BusinessType.UPDATE)
     @PutMapping("/audit")

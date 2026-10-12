@@ -89,9 +89,7 @@ public class MealOrderServiceImpl implements IMealOrderService {
     @Override
     public MealOrder selectMealOrderDetail(Long orderId) {
         MealOrder order = requireOrder(orderId);
-        if (!SecurityUtils.isAdmin()) {
-            MealScopeGuard.assertSameDept(order.getDeptId(), "订单");
-        }
+        MealScopeGuard.assertSameDept(order.getDeptId(), "订单");
         order.setItems(mealOrderMapper.selectItemsByOrderId(orderId));
         order.setReviewed(!mealReviewMapper.selectReviewedOrderIds(new Long[] { orderId }).isEmpty());
         fillDuration(order);
@@ -205,9 +203,7 @@ public class MealOrderServiceImpl implements IMealOrderService {
         }
         for (Long orderId : orderIds) {
             MealOrder order = requireOrder(orderId);
-            if (!SecurityUtils.isAdmin()) {
-                MealScopeGuard.assertSameDept(order.getDeptId(), "订单");
-            }
+            MealScopeGuard.assertSameDept(order.getDeptId(), "订单");
         }
         return mealOrderMapper.deleteMealOrderByIds(orderIds);
     }

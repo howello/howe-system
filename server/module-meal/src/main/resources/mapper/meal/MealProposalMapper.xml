@@ -104,6 +104,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="name != null and name != ''">name = #{name},</if>
             <if test="description != null">description = #{description},</if>
             <if test="image != null">image = #{image},</if>
+            <if test="tags != null">tags = #{tags},</if>
+            <if test="duration != null">duration = #{duration},</if>
+            <if test="level != null">level = #{level},</if>
+            <if test="ingredients != null">ingredients = #{ingredients},</if>
+            <if test="steps != null">steps = #{steps},</if>
+            <if test="tips != null">tips = #{tips},</if>
             <if test="reason != null">reason = #{reason},</if>
             <if test="status != null and status != ''">status = #{status},</if>
             <if test="auditBy != null and auditBy != ''">audit_by = #{auditBy}, audit_time = sysdate(),</if>
@@ -113,6 +119,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             update_time = sysdate()
         </set>
         where proposal_id = #{proposalId} and del_flag = '0'
+        <!-- 期望状态：AI 自动审核与人工审核并发时，只有一个能改动成功 -->
+        <if test="expectedStatus != null and expectedStatus != ''">and status = #{expectedStatus}</if>
     </update>
 
     <update id="deleteMealProposalByIds" parameterType="Long">

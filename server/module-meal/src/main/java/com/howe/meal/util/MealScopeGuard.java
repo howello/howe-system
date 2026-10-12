@@ -20,18 +20,18 @@ public final class MealScopeGuard {
     /**
      * 校验当前登录用户是否有权改动这条数据
      *
-     * <p>公共数据（{@code ownerDeptId = 0}）只有平台管理员能改；
-     * 其余数据必须属于当前用户所在的家庭。</p>
+     * <p>平台管理员对所有数据可写；其余用户：公共数据（{@code ownerDeptId = 0}）不可写，
+     * 家庭私有数据必须属于当前用户所在的家庭。</p>
      *
      * @param ownerDeptId 数据所属家庭ID
      * @param label       数据名称，用于拼错误提示
      */
     public static void assertWritable(Long ownerDeptId, String label) {
-        if (ownerDeptId == null || ownerDeptId.longValue() == 0L) {
-            if (!SecurityUtils.isAdmin()) {
-                throw new ServiceException("公共" + label + "只能由平台管理员维护");
-            }
+        if (SecurityUtils.isAdmin()) {
             return;
+        }
+        if (ownerDeptId == null || ownerDeptId.longValue() == 0L) {
+            throw new ServiceException("公共" + label + "只能由平台管理员维护");
         }
         assertSameDept(ownerDeptId, label);
     }
@@ -39,10 +39,15 @@ public final class MealScopeGuard {
     /**
      * 校验数据属于当前登录用户的家庭
      *
+     * <p>平台管理员不受家庭归属限制，可读写所有家庭的私有数据。</p>
+     *
      * @param ownerDeptId 数据所属家庭ID
      * @param label       数据名称，用于拼错误提示
      */
     public static void assertSameDept(Long ownerDeptId, String label) {
+        if (SecurityUtils.isAdmin()) {
+            return;
+        }
         Long deptId = SecurityUtils.getDeptId();
         if (ownerDeptId == null || deptId == null || !ownerDeptId.equals(deptId)) {
             throw new ServiceException("无权访问其他家庭的" + label);
