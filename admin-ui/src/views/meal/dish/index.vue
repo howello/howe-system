@@ -195,23 +195,43 @@
           </el-col>
         </el-row>
         <el-form-item label="用料" prop="ingredients">
-          <el-input
-            v-model="form.ingredients"
-            type="textarea"
-            :rows="3"
-            placeholder='JSON 数组，如 [{"name":"带皮五花肉","amount":"600 g"},{"name":"冰糖","amount":"25 g"}]'
-          />
+          <div class="list-editor">
+            <div v-for="(item, index) in ingredientList" :key="index" class="list-editor__row">
+              <el-input v-model="item.name" placeholder="用料名称，如 带皮五花肉" class="list-editor__grow" />
+              <el-input v-model="item.amount" placeholder="用量，如 600 g" class="list-editor__amount" />
+              <el-button link type="danger" icon="Delete" class="list-editor__op" @click="removeIngredient(index)" />
+            </div>
+            <el-button link type="primary" icon="Plus" @click="addIngredient">添加用料</el-button>
+          </div>
         </el-form-item>
         <el-form-item label="做法" prop="steps">
-          <el-input
-            v-model="form.steps"
-            type="textarea"
-            :rows="4"
-            placeholder='JSON 数组，如 ["五花肉切块焯水","炒糖色后翻炒上色","加热水小火炖 60 分钟"]'
-          />
+          <div class="list-editor">
+            <div v-for="(item, index) in stepList" :key="index" class="list-editor__row list-editor__row--step">
+              <span class="list-editor__index">{{ index + 1 }}</span>
+              <el-input
+                v-model="stepList[index]"
+                type="textarea"
+                :autosize="{ minRows: 1, maxRows: 4 }"
+                placeholder="描述这一步的做法"
+                class="list-editor__grow"
+              />
+              <div class="list-editor__ops">
+                <el-button link icon="Top" :disabled="index === 0" @click="moveStep(index, -1)" />
+                <el-button link icon="Bottom" :disabled="index === stepList.length - 1" @click="moveStep(index, 1)" />
+                <el-button link type="danger" icon="Delete" @click="removeStep(index)" />
+              </div>
+            </div>
+            <el-button link type="primary" icon="Plus" @click="addStep">添加步骤</el-button>
+          </div>
         </el-form-item>
         <el-form-item label="小贴士" prop="tips">
-          <el-input v-model="form.tips" type="textarea" :rows="2" placeholder='JSON 数组，如 ["炒糖色全程小火"]' />
+          <div class="list-editor">
+            <div v-for="(item, index) in tipList" :key="index" class="list-editor__row">
+              <el-input v-model="tipList[index]" placeholder="如 炒糖色全程小火" class="list-editor__grow" />
+              <el-button link type="danger" icon="Delete" class="list-editor__op" @click="removeTip(index)" />
+            </div>
+            <el-button link type="primary" icon="Plus" @click="addTip">添加小贴士</el-button>
+          </div>
         </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-radio-group v-model="form.status">
@@ -272,6 +292,15 @@ const total = ref<number>(0)
 const title = ref<string>("")
 const asPublic = ref<boolean>(false)
 
+/** 可视化编辑用的三段列表：用料、做法、小贴士 */
+interface IngredientItem {
+  name: string
+  amount: string
+}
+const ingredientList = ref<IngredientItem[]>([])
+const stepList = ref<string[]>([])
+const tipList = ref<string[]>([])
+
 const data = reactive({
   form: {} as MealDish,
   queryParams: {
@@ -309,6 +338,91 @@ function loadCategories() {
     .catch(() => {})
 }
 
+/** 解析用料 JSON（[{name, amount}]），非法或非数组返回空 */
+function parseIngredients(raw?: string): IngredientItem[] {
+  if (!raw) {
+    return []
+  }
+  try {
+    const arr = JSON.parse(raw)
+    if (!Array.isArray(arr)) {
+      return []
+    }
+    return arr.map((it: any) => ({ name: String(it?.name ?? ""), amount: String(it?.amount ?? "") }))
+  } catch (e) {
+    return []
+  }
+}
+
+/** 解析字符串数组 JSON（做法 / 小贴士），非法或非数组返回空 */
+function parseStringList(raw?: string): string[] {
+  if (!raw) {
+    return []
+  }
+  try {
+    const arr = JSON.parse(raw)
+    if (!Array.isArray(arr)) {
+      return []
+    }
+    return arr.map((it: any) => (typeof it === "string" ? it : String(it ?? "")))
+  } catch (e) {
+    return []
+  }
+}
+
+/** 把表单里的三段 JSON 解析进可视化列表 */
+function loadListsFromForm() {
+  ingredientList.value = parseIngredients(form.value.ingredients)
+  stepList.value = parseStringList(form.value.steps)
+  tipList.value = parseStringList(form.value.tips)
+}
+
+/** 把可视化列表序列化回表单字段；空列表置空，提交时由后端按「未填」处理 */
+function saveListsToForm() {
+  const ingredients = ingredientList.value
+    .map((it: IngredientItem) => ({ name: (it.name || "").trim(), amount: (it.amount || "").trim() }))
+    .filter((it: IngredientItem) => it.name || it.amount)
+  const steps = stepList.value.map((s: string) => (s || "").trim()).filter((s: string) => s)
+  const tips = tipList.value.map((t: string) => (t || "").trim()).filter((t: string) => t)
+  form.value.ingredients = ingredients.length ? JSON.stringify(ingredients) : undefined
+  form.value.steps = steps.length ? JSON.stringify(steps) : undefined
+  form.value.tips = tips.length ? JSON.stringify(tips) : undefined
+}
+
+function addIngredient() {
+  ingredientList.value.push({ name: "", amount: "" })
+}
+
+function removeIngredient(index: number) {
+  ingredientList.value.splice(index, 1)
+}
+
+function addStep() {
+  stepList.value.push("")
+}
+
+function removeStep(index: number) {
+  stepList.value.splice(index, 1)
+}
+
+/** 做法步骤上下移动 */
+function moveStep(index: number, offset: number) {
+  const target = index + offset
+  if (target < 0 || target >= stepList.value.length) {
+    return
+  }
+  const list = stepList.value
+  ;[list[index], list[target]] = [list[target], list[index]]
+}
+
+function addTip() {
+  tipList.value.push("")
+}
+
+function removeTip(index: number) {
+  tipList.value.splice(index, 1)
+}
+
 function cancel() {
   open.value = false
   reset()
@@ -316,6 +430,9 @@ function cancel() {
 
 function reset() {
   asPublic.value = false
+  ingredientList.value = []
+  stepList.value = []
+  tipList.value = []
   form.value = {
     dishId: undefined,
     name: undefined,
@@ -366,6 +483,7 @@ function handleUpdate(row?: MealDish) {
   const dishId = row?.dishId || ids.value[0]
   getDish(dishId).then((response: any) => {
     form.value = response.data
+    loadListsFromForm()
     open.value = true
     title.value = "修改菜品"
   })
@@ -420,6 +538,8 @@ function applyTextResult(result: MealDishAiTextResult) {
   if (result.unmatchedCategoryNames && result.unmatchedCategoryNames.length) {
     proxy.$modal.msgWarning(`以下分类不在现有分类中，未回填：${result.unmatchedCategoryNames.join("、")}`)
   }
+  // 用料 / 做法 / 小贴士 可能被补齐，重新解析进可视化列表
+  loadListsFromForm()
 }
 
 /** 一键 AI：文本与封面并行请求，各自回填；已填封面时跳过封面请求 */
@@ -432,6 +552,8 @@ async function handleAiGenerate() {
   if (aiLoading.value) {
     return
   }
+  // 先把可视化列表写回表单，保证 current 快照包含用户已填的用料 / 做法 / 小贴士
+  saveListsToForm()
   const current = {
     categoryIds: form.value.categoryIds && form.value.categoryIds.length ? form.value.categoryIds : undefined,
     description: form.value.description || undefined,
@@ -614,32 +736,13 @@ async function runBatchAi(rows: MealDish[]) {
   }
 }
 
-/** 三列 JSON 在提交前做一次格式校验，避免脏数据进库后前端解析失败 */
-function validateJson(label: string, raw?: string): boolean {
-  if (!raw) {
-    return true
-  }
-  try {
-    JSON.parse(raw)
-    return true
-  } catch (e) {
-    proxy.$modal.msgError(`${label}不是合法的 JSON`)
-    return false
-  }
-}
-
 function submitForm() {
   proxy.$refs["formRef"].validate((valid: boolean) => {
     if (!valid) {
       return
     }
-    if (
-      !validateJson("用料", form.value.ingredients) ||
-      !validateJson("做法", form.value.steps) ||
-      !validateJson("小贴士", form.value.tips)
-    ) {
-      return
-    }
+    // 可视化列表统一序列化后再提交
+    saveListsToForm()
     submitting.value = true
     const payload: MealDish = { ...form.value }
     if (!payload.dishId) {
@@ -700,6 +803,57 @@ loadCategories()
   border-radius: 6px;
   flex-shrink: 0;
   cursor: pointer;
+}
+
+/* 用料 / 做法 / 小贴士 可视化列表编辑器 */
+.list-editor {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.list-editor__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.list-editor__row--step {
+  align-items: flex-start;
+}
+
+.list-editor__grow {
+  flex: 1;
+}
+
+.list-editor__amount {
+  width: 140px;
+  flex-shrink: 0;
+}
+
+.list-editor__index {
+  width: 24px;
+  height: 24px;
+  line-height: 24px;
+  text-align: center;
+  border-radius: 50%;
+  background: var(--el-fill-color);
+  color: var(--el-text-color-regular);
+  font-size: 12px;
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+
+.list-editor__op {
+  flex-shrink: 0;
+}
+
+.list-editor__ops {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 /* 一键 AI 两步进度 */

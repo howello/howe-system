@@ -201,7 +201,9 @@ delete from sys_config where config_key in (
   'ai.image.transfer.retryBackoffMs',
   'ai.image.transfer.compensateEnabled',
   'ai.image.transfer.compensateMaxAttempt',
-  'ai.image.transfer.expireMinutes'
+  'ai.image.transfer.expireMinutes',
+  'ai.prompt.meal.dish.system',
+  'ai.prompt.meal.dish.auditSuffix'
 );
 
 insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
@@ -291,6 +293,16 @@ values ('AI-转存补偿最大次数', 'ai.image.transfer.compensateMaxAttempt',
 insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
 values ('AI-转存补偿保留时长', 'ai.image.transfer.expireMinutes', '120', 'Y', 'admin', sysdate(),
         '待补偿任务的保留时长，单位分钟，超时丢弃');
+
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+values ('AI-菜品补全提示词', 'ai.prompt.meal.dish.system',
+        '你是一位资深中餐菜谱编辑，请根据菜名补全菜品信息。所有内容使用简体中文：简介精炼（不超过 60 字）；标签、耗时、难度贴合家常做法；份量给出人份（如 2 人份）；热量给出每份千卡估值（如 520 千卡）；用料给出常见份量的名称与用量；做法步骤清晰可执行；小贴士简洁实用。',
+        'Y', 'admin', sysdate(), '菜品「一键 AI 补齐」与自动审核共用的 system 提示词；留空则用代码内缺省值');
+
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+values ('AI-新菜审核提示词追加', 'ai.prompt.meal.dish.auditSuffix',
+        '另外，请先判断该菜名是否为一道可制作的家常菜品：若是，approved 填 "true" 并按要求补齐字段；若不是可制作的菜品、或内容明显不当，approved 填 "false"，rejectReason 用一句中文说明原因，其余字段留空。',
+        'Y', 'admin', sysdate(), '仅「新菜提案 AI 自动审核」使用，追加在菜品补全提示词之后；留空则用代码内缺省值');
 
 -- ----------------------------------------------------------------------------
 -- 9. 菜单与按钮权限

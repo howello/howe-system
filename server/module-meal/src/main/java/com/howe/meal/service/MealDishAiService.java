@@ -8,7 +8,9 @@ import com.howe.ai.api.dto.AiChatResult;
 import com.howe.ai.api.dto.AiImage;
 import com.howe.ai.api.dto.AiImageRequest;
 import com.howe.ai.api.dto.AiImageResult;
+import com.howe.common.constant.ConfigConstants;
 import com.howe.common.exception.ServiceException;
+import com.howe.common.utils.ConfigUtils;
 import com.howe.common.utils.SecurityUtils;
 import com.howe.meal.domain.MealCategory;
 import com.howe.meal.domain.dto.DishAiAuditResult;
@@ -53,15 +55,24 @@ public class MealDishAiService {
     /** 封面风格后缀模板 key，对应 sys_config 的 ai.image.styleSuffix.recipe.photo */
     private static final String STYLE_KEY = "recipe.photo";
 
-    /** 生成内容一律使用简体中文 */
-    private static final String SYSTEM_PROMPT = "你是一位资深中餐菜谱编辑，请根据菜名补全菜品信息。"
+    /**
+     * 文本补齐 system 提示词的缺省值
+     *
+     * <p>实际取值优先读 sys_config（{@link ConfigConstants#AI_PROMPT_MEAL_DISH_SYSTEM}），
+     * 未配置时回退到这里，保证开箱可用。</p>
+     */
+    private static final String DEFAULT_SYSTEM_PROMPT = "你是一位资深中餐菜谱编辑，请根据菜名补全菜品信息。"
             + "所有内容使用简体中文：简介精炼（不超过 60 字）；标签、耗时、难度贴合家常做法；"
             + "份量给出人份（如 2 人份）；热量给出每份千卡估值（如 520 千卡）；"
             + "用料给出常见份量的名称与用量；做法步骤清晰可执行；小贴士简洁实用。";
 
-    /** AI 自动审核场景在补齐提示词之上追加的判定说明 */
-    private static final String AUDIT_PROMPT = SYSTEM_PROMPT
-            + "另外，请先判断该菜名是否为一道可制作的家常菜品：若是，approved 填 \"true\" 并按要求补齐字段；"
+    /**
+     * AI 自动审核在 system 提示词之后追加的判定说明缺省值
+     *
+     * <p>实际取值优先读 sys_config（{@link ConfigConstants#AI_PROMPT_MEAL_DISH_AUDIT_SUFFIX}）。</p>
+     */
+    private static final String DEFAULT_AUDIT_SUFFIX =
+            "另外，请先判断该菜名是否为一道可制作的家常菜品：若是，approved 填 \"true\" 并按要求补齐字段；"
             + "若不是可制作的菜品、或内容明显不当，approved 填 \"false\"，rejectReason 用一句中文说明原因，其余字段留空。";
 
     private final AiClient aiClient;
@@ -103,7 +114,7 @@ public class MealDishAiService {
 
             AiChatRequest chatRequest = AiChatRequest.builder()
                     .scene(SCENE_GENERATE)
-                    .system(SYSTEM_PROMPT)
+                    .system(systemPrompt())
                     .prompt(buildPrompt(name, categoryIdByName.keySet(), requestCategories))
                     .outputSchema(JSON.toJSONString(objectSchema(properties, required)))
                     .build();
@@ -137,7 +148,7 @@ public class MealDishAiService {
 
         AiChatRequest chatRequest = AiChatRequest.builder()
                 .scene(SCENE_GENERATE)
-                .system(AUDIT_PROMPT)
+                .system(auditPrompt())
                 .prompt(buildAuditPrompt(name, categoryIdByName.keySet(), requestCategories))
                 .outputSchema(JSON.toJSONString(objectSchema(properties, required)))
                 .build();
@@ -339,6 +350,20 @@ public class MealDishAiService {
             return requested;
         }
         return SecurityUtils.getDeptId();
+    }
+
+    /**
+     * 读取文本补齐的 system 提示词（可在「参数设置」修改，未配置时用缺省值）
+     */
+    private String systemPrompt() {
+        return ConfigUtils.getString(ConfigConstants.AI_PROMPT_MEAL_DISH_SYSTEM, DEFAULT_SYSTEM_PROMPT);
+    }
+
+    /**
+     * 读取自动审核的 system 提示词：在补齐提示词之后追加判定说明
+     */
+    private String auditPrompt() {
+        return systemPrompt() + ConfigUtils.getString(ConfigConstants.AI_PROMPT_MEAL_DISH_AUDIT_SUFFIX, DEFAULT_AUDIT_SUFFIX);
     }
 
     private String buildPrompt(String name, Collection<String> categoryNames, boolean withCategories) {

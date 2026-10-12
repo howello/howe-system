@@ -185,4 +185,10 @@ public class ConfigConstants
 
     /** 生成图转存补偿：任务保留时长（分钟），超时丢弃 */
     public static final String AI_IMAGE_TRANSFER_EXPIRE_MINUTES = "ai.image.transfer.expireMinutes";
+
+    /** 菜品一键 AI 文本补齐的 system 提示词 */
+    public static final String AI_PROMPT_MEAL_DISH_SYSTEM = "ai.prompt.meal.dish.system";
+
+    /** 新菜提案 AI 自动审核在 system 提示词之后追加的判定说明 */
+    public static final String AI_PROMPT_MEAL_DISH_AUDIT_SUFFIX = "ai.prompt.meal.dish.auditSuffix";
 }
