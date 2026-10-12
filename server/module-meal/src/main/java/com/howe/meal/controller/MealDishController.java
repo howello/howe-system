@@ -60,11 +60,18 @@ public class MealDishController extends BaseController {
         return success(mealDishService.selectMealDishById(dishId));
     }
 
-    @Operation(summary = "一键 AI 补齐菜品信息",
-            description = "根据菜名只补齐当前为空的字段，不覆盖已填；分类只从现有分类中匹配；缺封面时生成图片并由 AI 模块转存为永久地址。登录即可调用，点餐端与后台共用。")
-    @PostMapping("/ai-generate")
-    public AjaxResult aiGenerate(@RequestBody DishAiGenerateRequest request) {
-        return success(mealDishAiService.generate(request));
+    @Operation(summary = "一键 AI 补齐菜品文本信息",
+            description = "根据菜名只补齐当前为空的文本字段，不覆盖已填；分类只从现有分类中匹配。登录即可调用，点餐端与后台共用。")
+    @PostMapping("/ai-generate/text")
+    public AjaxResult aiGenerateText(@RequestBody DishAiGenerateRequest request) {
+        return success(mealDishAiService.generateText(request));
+    }
+
+    @Operation(summary = "一键 AI 生成菜品封面",
+            description = "根据菜名生成封面图并由 AI 模块转存为永久地址；已填封面时不生成。登录即可调用，点餐端与后台共用。")
+    @PostMapping("/ai-generate/cover")
+    public AjaxResult aiGenerateCover(@RequestBody DishAiGenerateRequest request) {
+        return success(mealDishAiService.generateCover(request));
     }
 
     @Operation(summary = "新增菜品")

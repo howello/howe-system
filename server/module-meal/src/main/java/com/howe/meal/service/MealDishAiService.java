@@ -11,8 +11,9 @@ import com.howe.ai.api.dto.AiImageResult;
 import com.howe.common.exception.ServiceException;
 import com.howe.common.utils.SecurityUtils;
 import com.howe.meal.domain.MealCategory;
+import com.howe.meal.domain.dto.DishAiCoverResult;
 import com.howe.meal.domain.dto.DishAiGenerateRequest;
-import com.howe.meal.domain.dto.DishAiGenerateResult;
+import com.howe.meal.domain.dto.DishAiTextResult;
 import com.howe.meal.mapper.MealCategoryMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,9 +27,9 @@ import java.util.Map;
 /**
  * 菜品一键 AI 补齐服务
  *
- * <p>固定流水线编排：先由后端判断缺失字段 → 只把缺失字段交给对话模型（结构化输出）
- * → 分类名只从「当前可用分类」中匹配 → 缺封面时再调文生图。不引入 Agent 编排框架，
- * 模型只负责填空，缺什么的判断与合并都在这里完成。</p>
+ * <p>拆成「文本」与「封面」两条独立流水线，前端可并行调用：文本补齐先由后端判断缺失字段
+ * → 只把缺失字段交给对话模型（结构化输出）→ 分类名只从「当前可用分类」中匹配；
+ * 封面则在缺失时调文生图。两条流水线互不依赖，不引入 Agent 编排框架，模型只负责填空。</p>
  *
  * <p>只补缺失、绝不覆盖用户已填字段；生成结果不落库，由前端回填后走原有提交。</p>
  *
@@ -58,22 +59,19 @@ public class MealDishAiService {
     private final MealCategoryMapper mealCategoryMapper;
 
     /**
-     * 按菜名补齐当前为空的菜品字段
+     * 按菜名补齐当前为空的文本字段（不含封面）
      *
      * @param request 生成请求（菜名 + 已填字段快照）
-     * @return 只含被补齐字段的结果
+     * @return 只含被补齐文本字段与分类匹配结果
      */
-    public DishAiGenerateResult generate(DishAiGenerateRequest request) {
-        String name = request.getName() == null ? "" : request.getName().trim();
-        if (name.isEmpty()) {
-            throw new ServiceException("请先填写菜名");
-        }
+    public DishAiTextResult generateText(DishAiGenerateRequest request) {
+        String name = resolveName(request);
         DishAiGenerateRequest.Current current = request.getCurrent();
 
         // 候选分类：公共分类（dept_id=0）+ 目标家庭的私有分类
         Map<String, Long> categoryIdByName = loadCandidateCategories(resolveDeptId(request.getDeptId()));
 
-        DishAiGenerateResult result = new DishAiGenerateResult();
+        DishAiTextResult result = new DishAiTextResult();
         result.setFields(new LinkedHashMap<>());
         result.setMatchedCategoryIds(new ArrayList<>());
         result.setUnmatchedCategoryNames(new ArrayList<>());
@@ -98,7 +96,20 @@ public class MealDishAiService {
             fillTextFields(result, name, categoryIdByName, requestCategories, needDescription, needTags,
                     needDuration, needLevel, needServe, needKcal, needIngredients, needSteps, needTips);
         }
+        return result;
+    }
 
+    /**
+     * 按菜名生成封面（已填封面时不生成）
+     *
+     * @param request 生成请求（菜名 + 已填字段快照）
+     * @return 封面永久地址或失败原因
+     */
+    public DishAiCoverResult generateCover(DishAiGenerateRequest request) {
+        String name = resolveName(request);
+        DishAiGenerateRequest.Current current = request.getCurrent();
+
+        DishAiCoverResult result = new DishAiCoverResult();
         if (isBlank(current == null ? null : current.getCover())) {
             fillCover(result, name);
         }
@@ -106,9 +117,23 @@ public class MealDishAiService {
     }
 
     /**
+     * 校验并取出菜名
+     *
+     * @param request 生成请求
+     * @return 去掉首尾空白的菜名
+     */
+    private String resolveName(DishAiGenerateRequest request) {
+        String name = request.getName() == null ? "" : request.getName().trim();
+        if (name.isEmpty()) {
+            throw new ServiceException("请先填写菜名");
+        }
+        return name;
+    }
+
+    /**
      * 结构化对话一次性补齐缺失的文本字段
      */
-    private void fillTextFields(DishAiGenerateResult result, String name, Map<String, Long> categoryIdByName,
+    private void fillTextFields(DishAiTextResult result, String name, Map<String, Long> categoryIdByName,
             boolean needCategories, boolean needDescription, boolean needTags, boolean needDuration,
             boolean needLevel, boolean needServe, boolean needKcal, boolean needIngredients, boolean needSteps,
             boolean needTips) {
@@ -210,7 +235,7 @@ public class MealDishAiService {
     /**
      * 缺封面时调用文生图；失败只记录可读原因，不影响文本补齐
      */
-    private void fillCover(DishAiGenerateResult result, String name) {
+    private void fillCover(DishAiCoverResult result, String name) {
         try {
             AiImageResult imageResult = aiClient.image(AiImageRequest.builder()
                     .scene(SCENE_COVER)

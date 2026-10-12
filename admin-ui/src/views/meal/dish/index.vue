@@ -50,6 +50,19 @@
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
+    <div v-if="batchAiLoading" class="batch-ai">
+      <el-progress :percentage="batchPercent" :stroke-width="10" />
+      <div class="batch-ai__text">
+        正在处理 {{ batchIndex }}/{{ batchTotal }}：{{ batchName }}
+        <span class="ai-step" :class="stepClass(batchTextState)">
+          <span class="ai-step__icon">{{ stepIcon(batchTextState) }}</span>菜品信息 · {{ stepText(batchTextState) }}
+        </span>
+        <span class="ai-step" :class="stepClass(batchCoverState)">
+          <span class="ai-step__icon">{{ stepIcon(batchCoverState) }}</span>封面图 · {{ stepText(batchCoverState) }}
+        </span>
+      </div>
+    </div>
+
     <el-table v-loading="loading" :data="dishList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="封面" align="center" width="80">
@@ -101,8 +114,18 @@
     <el-dialog :title="title" v-model="open" width="760px" append-to-body>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
         <el-form-item label="一键 AI">
-          <el-button type="primary" plain icon="MagicStick" :loading="aiLoading" @click="handleAiGenerate">一键 AI 补齐</el-button>
-          <span class="ai-tip">填写菜名后点击，仅补齐空字段，不覆盖已填内容</span>
+          <div class="ai-field">
+            <el-button type="primary" plain icon="MagicStick" :loading="aiLoading" @click="handleAiGenerate">一键 AI 补齐</el-button>
+            <span class="ai-tip">填写菜名后点击，仅补齐空字段，不覆盖已填内容</span>
+          </div>
+          <div v-if="aiLoading" class="ai-steps">
+            <span class="ai-step" :class="stepClass(aiTextState)">
+              <span class="ai-step__icon">{{ stepIcon(aiTextState) }}</span>菜品信息 · {{ stepText(aiTextState) }}
+            </span>
+            <span class="ai-step" :class="stepClass(aiCoverState)">
+              <span class="ai-step__icon">{{ stepIcon(aiCoverState) }}</span>封面图 · {{ stepText(aiCoverState) }}
+            </span>
+          </div>
         </el-form-item>
         <el-row :gutter="16">
           <el-col :span="12">
@@ -211,11 +234,14 @@
 </template>
 
 <script setup lang="ts" name="MealDish">
-import { getDish, listDish, addDish, updateDish, delDish, aiGenerateDish } from "@/api/meal/dish"
+import { getDish, listDish, addDish, updateDish, delDish, aiGenerateDishText, aiGenerateDishCover } from "@/api/meal/dish"
 import { listCategory } from "@/api/meal/category"
-import type { MealDish, MealDishQueryParams, MealDishAiCurrent } from "@/types/api/meal/dish"
+import type { MealDish, MealDishQueryParams, MealDishAiCurrent, MealDishAiTextResult } from "@/types/api/meal/dish"
 import type { MealCategory } from "@/types/api/meal/category"
 import useUserStore from "@/store/modules/user"
+
+/** AI 两步任务状态 */
+type StepState = "idle" | "loading" | "done" | "error" | "skip"
 
 const { proxy } = getCurrentInstance() as any
 
@@ -227,8 +253,17 @@ const categoryOptions = ref<MealCategory[]>([])
 const open = ref<boolean>(false)
 const loading = ref<boolean>(true)
 const submitting = ref<boolean>(false)
-const aiLoading = ref<boolean>(false)
+const aiTextState = ref<StepState>("idle")
+const aiCoverState = ref<StepState>("idle")
+const aiLoading = computed(() => aiTextState.value === "loading" || aiCoverState.value === "loading")
 const batchAiLoading = ref<boolean>(false)
+const batchTotal = ref<number>(0)
+const batchDone = ref<number>(0)
+const batchIndex = ref<number>(0)
+const batchName = ref<string>("")
+const batchTextState = ref<StepState>("idle")
+const batchCoverState = ref<StepState>("idle")
+const batchPercent = computed(() => (batchTotal.value ? Math.round((batchDone.value / batchTotal.value) * 100) : 0))
 const showSearch = ref<boolean>(true)
 const ids = ref<number[]>([])
 const single = ref<boolean>(true)
@@ -336,8 +371,59 @@ function handleUpdate(row?: MealDish) {
   })
 }
 
-/** 一键 AI：只补齐当前为空的字段，已填内容不覆盖 */
-function handleAiGenerate() {
+/** 进度行图标 */
+function stepIcon(state: StepState): string {
+  if (state === "done") return "✓"
+  if (state === "error") return "✕"
+  if (state === "skip") return "—"
+  return "●"
+}
+
+/** 进度行文案 */
+function stepText(state: StepState): string {
+  const map: Record<StepState, string> = {
+    idle: "等待中",
+    loading: "进行中",
+    done: "已完成",
+    error: "失败",
+    skip: "已跳过"
+  }
+  return map[state]
+}
+
+/** 进度行样式 */
+function stepClass(state: StepState): Record<string, boolean> {
+  return {
+    "is-active": state === "loading",
+    "is-done": state === "done",
+    "is-error": state === "error"
+  }
+}
+
+/** 把文本补齐结果回填到表单（只填空字段） */
+function applyTextResult(result: MealDishAiTextResult) {
+  const fields = result.fields || {}
+  Object.keys(fields).forEach((key) => {
+    const value = fields[key]
+    if (value !== undefined && value !== null && value !== "") {
+      ;(form.value as any)[key] = value
+    }
+  })
+  // 只在用户没选分类时回填，避免覆盖已选
+  if (
+    result.matchedCategoryIds &&
+    result.matchedCategoryIds.length &&
+    !(form.value.categoryIds && form.value.categoryIds.length)
+  ) {
+    form.value.categoryIds = result.matchedCategoryIds
+  }
+  if (result.unmatchedCategoryNames && result.unmatchedCategoryNames.length) {
+    proxy.$modal.msgWarning(`以下分类不在现有分类中，未回填：${result.unmatchedCategoryNames.join("、")}`)
+  }
+}
+
+/** 一键 AI：文本与封面并行请求，各自回填；已填封面时跳过封面请求 */
+async function handleAiGenerate() {
   const name = (form.value.name || "").trim()
   if (!name) {
     proxy.$modal.msgWarning("请先填写菜名")
@@ -346,7 +432,6 @@ function handleAiGenerate() {
   if (aiLoading.value) {
     return
   }
-  aiLoading.value = true
   const current = {
     categoryIds: form.value.categoryIds && form.value.categoryIds.length ? form.value.categoryIds : undefined,
     description: form.value.description || undefined,
@@ -361,39 +446,49 @@ function handleAiGenerate() {
     tips: form.value.tips || undefined
   }
   const deptId = isAdmin.value && !form.value.dishId && asPublic.value ? 0 : undefined
-  aiGenerateDish({ name, deptId, current })
+  const payload = { name, deptId, current }
+  const needCover = !form.value.cover
+
+  aiTextState.value = "loading"
+  aiCoverState.value = needCover ? "loading" : "skip"
+
+  const textTask = aiGenerateDishText(payload)
     .then((response: any) => {
-      const result = response.data || {}
-      const fields = result.fields || {}
-      Object.keys(fields).forEach((key) => {
-        const value = fields[key]
-        if (value !== undefined && value !== null && value !== "") {
-          ;(form.value as any)[key] = value
-        }
-      })
-      if (result.cover) {
-        form.value.cover = result.cover
-      }
-      // 只在用户没选分类时回填，避免覆盖已选
-      if (
-        result.matchedCategoryIds &&
-        result.matchedCategoryIds.length &&
-        !(form.value.categoryIds && form.value.categoryIds.length)
-      ) {
-        form.value.categoryIds = result.matchedCategoryIds
-      }
-      if (result.unmatchedCategoryNames && result.unmatchedCategoryNames.length) {
-        proxy.$modal.msgWarning(`以下分类不在现有分类中，未回填：${result.unmatchedCategoryNames.join("、")}`)
-      }
-      if (result.imageError) {
-        proxy.$modal.msgWarning(`封面图未生成：${result.imageError}`)
-      } else {
-        proxy.$modal.msgSuccess("已补齐空字段")
-      }
+      applyTextResult(response.data || {})
+      aiTextState.value = "done"
     })
-    .finally(() => {
-      aiLoading.value = false
+    .catch(() => {
+      aiTextState.value = "error"
     })
+
+  const coverTask = needCover
+    ? aiGenerateDishCover(payload)
+        .then((response: any) => {
+          const result = response.data || {}
+          if (result.cover) {
+            form.value.cover = result.cover
+            aiCoverState.value = "done"
+          } else {
+            aiCoverState.value = "error"
+            if (result.imageError) {
+              proxy.$modal.msgWarning(`封面图未生成：${result.imageError}`)
+            }
+          }
+        })
+        .catch(() => {
+          aiCoverState.value = "error"
+        })
+    : Promise.resolve()
+
+  await Promise.allSettled([textTask, coverTask])
+  finishAiSummary()
+}
+
+/** 两步都结束后汇总提示（放在函数里读取状态，避免 TS 把赋值后的类型收窄） */
+function finishAiSummary() {
+  if (aiTextState.value === "done" && aiCoverState.value !== "error") {
+    proxy.$modal.msgSuccess("已补齐空字段")
+  }
 }
 
 /** 批量 AI 优化：对选中的多个菜品逐个补齐空字段并自动保存 */
@@ -409,12 +504,24 @@ function handleBatchAi() {
     .catch(() => {})
 }
 
-/** 依次处理每个菜品：拉取详情 → AI 补齐空字段 → 自动提交；单条失败不中断 */
+/** 批量：当前菜品文本失败且封面未成功时视为失败 */
+function batchCurrentFailed(): boolean {
+  return batchTextState.value === "error" && batchCoverState.value !== "done"
+}
+
+/** 依次处理每个菜品：拉取详情 → 文本/封面并行补齐 → 自动提交；单条失败不中断 */
 async function runBatchAi(rows: MealDish[]) {
   batchAiLoading.value = true
+  batchTotal.value = rows.length
+  batchDone.value = 0
   let success = 0
   const failed: string[] = []
-  for (const row of rows) {
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]
+    batchIndex.value = i + 1
+    batchName.value = row.name || String(row.dishId)
+    batchTextState.value = "idle"
+    batchCoverState.value = "idle"
     try {
       const detailResp: any = await getDish(row.dishId as number)
       const dish: MealDish = detailResp.data || row
@@ -431,34 +538,74 @@ async function runBatchAi(rows: MealDish[]) {
         steps: dish.steps || undefined,
         tips: dish.tips || undefined
       }
-      const aiResp: any = await aiGenerateDish({ name: dish.name as string, current })
-      const result = aiResp.data || {}
-      const fields = result.fields || {}
-      Object.keys(fields).forEach((key) => {
-        const value = fields[key]
-        if (value !== undefined && value !== null && value !== "") {
-          ;(dish as any)[key] = value
-        }
-      })
-      if (result.cover) {
-        dish.cover = result.cover
+      const payload = { name: dish.name as string, current }
+      const needCover = !dish.cover
+      batchTextState.value = "loading"
+      batchCoverState.value = needCover ? "loading" : "skip"
+
+      const textTask = aiGenerateDishText(payload)
+        .then((resp: any) => {
+          const result = resp.data || {}
+          const fields = result.fields || {}
+          Object.keys(fields).forEach((key) => {
+            const value = fields[key]
+            if (value !== undefined && value !== null && value !== "") {
+              ;(dish as any)[key] = value
+            }
+          })
+          if (
+            result.matchedCategoryIds &&
+            result.matchedCategoryIds.length &&
+            !(dish.categoryIds && dish.categoryIds.length)
+          ) {
+            dish.categoryIds = result.matchedCategoryIds
+          }
+          batchTextState.value = "done"
+        })
+        .catch(() => {
+          batchTextState.value = "error"
+        })
+
+      const coverTask = needCover
+        ? aiGenerateDishCover(payload)
+            .then((resp: any) => {
+              const result = resp.data || {}
+              if (result.cover) {
+                dish.cover = result.cover
+                batchCoverState.value = "done"
+              } else {
+                batchCoverState.value = "error"
+              }
+            })
+            .catch(() => {
+              batchCoverState.value = "error"
+            })
+        : Promise.resolve()
+
+      await Promise.allSettled([textTask, coverTask])
+
+      // 文本失败且封面也没成功 → 视为失败，不保存
+      if (batchCurrentFailed()) {
+        throw new Error("AI 生成失败")
       }
-      if (
-        result.matchedCategoryIds &&
-        result.matchedCategoryIds.length &&
-        !(dish.categoryIds && dish.categoryIds.length)
-      ) {
-        dish.categoryIds = result.matchedCategoryIds
-      }
+
       // 修改时不清空/变更归属，与单条编辑保持一致
       dish.deptId = undefined
       await updateDish(dish)
       success++
     } catch (e) {
       failed.push(row.name || String(row.dishId))
+    } finally {
+      batchDone.value = i + 1
     }
   }
   batchAiLoading.value = false
+  batchTotal.value = 0
+  batchDone.value = 0
+  batchIndex.value = 0
+  batchName.value = ""
+  batchTextState.value = "idle"
+  batchCoverState.value = "idle"
   getList()
   if (failed.length) {
     proxy.$modal.msgWarning(`AI 优化完成：成功 ${success} 个，失败 ${failed.length} 个（${failed.join("、")}）`)
@@ -553,5 +700,57 @@ loadCategories()
   border-radius: 6px;
   flex-shrink: 0;
   cursor: pointer;
+}
+
+/* 一键 AI 两步进度 */
+.ai-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ai-steps {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.batch-ai {
+  margin-bottom: 12px;
+}
+
+.batch-ai__text {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.ai-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--el-text-color-secondary);
+}
+
+.ai-step__icon {
+  font-weight: 700;
+}
+
+.ai-step.is-active {
+  color: var(--el-color-primary);
+  font-weight: 600;
+}
+
+.ai-step.is-done {
+  color: var(--el-color-success);
+}
+
+.ai-step.is-error {
+  color: var(--el-color-danger);
 }
 </style>
