@@ -45,6 +45,9 @@ public class AiSceneRouteServiceImpl implements IAiSceneRouteService
         requireModel(aiSceneRoute.getPrimaryModelId(), "主模型");
         aiSceneRoute.setEnabled(aiSceneRoute.getEnabled() == null ? ENABLED : aiSceneRoute.getEnabled());
         aiSceneRoute.setUpdateBy(SecurityUtils.getUsername());
+        // 两个 JSON 列不接受空串（MySQL 会报 Invalid JSON text），空白统一归一为 null
+        aiSceneRoute.setFallbackModelIds(blankToNull(aiSceneRoute.getFallbackModelIds()));
+        aiSceneRoute.setRouteParams(blankToNull(aiSceneRoute.getRouteParams()));
 
         AiSceneRoute existing = aiSceneRoute.getId() == null
                 ? aiSceneRouteMapper.selectByScene(aiSceneRoute.getScene(), aiSceneRoute.getCapability())
@@ -74,6 +77,17 @@ public class AiSceneRouteServiceImpl implements IAiSceneRouteService
         int rows = aiSceneRouteMapper.deleteAiSceneRouteByIds(ids);
         aiConfigService.refresh();
         return rows;
+    }
+
+    /**
+     * 空白串归一为 null，避免写入 MySQL JSON 列时报 Invalid JSON text
+     *
+     * @param value 原始值
+     * @return 去空白后为空则返回 null，否则返回原值
+     */
+    private static String blankToNull(String value)
+    {
+        return (value == null || value.isBlank()) ? null : value;
     }
 
     /**
