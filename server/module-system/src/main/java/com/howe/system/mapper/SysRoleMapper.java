@@ -34,6 +34,16 @@ public interface SysRoleMapper
     public List<SysRole> selectRoleAll();
 
     /**
+     * 根据角色标识查询角色
+     *
+     * <p>不做数据权限过滤，供匿名注册等没有登录态的场景使用。</p>
+     *
+     * @param roleKey 角色权限字符串
+     * @return 角色，不存在返回 null
+     */
+    public SysRole selectRoleByKey(String roleKey);
+
+    /**
      * 根据用户ID获取角色选择框列表
      *
      * @param userId 用户ID

@@ -44,6 +44,16 @@ public interface ISysRoleService
     public List<SysRole> selectRoleAll();
 
     /**
+     * 根据角色标识查询角色
+     *
+     * <p>不做数据权限过滤，供匿名注册等没有登录态的场景使用。</p>
+     *
+     * @param roleKey 角色权限字符串
+     * @return 角色，不存在返回 null
+     */
+    public SysRole selectRoleByKey(String roleKey);
+
+    /**
      * 根据用户ID获取角色选择框列表
      *
      * @param userId 用户ID
@@ -88,6 +98,16 @@ public interface ISysRoleService
      * @param roleIds 角色id
      */
     public void checkRoleDataScope(Long... roleIds);
+
+    /**
+     * 校验待分配角色是否可由家庭管理员授予
+     *
+     * <p>家庭管理员（非平台管理员）只能分配三个家庭角色
+     * （点餐员 / 厨师 / 家庭管理员），不能授予平台级角色。平台管理员不受限。</p>
+     *
+     * @param roleIds 角色id
+     */
+    public void checkFamilyRoleAssignable(Long... roleIds);
 
     /**
      * 通过角色ID查询角色使用数量

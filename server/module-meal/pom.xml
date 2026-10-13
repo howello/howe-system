@@ -23,6 +23,12 @@
             <artifactId>module-common</artifactId>
         </dependency>
 
+        <!-- 用户/角色/部门服务（家庭成员管理复用 sys_user / sys_role / sys_dept）-->
+        <dependency>
+            <groupId>com.howe</groupId>
+            <artifactId>module-system</artifactId>
+        </dependency>
+
         <!-- AI 调用网关（菜品一键 AI 补齐）-->
         <dependency>
             <groupId>com.howe</groupId>

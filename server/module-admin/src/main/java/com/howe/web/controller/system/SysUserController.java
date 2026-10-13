@@ -20,6 +20,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.howe.common.annotation.Log;
+import com.howe.common.constant.FamilyRoleConstants;
 import com.howe.common.core.controller.BaseController;
 import com.howe.common.core.domain.AjaxResult;
 import com.howe.common.core.domain.entity.SysDept;
@@ -120,7 +121,16 @@ public class SysUserController extends BaseController
             ajax.put("roleIds", sysUser.getRoles().stream().map(SysRole::getRoleId).collect(Collectors.toList()));
         }
         List<SysRole> roles = roleService.selectRoleAll();
-        ajax.put("roles", SecurityUtils.isAdmin(userId) ? roles : roles.stream().filter(r -> !r.isAdmin()).collect(Collectors.toList()));
+        if (!SecurityUtils.isAdmin())
+        {
+            // 家庭管理员只能分配家庭角色，下拉里也只暴露这三个
+            roles = roles.stream().filter(r -> FamilyRoleConstants.isFamilyRole(r.getRoleKey())).collect(Collectors.toList());
+        }
+        else
+        {
+            roles = SecurityUtils.isAdmin(userId) ? roles : roles.stream().filter(r -> !r.isAdmin()).collect(Collectors.toList());
+        }
+        ajax.put("roles", roles);
         ajax.put("posts", postService.selectPostAll());
         return ajax;
     }
@@ -134,8 +144,14 @@ public class SysUserController extends BaseController
     @PostMapping
     public AjaxResult add(@Validated @RequestBody SysUser user)
     {
+        if (!SecurityUtils.isAdmin())
+        {
+            // 家庭管理员新增成员只能落在自己家庭
+            user.setDeptId(SecurityUtils.getDeptId());
+        }
         deptService.checkDeptDataScope(user.getDeptId());
         roleService.checkRoleDataScope(user.getRoleIds());
+        roleService.checkFamilyRoleAssignable(user.getRoleIds());
         if (!userService.checkUserNameUnique(user))
         {
             return error("新增用户'" + user.getUserName() + "'失败，登录账号已存在");
@@ -164,8 +180,14 @@ public class SysUserController extends BaseController
     {
         userService.checkUserAllowed(user);
         userService.checkUserDataScope(user.getUserId());
+        if (!SecurityUtils.isAdmin())
+        {
+            // 家庭管理员不能把成员移出自己家庭
+            user.setDeptId(SecurityUtils.getDeptId());
+        }
         deptService.checkDeptDataScope(user.getDeptId());
         roleService.checkRoleDataScope(user.getRoleIds());
+        roleService.checkFamilyRoleAssignable(user.getRoleIds());
         if (!userService.checkUserNameUnique(user))
         {
             return error("修改用户'" + user.getUserName() + "'失败，登录账号已存在");
@@ -240,8 +262,17 @@ public class SysUserController extends BaseController
         AjaxResult ajax = AjaxResult.success();
         SysUser user = userService.selectUserById(userId);
         List<SysRole> roles = roleService.selectRolesByUserId(userId);
+        if (!SecurityUtils.isAdmin())
+        {
+            // 家庭管理员只能分配家庭角色
+            roles = roles.stream().filter(r -> FamilyRoleConstants.isFamilyRole(r.getRoleKey())).collect(Collectors.toList());
+        }
+        else
+        {
+            roles = SecurityUtils.isAdmin(userId) ? roles : roles.stream().filter(r -> !r.isAdmin()).collect(Collectors.toList());
+        }
         ajax.put("user", user);
-        ajax.put("roles", SecurityUtils.isAdmin(userId) ? roles : roles.stream().filter(r -> !r.isAdmin()).collect(Collectors.toList()));
+        ajax.put("roles", roles);
         return ajax;
     }
 
@@ -256,6 +287,7 @@ public class SysUserController extends BaseController
     {
         userService.checkUserDataScope(userId);
         roleService.checkRoleDataScope(roleIds);
+        roleService.checkFamilyRoleAssignable(roleIds);
         userService.insertUserAuth(userId, roleIds);
         return success();
     }

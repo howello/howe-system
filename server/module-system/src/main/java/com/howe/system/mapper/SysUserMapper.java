@@ -21,6 +21,18 @@ public interface SysUserMapper
     public List<SysUser> selectUserList(SysUser sysUser);
 
     /**
+     * 查询指定家庭（部门）的成员，含成员已分配的家庭角色
+     *
+     * <p>点餐端「家庭与成员」使用：显式按部门过滤，不走 {@code @DataScope}，
+     * 便于家庭管理员与平台管理员得到一致、可预期的结果。</p>
+     *
+     * @param deptId  家庭（部门）ID
+     * @param keyword 账号或昵称关键字，可为空
+     * @return 成员集合，含 roles
+     */
+    public List<SysUser> selectFamilyMemberList(@Param("deptId") Long deptId, @Param("keyword") String keyword);
+
+    /**
      * 根据条件分页查询已配用户角色列表
      *
      * @param user 用户信息

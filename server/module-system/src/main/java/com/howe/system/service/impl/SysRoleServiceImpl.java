@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.howe.common.annotation.DataScope;
+import com.howe.common.constant.FamilyRoleConstants;
 import com.howe.common.constant.UserConstants;
 import com.howe.common.core.domain.entity.SysRole;
 import com.howe.common.exception.ServiceException;
@@ -115,6 +116,18 @@ public class SysRoleServiceImpl implements ISysRoleService
     }
 
     /**
+     * 根据角色标识查询角色（不做数据权限过滤，供匿名注册使用）
+     *
+     * @param roleKey 角色权限字符串
+     * @return 角色，不存在返回 null
+     */
+    @Override
+    public SysRole selectRoleByKey(String roleKey)
+    {
+        return roleMapper.selectRoleByKey(roleKey);
+    }
+
+    /**
      * 根据用户ID获取角色选择框列表
      *
      * @param userId 用户ID
@@ -207,6 +220,35 @@ public class SysRoleServiceImpl implements ISysRoleService
                 {
                     throw new ServiceException("没有权限访问角色数据！");
                 }
+            }
+        }
+    }
+
+    /**
+     * 校验待分配角色是否可由家庭管理员授予
+     *
+     * <p>非平台管理员只能分配三个家庭角色，防止家庭管理员借用户管理越权授予
+     * 平台级角色。平台管理员不受限。</p>
+     *
+     * @param roleIds 角色id
+     */
+    @Override
+    public void checkFamilyRoleAssignable(Long... roleIds)
+    {
+        if (SecurityUtils.isAdmin() || StringUtils.isEmpty(roleIds))
+        {
+            return;
+        }
+        for (Long roleId : roleIds)
+        {
+            if (roleId == null)
+            {
+                continue;
+            }
+            SysRole role = roleMapper.selectRoleById(roleId);
+            if (role == null || !FamilyRoleConstants.isFamilyRole(role.getRoleKey()))
+            {
+                throw new ServiceException("只能分配家庭角色（点餐员 / 厨师 / 家庭管理员）");
             }
         }
     }
