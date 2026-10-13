@@ -32,6 +32,9 @@ public class MealAppVersionServiceImpl implements IMealAppVersionService {
     /** 允许上传的扩展名 */
     private static final String[] WGT_ALLOWED_EXTENSION = { "wgt" };
 
+    /** 脚本发布（发布令牌接口）落库时的创建者标识 */
+    private static final String PUBLISH_CREATE_BY = "publish-token";
+
     private final MealAppVersionMapper mealAppVersionMapper;
 
     @Override
@@ -125,5 +128,37 @@ public class MealAppVersionServiceImpl implements IMealAppVersionService {
         }
         // 用 UUID 命名，保证每次上传的对象键唯一，避免 R2 / CDN 边缘缓存命中旧包
         return FileUploadUtils.uploadTo(WGT_BIZ_DIR, file, WGT_ALLOWED_EXTENSION, true);
+    }
+
+    /**
+     * 脚本发布路径：不经过登录态，因此 createBy 记为固定标识，便于在列表里区分脚本发布与后台手工发布。
+     * 参数校验放在这里，让发布接口的报错信息保持可读。
+     */
+    @Override
+    public MealAppVersion publishWgt(MultipartFile file, String versionName, Integer versionCode,
+            String updateLog, String forceUpdate) throws IOException, InvalidExtensionException {
+        if (file == null || file.isEmpty()) {
+            throw new ServiceException("请选择要上传的 wgt 文件");
+        }
+        if (StringUtils.isEmpty(versionName)) {
+            throw new ServiceException("版本名称不能为空");
+        }
+        if (versionCode == null) {
+            throw new ServiceException("版本序号不能为空");
+        }
+
+        String url = uploadWgt(file);
+        MealAppVersion version = new MealAppVersion();
+        version.setVersionName(versionName);
+        version.setVersionCode(versionCode);
+        version.setWgtUrl(url);
+        version.setWgtSize(file.getSize());
+        version.setFileName(file.getOriginalFilename());
+        version.setUpdateLog(updateLog);
+        version.setForceUpdate(StringUtils.isEmpty(forceUpdate) ? "0" : forceUpdate);
+        version.setStatus("0");
+        version.setCreateBy(PUBLISH_CREATE_BY);
+        mealAppVersionMapper.insertMealAppVersion(version);
+        return version;
     }
 }

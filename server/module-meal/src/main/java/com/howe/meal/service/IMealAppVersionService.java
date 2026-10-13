@@ -76,4 +76,22 @@ public interface IMealAppVersionService {
      * @throws InvalidExtensionException 扩展名不是 wgt
      */
     String uploadWgt(MultipartFile file) throws IOException, InvalidExtensionException;
+
+    /**
+     * 脚本发布：上传 wgt 到 R2 并新建一条已发布的版本记录
+     *
+     * <p>供发布令牌接口调用：不依赖登录态（{@code createBy} 记为固定标识），
+     * 一次完成「上传 + 建记录」。</p>
+     *
+     * @param file wgt 文件
+     * @param versionName 版本名称
+     * @param versionCode 版本序号
+     * @param updateLog 更新说明，可为空
+     * @param forceUpdate 是否强制更新（0/1），为空按 0
+     * @return 新建的版本记录（含 versionId）
+     * @throws IOException 读取上传流出错
+     * @throws InvalidExtensionException 扩展名不是 wgt
+     */
+    MealAppVersion publishWgt(MultipartFile file, String versionName, Integer versionCode,
+            String updateLog, String forceUpdate) throws IOException, InvalidExtensionException;
 }

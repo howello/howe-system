@@ -639,3 +639,17 @@ select 1, d.dish_id, c.category_id
 from meal_dish d join meal_category c on c.dept_id = 0 and c.del_flag = '0'
 where d.dept_id = 0 and d.name = '辣炒花甲'
   and c.name in ('热菜','荤菜','炒');
+
+-- ----------------------------
+-- 13、参数配置（App 版本发布令牌）
+--
+-- 给打包脚本（meal-ui 的 publish:wgt）用的静态发布令牌，配合第 8 节的 meal_app_version
+-- 与发布接口 POST /meal/app/version/publish 使用。这里只预置键与说明：值留空表示未配置，
+-- 未配置时发布接口一律拒绝（不会变成无鉴权的上传口）。
+-- 真实令牌请在「系统管理 > 参数设置」里填入（改完即时生效），不要写进仓库。
+-- 建议值：32 字节随机串，如 openssl rand -hex 32。
+-- ----------------------------
+delete from sys_config where config_key = 'meal.app.publishToken';
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+values ('点餐-App 版本发布令牌', 'meal.app.publishToken', '', 'N', 'admin', sysdate(),
+        '打包脚本 publish:wgt 用：请求头 X-Publish-Token 与之匹配即可发布版本；留空=未配置（发布接口拒绝）');

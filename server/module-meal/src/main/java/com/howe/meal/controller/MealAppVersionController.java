@@ -2,10 +2,14 @@ package com.howe.meal.controller;
 
 import com.howe.common.annotation.Anonymous;
 import com.howe.common.annotation.Log;
+import com.howe.common.constant.ConfigConstants;
+import com.howe.common.constant.HttpStatus;
 import com.howe.common.core.controller.BaseController;
 import com.howe.common.core.domain.AjaxResult;
 import com.howe.common.core.page.TableDataInfo;
 import com.howe.common.enums.BusinessType;
+import com.howe.common.utils.ConfigUtils;
+import com.howe.common.utils.StringUtils;
 import com.howe.meal.domain.MealAppVersion;
 import com.howe.meal.service.IMealAppVersionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,11 +24,14 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +51,9 @@ import java.util.Map;
 public class MealAppVersionController extends BaseController {
 
     private final IMealAppVersionService mealAppVersionService;
+
+    /** 脚本发布用的令牌请求头 */
+    private static final String PUBLISH_TOKEN_HEADER = "X-Publish-Token";
 
     @Operation(summary = "查询版本列表")
     @GetMapping("/list")
@@ -113,5 +123,63 @@ public class MealAppVersionController extends BaseController {
     public AjaxResult remove(@Parameter(description = "版本记录ID数组，多个用逗号分隔", required = true)
             @PathVariable Long[] versionIds) {
         return toAjax(mealAppVersionService.deleteMealAppVersionByIds(versionIds));
+    }
+
+    /**
+     * 脚本发布：上传 wgt 到 R2 并新建一条已发布的版本记录
+     *
+     * <p>匿名放行，用请求头 {@code X-Publish-Token} 与参数 {@code meal.app.publishToken} 做常量时间比较。
+     * 令牌未配置时一律拒绝——不能因为参数缺失就变成无鉴权的上传口。只授权「上传 + 新建记录」，
+     * 不提供读取、修改、停用、删除能力。</p>
+     */
+    @Operation(summary = "发布 wgt 版本（脚本用）",
+            description = "用发布令牌鉴权，一次请求完成「上传 wgt 到 R2 + 新建版本记录」")
+    @Anonymous
+    @PostMapping("/publish")
+    public AjaxResult publish(
+            @Parameter(description = "发布令牌") @RequestHeader(value = PUBLISH_TOKEN_HEADER, required = false) String publishToken,
+            @Parameter(description = "wgt 资源包") @RequestParam(value = "file", required = false) MultipartFile file,
+            @Parameter(description = "版本名称") @RequestParam(value = "versionName", required = false) String versionName,
+            @Parameter(description = "版本序号") @RequestParam(value = "versionCode", required = false) Integer versionCode,
+            @Parameter(description = "更新说明") @RequestParam(value = "updateLog", required = false) String updateLog,
+            @Parameter(description = "是否强制更新（0/1）") @RequestParam(value = "forceUpdate", required = false) String forceUpdate) {
+        AjaxResult tokenError = assertPublishToken(publishToken);
+        if (tokenError != null) {
+            return tokenError;
+        }
+        try {
+            MealAppVersion version = mealAppVersionService.publishWgt(file, versionName, versionCode, updateLog, forceUpdate);
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("versionId", version.getVersionId());
+            data.put("versionName", version.getVersionName());
+            data.put("versionCode", version.getVersionCode());
+            data.put("wgtUrl", version.getWgtUrl());
+            data.put("wgtSize", version.getWgtSize());
+            data.put("fileName", version.getFileName());
+            data.put("forceUpdate", version.getForceUpdate());
+            return AjaxResult.success(data);
+        } catch (Exception e) {
+            return AjaxResult.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 校验发布令牌
+     *
+     * @param publishToken 请求头里的令牌
+     * @return 校验通过返回 {@code null}，否则返回应直接回给调用方的错误结果
+     */
+    private AjaxResult assertPublishToken(String publishToken) {
+        String expected = ConfigUtils.getString(ConfigConstants.MEAL_APP_PUBLISH_TOKEN);
+        if (StringUtils.isEmpty(expected)) {
+            return AjaxResult.error("发布令牌未配置：请在「系统管理 > 参数设置」配置参数 "
+                    + ConfigConstants.MEAL_APP_PUBLISH_TOKEN);
+        }
+        // 常量时间比较，避免通过响应时间推断令牌
+        if (StringUtils.isEmpty(publishToken) || !MessageDigest.isEqual(
+                publishToken.getBytes(StandardCharsets.UTF_8), expected.getBytes(StandardCharsets.UTF_8))) {
+            return AjaxResult.error(HttpStatus.UNAUTHORIZED, "发布令牌无效");
+        }
+        return null;
     }
 }

@@ -191,4 +191,13 @@ public class ConfigConstants
 
     /** 新菜提案 AI 自动审核在 system 提示词之后追加的判定说明 */
     public static final String AI_PROMPT_MEAL_DISH_AUDIT_SUFFIX = "ai.prompt.meal.dish.auditSuffix";
+
+    /**
+     * 点餐 App 版本发布令牌
+     *
+     * <p>给打包脚本（`meal-ui` 的 `publish:wgt`）用的静态令牌：请求头 {@code X-Publish-Token}
+     * 与之匹配即可调用发布接口（上传 wgt 到 R2 并新建版本记录），不依赖登录、不参与验证码与人机校验。
+     * 为空表示未配置，发布接口一律拒绝。</p>
+     */
+    public static final String MEAL_APP_PUBLISH_TOKEN = "meal.app.publishToken";
 }
