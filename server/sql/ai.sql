@@ -13,7 +13,8 @@
 --   ai_call_log     调用记录（每次尝试一条）
 --   ai_image_asset  生成图资产（便于后续清理对象存储与统计）
 --
--- 同时写入 ai.* 参数配置、四个后台菜单与按钮权限。
+-- 同时写入 ai.* 参数配置、四个后台菜单与按钮权限，
+-- 以及 meal.* 一键 AI 的场景路由种子（需已有可用模型，否则跳过）。
 --
 -- 幂等：建表用 drop + create；参数与菜单先 delete 再 insert，可重复执行。
 -- 执行后请到「系统管理 > 参数设置」确认 ai.enabled 仍为关闭状态，
@@ -178,7 +179,33 @@ values ('raw-http', '原生异步文生图', 'raw-http', null,
         'Spring AI 未覆盖的异步文生图接口，自行实现提交与轮询；接入点必须在渠道上指定', 'admin', sysdate());
 
 -- ----------------------------------------------------------------------------
--- 8. 参数配置（ai.*）
+-- 8. 业务场景路由种子（meal.* 一键 AI）
+--
+-- 只做「有可用模型时的便利初始化」：ai_model 由后台录入，本脚本执行时若还没有
+-- 对应能力的启用模型，这两条 select 会插入 0 行，不影响脚本执行；之后可在
+-- 「AI 管理 > 场景路由」里手工维护。
+-- 场景标识与 module-meal 代码里写死的常量一致，不要改名。
+-- ----------------------------------------------------------------------------
+delete from ai_scene_route where scene in ('meal.dish.generate', 'meal.dish.cover');
+
+-- 对话补齐：优先名为 deepseek-flash 的对话模型，否则取首个启用的对话模型
+insert into ai_scene_route (scene, capability, primary_model_id, params, enabled, remark, create_by, create_time)
+select 'meal.dish.generate', 'CHAT', m.id, '{"temperature":0.7}', 1, '菜品一键AI-文本补齐', 'admin', sysdate()
+from ai_model m
+where m.capability = 'CHAT' and m.enabled = 1
+order by (m.model_name = 'deepseek-flash') desc, m.id asc
+limit 1;
+
+-- 封面图：取首个启用的文生图模型；没有可用文生图模型时不写入（接口按未配置降级）
+insert into ai_scene_route (scene, capability, primary_model_id, params, enabled, remark, create_by, create_time)
+select 'meal.dish.cover', 'IMAGE', m.id, '{"size":"1024*1024","styleSuffixKey":"recipe.photo"}', 1, '菜品一键AI-封面图', 'admin', sysdate()
+from ai_model m
+where m.capability = 'IMAGE' and m.enabled = 1
+order by m.id asc
+limit 1;
+
+-- ----------------------------------------------------------------------------
+-- 9. 参数配置（ai.*）
 -- ----------------------------------------------------------------------------
 delete from sys_config where config_key in (
   'ai.enabled',
@@ -305,7 +332,7 @@ values ('AI-新菜审核提示词追加', 'ai.prompt.meal.dish.auditSuffix',
         'Y', 'admin', sysdate(), '仅「新菜提案 AI 自动审核」使用，追加在菜品补全提示词之后；留空则用代码内缺省值');
 
 -- ----------------------------------------------------------------------------
--- 9. 菜单与按钮权限
+-- 10. 菜单与按钮权限
 -- 不硬编码 menu_id：sys_menu 的 auto_increment 与既有数据无关，写死会撞车。
 -- 先按名称捕获或新建「AI 管理」目录，再用 LAST_INSERT_ID() 逐级捕获新建菜单的 ID。
 -- ----------------------------------------------------------------------------

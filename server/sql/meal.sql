@@ -1,9 +1,11 @@
 -- ============================================================
 -- meal.sql — 家庭点餐模块脚本（module-meal）
 --
--- 内容：七张业务表的建表、后台菜单与三个家庭角色，以及公共菜谱初始/扩展 seed。
+-- 内容：七张业务表的建表、后台菜单与三个家庭角色（家庭管理员额外获得管理端
+--       「系统管理 > 用户管理」授权，用于维护本家庭成员），以及公共菜谱初始/扩展 seed。
 --       由原 meal_20260922 / meal_notify_20260929 / meal_seed_20260928 合并而来，
---       其中 accept_user_id 已并入 meal_order 建表（原为独立 ALTER 增量）。
+--       其中 accept_user_id 已并入 meal_order 建表（原为独立 ALTER 增量），
+--       meal_proposal 的标签/耗时/难度/用料/做法/小贴士扩展列已并入建表。
 --
 -- 七张表：
 --   meal_category     菜品分类，dept_id=0 为平台公共分类，否则为该家庭私有分类
@@ -320,6 +322,18 @@ where perms in ('meal:dish:list', 'meal:dish:query', 'meal:dish:add', 'meal:dish
 insert into sys_role_menu (role_id, menu_id) values (@managerRoleId, @mealDirId);
 insert into sys_role_menu (role_id, menu_id)
 select @managerRoleId, menu_id from sys_menu where perms like 'meal:%';
+
+-- 家庭管理员额外获得管理端「系统管理 > 用户管理」的菜单与按钮，用于增删改本家庭成员。
+-- 数据范围仍是 data_scope='3'（本部门），用户列表只会返回本家庭成员，新增时归属部门
+-- 固定为登录者自己的家庭；不授予 export / import / resetPwd（家庭场景用不到）。
+insert into sys_role_menu (role_id, menu_id)
+select @managerRoleId, menu_id from sys_menu
+where perms in ('system:user:list', 'system:user:query', 'system:user:add', 'system:user:edit', 'system:user:remove');
+
+-- 只挂子菜单不挂父目录，侧边栏不会渲染出该菜单，因此按「用户管理」菜单的 parent_id 反查父目录
+insert into sys_role_menu (role_id, menu_id)
+select distinct @managerRoleId, parent_id from sys_menu
+where perms = 'system:user:list' and parent_id is not null and parent_id <> 0;
 
 -- ----------------------------
 -- 10、公共菜谱分类（dept_id = 0，所有家庭可见）
