@@ -1,13 +1,13 @@
 -- ============================================================
 -- meal.sql — 家庭点餐模块脚本（module-meal）
 --
--- 内容：七张业务表的建表、后台菜单与三个家庭角色（家庭管理员额外获得管理端
+-- 内容：八张业务表的建表、后台菜单与三个家庭角色（家庭管理员额外获得管理端
 --       「系统管理 > 用户管理」授权，用于维护本家庭成员），以及公共菜谱初始/扩展 seed。
 --       由原 meal_20260922 / meal_notify_20260929 / meal_seed_20260928 合并而来，
 --       其中 accept_user_id 已并入 meal_order 建表（原为独立 ALTER 增量），
 --       meal_proposal 的标签/耗时/难度/用料/做法/小贴士扩展列已并入建表。
 --
--- 七张表：
+-- 八张表：
 --   meal_category     菜品分类，dept_id=0 为平台公共分类，否则为该家庭私有分类
 --   meal_dish         菜品，dept_id=0 为平台公共菜谱，否则为该家庭私有菜
 --   meal_order        订单主表，只有下单时间（没有预约用餐时间）
@@ -15,6 +15,7 @@
 --   meal_review       评价，一单一评（order_id 唯一约束）
 --   meal_proposal     新菜提案，审核通过时自动往 meal_dish 落一条（source=1）
 --   meal_category_ref 菜品/提案与分类的多对多关联，biz_type 区分（1=菜品 2=提案）
+--   meal_app_version  App（meal-ui）wgt 资源包版本，客户端启动时据此检测热更新
 --
 -- 菜品与分类承载「公共数据 + 家庭私有数据」，因此不走 @DataScope（数据权限只会
 -- 拼出本部门，会把 dept_id=0 的公共数据一起过滤掉），隔离条件在 Mapper XML 里手写。
@@ -203,7 +204,37 @@ create table meal_category_ref (
 ) engine=innodb comment = '点餐-分类关联（菜品/提案共用）';
 
 -- ----------------------------
--- 8、后台菜单
+-- 8、App 版本（wgt 资源热更新）
+--
+-- 一条记录 = 一个已上传到对象存储（R2）的 wgt 应用资源包。客户端启动时上报自己的
+-- 「版本名称 + 版本号」，服务端取 status='0'（已发布）中 version_code 最大的一条判定是否有更新：
+-- 版本号更大，或版本号相同但版本名称不同，都视为有新版本；版本号更小则不提示降级。
+-- 只服务 wgt 资源热更新，不承载整包（apk/ipa）升级，因此没有整包下载地址列。
+-- 版本记录是平台级配置（不分家庭），不走 @DataScope。
+-- ----------------------------
+drop table if exists meal_app_version;
+create table meal_app_version (
+  version_id   bigint(20)   not null auto_increment    comment '版本记录ID',
+  version_name varchar(32)  not null                   comment '版本名称（展示用）',
+  version_code int(11)      not null                   comment '版本序号（比较基准，整数递增）',
+  wgt_url      varchar(500) not null                   comment 'wgt 资源包地址（R2）',
+  wgt_size     bigint(20)   default 0                  comment '资源包字节大小',
+  file_name    varchar(255) default ''                 comment '上传时的原始文件名',
+  update_log   text                                    comment '更新说明',
+  force_update char(1)      default '0'                comment '是否强制更新（0否 1是）',
+  status       char(1)      default '0'                comment '发布状态（0已发布 1停用）',
+  del_flag     char(1)      default '0'                comment '删除标记（0存在 2删除）',
+  create_by    varchar(64)  default ''                 comment '创建者',
+  create_time  datetime                                comment '创建时间',
+  update_by    varchar(64)  default ''                 comment '更新者',
+  update_time  datetime                                comment '更新时间',
+  remark       varchar(500) default null               comment '备注',
+  primary key (version_id),
+  key idx_meal_app_version_code (version_code, status, del_flag)
+) engine=innodb auto_increment=1 comment = '点餐-App 版本（wgt 热更新）';
+
+-- ----------------------------
+-- 9、后台菜单
 --
 -- 不硬编码 menu_id：sys_menu 的 auto_increment 与既有数据无关，写死会撞车。
 -- 先按名称捕获或新建「点餐管理」目录，再用 LAST_INSERT_ID() 逐级捕获新建菜单的 ID。
@@ -240,6 +271,11 @@ insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame
 values ('新菜审核', @mealDirId, '5', 'proposal', 'meal/proposal/index', 1, 0, 'C', '0', '0', 'meal:proposal:list', 'edit', 'admin', sysdate(), '新菜审核菜单');
 
 select @mealProposalMenuId := LAST_INSERT_ID();
+
+insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+values ('App 版本管理', @mealDirId, '6', 'appversion', 'meal/appversion/index', 1, 0, 'C', '0', '0', 'meal:appVersion:list', 'download', 'admin', sysdate(), 'App 版本管理菜单（wgt 热更新）');
+
+select @mealAppVersionMenuId := LAST_INSERT_ID();
 
 -- 菜品按钮
 insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
@@ -285,8 +321,20 @@ values ('提案审核', @mealProposalMenuId, '2', '#', '', 1, 0, 'F', '0', '0', 
 insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 values ('提案删除', @mealProposalMenuId, '3', '#', '', 1, 0, 'F', '0', '0', 'meal:proposal:remove', '#', 'admin', sysdate(), '');
 
+-- App 版本按钮
+insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+values ('版本查询', @mealAppVersionMenuId, '1', '#', '', 1, 0, 'F', '0', '0', 'meal:appVersion:query', '#', 'admin', sysdate(), '');
+insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+values ('版本新增', @mealAppVersionMenuId, '2', '#', '', 1, 0, 'F', '0', '0', 'meal:appVersion:add', '#', 'admin', sysdate(), '');
+insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+values ('版本修改', @mealAppVersionMenuId, '3', '#', '', 1, 0, 'F', '0', '0', 'meal:appVersion:edit', '#', 'admin', sysdate(), '');
+insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+values ('版本删除', @mealAppVersionMenuId, '4', '#', '', 1, 0, 'F', '0', '0', 'meal:appVersion:remove', '#', 'admin', sysdate(), '');
+insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+values ('资源包上传', @mealAppVersionMenuId, '5', '#', '', 1, 0, 'F', '0', '0', 'meal:appVersion:upload', '#', 'admin', sysdate(), '上传 wgt 资源包到 R2');
+
 -- ----------------------------
--- 9、三个家庭角色
+-- 10、三个家庭角色
 --
 -- data_scope 一律用 '3'（本部门数据权限）：订单/评价/提案的 list 查询靠它隔离到本家庭。
 -- role_key 是点餐端判断「是不是厨师」的依据（/getInfo 返回的 roles 里带 meal_chef）。
@@ -336,7 +384,7 @@ select distinct @managerRoleId, parent_id from sys_menu
 where perms = 'system:user:list' and parent_id is not null and parent_id <> 0;
 
 -- ----------------------------
--- 10、公共菜谱分类（dept_id = 0，所有家庭可见）
+-- 11、公共菜谱分类（dept_id = 0，所有家庭可见）
 --
 -- 19 个公共分类，按「类型（荤菜/半荤半素/素菜）+ 食材（肉/鱼/蛋/蔬菜/豆制品）+
 -- 做法（炒/炖/炸/煮/蒸/烤/凉拌/卤/汤）+ 热菜 + 地方口味（岷县）」组织。
@@ -365,7 +413,7 @@ values
 (0, '汤',       '🥣', 19, '0', '0', 'admin', sysdate(), '公共分类');
 
 -- ----------------------------
--- 11、公共菜谱（dept_id = 0，所有家庭可见）
+-- 12、公共菜谱（dept_id = 0，所有家庭可见）
 --
 -- 42 道完整菜谱（含封面/简介/标签/耗时/难度/份量/热量/用料/做法/小贴士）。
 -- 分类归属统一在文末写入 meal_category_ref；本脚本 drop 重建，重复执行即重置为初始数据。
