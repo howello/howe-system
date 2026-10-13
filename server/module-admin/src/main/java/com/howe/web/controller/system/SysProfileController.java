@@ -1,5 +1,6 @@
 package com.howe.web.controller.system;
 
+import java.io.IOException;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import com.howe.ai.storage.AiImageCompressor;
 import com.howe.common.annotation.Log;
 import com.howe.common.config.YmlConfig;
 import com.howe.common.core.controller.BaseController;
@@ -20,12 +22,14 @@ import com.howe.common.core.domain.AjaxResult;
 import com.howe.common.core.domain.entity.SysUser;
 import com.howe.common.core.domain.model.LoginUser;
 import com.howe.common.enums.BusinessType;
+import com.howe.common.exception.file.InvalidExtensionException;
 import com.howe.common.storage.StorageService;
 import com.howe.common.utils.DateUtils;
 import com.howe.common.utils.SecurityUtils;
 import com.howe.common.utils.StringUtils;
 import com.howe.common.utils.file.FileUploadUtils;
 import com.howe.common.utils.file.MimeTypeUtils;
+import com.howe.common.utils.uuid.IdUtils;
 import com.howe.framework.web.service.TokenService;
 import com.howe.system.service.ISysUserService;
 
@@ -132,14 +136,14 @@ public class SysProfileController extends BaseController
      * 头像上传
      */
     @Log(title = "用户头像", businessType = BusinessType.UPDATE)
-    @Operation(summary = "上传用户头像", description = "上传成功后更新用户头像并清理旧头像文件，返回头像访问地址")
+    @Operation(summary = "上传用户头像", description = "上传前压缩图片，成功后更新用户头像并清理旧头像文件，返回头像访问地址")
     @PostMapping("/avatar")
     public AjaxResult avatar(@Parameter(description = "头像文件") @RequestParam("avatarfile") MultipartFile file) throws Exception
     {
         if (!file.isEmpty())
         {
             LoginUser loginUser = getLoginUser();
-            String avatar = FileUploadUtils.uploadTo(YmlConfig.AVATAR_DIR, file, MimeTypeUtils.IMAGE_EXTENSION, true);
+            String avatar = storeCompressedAvatar(file);
             if (userService.updateUserAvatar(loginUser.getUserId(), avatar))
             {
                 String oldAvatar = loginUser.getUser().getAvatar();
@@ -157,5 +161,28 @@ public class SysProfileController extends BaseController
             }
         }
         return error("上传图片异常，请联系管理员");
+    }
+
+    /**
+     * 压缩并转存头像
+     *
+     * <p>上传的原始头像常有数 MB，直接转存既浪费对象存储又拖慢各端加载。这里沿用既有图片校验后，
+     * 用 {@link AiImageCompressor} 压缩（长边缩到 1024px 并按质量阶梯压成 JPEG，有透明通道则保留 PNG，
+     * 目标 ≤ 500KB），再以压缩后的后缀写入对象存储并返回可访问地址。无法解码时原样转存，
+     * 压缩失败不影响上传。</p>
+     *
+     * @param file 上传的头像文件
+     * @return 图床可访问地址（R2 模式）或 {@code /profile} 相对路径（本地存储模式）
+     * @throws IOException 读取上传流出错
+     * @throws InvalidExtensionException 非图片扩展名
+     */
+    private String storeCompressedAvatar(MultipartFile file) throws IOException, InvalidExtensionException {
+        // 沿用既有校验：仅允许图片扩展名、限制文件大小
+        FileUploadUtils.assertAllowed(file, MimeTypeUtils.IMAGE_EXTENSION);
+        AiImageCompressor.Compressed compressed = AiImageCompressor.compress(
+                file.getBytes(), FileUploadUtils.getExtension(file));
+        String objectKey = DateUtils.datePath() + "/" + IdUtils.fastSimpleUUID() + "." + compressed.extension();
+        return FileUploadUtils.uploadBytes(YmlConfig.AVATAR_DIR, objectKey,
+                compressed.bytes(), MimeTypeUtils.getContentType(compressed.extension()));
     }
 }
