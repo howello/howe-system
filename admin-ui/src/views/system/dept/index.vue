@@ -100,7 +100,8 @@
                         :data="deptOptions"
                         :props="{ value: 'deptId', label: 'deptName', children: 'children' }"
                         value-key="deptId"
-                        placeholder="选择上级部门"
+                        placeholder="选择上级部门，不选则为顶级部门"
+                        clearable
                         check-strictly
                      />
                   </el-form-item>
@@ -178,7 +179,6 @@ const data = reactive({
     status: undefined
   } as DeptQueryParams,
   rules: {
-    parentId: [{ required: true, message: "上级部门不能为空", trigger: "blur" }],
     deptName: [{ required: true, message: "部门名称不能为空", trigger: "blur" }],
     orderNum: [{ required: true, message: "显示排序不能为空", trigger: "blur" }],
     email: [{ type: "email", message: "请输入正确的邮箱地址", trigger: ["blur", "change"] }],
@@ -269,6 +269,10 @@ function handleUpdate(row: SysDept) {
 function submitForm() {
   proxy.$refs["deptRef"].validate((valid: boolean) => {
     if (valid) {
+      // 未选择上级部门时，作为顶级部门（parentId = 0）
+      if (form.value.parentId == undefined) {
+        form.value.parentId = 0
+      }
       if (form.value.deptId != undefined) {
         updateDept(form.value).then(() => {
           proxy.$modal.msgSuccess("修改成功")
