@@ -200,4 +200,40 @@ public class ConfigConstants
      * 为空表示未配置，发布接口一律拒绝。</p>
      */
     public static final String MEAL_APP_PUBLISH_TOKEN = "meal.app.publishToken";
+
+    /** 文件分享：本地缓存大小上限（字节，超过落 R2） */
+    public static final String SHARE_CACHE_LOCAL_MAX_SIZE = "share.cache.localMaxSize";
+
+    /** 文件分享：文档白名单（这些扩展名且不超上限的文件落本地），逗号分隔 */
+    public static final String SHARE_CACHE_DOC_EXTS = "share.cache.docExts";
+
+    /** 文件分享：缓存失败自动重试开关 */
+    public static final String SHARE_CACHE_RETRY_ENABLED = "share.cache.retryEnabled";
+
+    /** 文件分享：缓存最大重试次数 */
+    public static final String SHARE_CACHE_MAX_RETRY = "share.cache.maxRetry";
+
+    /** 文件分享：Redis 路由缓存开关 */
+    public static final String SHARE_ROUTE_CACHE_ENABLED = "share.route.cacheEnabled";
+
+    /** 文件分享：无过期时间时的路由缓存 TTL（秒） */
+    public static final String SHARE_ROUTE_TTL = "share.route.ttl";
+
+    /** 文件分享：密码尝试次数上限 */
+    public static final String SHARE_PASSWORD_MAX_ATTEMPTS = "share.password.maxAttempts";
+
+    /** 文件分享：密码尝试统计窗口（秒） */
+    public static final String SHARE_PASSWORD_WINDOW_SECONDS = "share.password.windowSeconds";
+
+    /** 文件分享：会话票据有效期（秒） */
+    public static final String SHARE_TICKET_TTL = "share.ticket.ttl";
+
+    /** 文件分享：单文件下载上限（字节） */
+    public static final String SHARE_DOWNLOAD_MAX_SIZE = "share.download.maxSize";
+
+    /** 文件分享：访问日志保留天数 */
+    public static final String SHARE_ACCESS_LOG_RETAIN_DAYS = "share.access.log.retainDays";
+
+    /** 文件分享：短链对外基址（末尾带 /），用于拼列表展示的短链 */
+    public static final String SHARE_BASE_URL = "share.baseUrl";
 }

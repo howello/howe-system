@@ -22,6 +22,12 @@ howe:
     # 用于 AES-GCM 加解密。只从环境变量读，不写死在这里、也不入库。
     # 生成方式：openssl rand -base64 32
     secret-key: ${AI_SECRET_KEY:}
+  # 文件分享短链
+  share:
+    # WebDAV 源密码（share_source.password_cipher）的主密钥：Base64 编码的 16/24/32 字节，
+    # 用于 AES-GCM 加解密。只从环境变量读，不写死在这里、也不入库。
+    # 生成方式：openssl rand -base64 32
+    secret-key: ${SHARE_SECRET_KEY:}
 
 # 开发环境配置
 server:

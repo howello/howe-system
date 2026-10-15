@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex,nofollow" />
+<title>文件分享</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-1: #eef2fb;
+  --bg-2: #e3eaf7;
+  --card: #ffffff;
+  --ink: #16203a;
+  --ink-2: #5a6478;
+  --ink-3: #8d97ab;
+  --line: #e9edf5;
+  --line-2: #f1f4fa;
+  --accent: #3b6ef5;
+  --accent-2: #6d8dff;
+  --accent-soft: #ecf1ff;
+  --warn: #b26a00;
+  --warn-soft: #fff6e5;
+  --danger: #e5484d;
+  --danger-soft: #fdecec;
+  --shadow: 0 24px 60px rgba(26, 45, 92, .13), 0 6px 16px rgba(26, 45, 92, .06);
+  --shadow-sm: 0 4px 14px rgba(26, 45, 92, .07);
+  --radius: 22px;
+}
+
+html.dark {
+  --bg-1: #161d2e;
+  --bg-2: #0c1019;
+  --card: #151b29;
+  --ink: #e9eef8;
+  --ink-2: #a5afc3;
+  --ink-3: #6d778d;
+  --line: #242c3e;
+  --line-2: #1d2434;
+  --accent: #6d8dff;
+  --accent-2: #8aa4ff;
+  --accent-soft: #1d2740;
+  --warn: #e3a94a;
+  --warn-soft: #2a2113;
+  --danger: #ff6b6f;
+  --danger-soft: #2e1a1c;
+  --shadow: 0 24px 60px rgba(0, 0, 0, .55), 0 6px 16px rgba(0, 0, 0, .4);
+  --shadow-sm: 0 4px 14px rgba(0, 0, 0, .4);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+  color: var(--ink);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+  background:
+    radial-gradient(1100px 520px at 50% -12%, var(--bg-1), transparent 70%),
+    radial-gradient(900px 500px at 90% 110%, var(--bg-1), transparent 65%),
+    var(--bg-2);
+  transition: background .35s ease, color .35s ease;
+  -webkit-font-smoothing: antialiased;
+}
+
+.card {
+  width: min(480px, 100%);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.card-top {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 15px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.brand-mark {
+  width: 30px; height: 30px; border-radius: 9px;
+  display: grid; place-items: center;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff; flex: none;
+  box-shadow: 0 4px 10px rgba(59, 110, 245, .35);
+}
+.brand-text { font-size: 13px; font-weight: 650; }
+.brand-sub { font-size: 11px; color: var(--ink-3); margin-top: 1px; }
+.card-body { padding: 22px 20px 24px; }
+.card-foot {
+  padding: 12px 20px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--ink-3);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.state { display: none; }
+.state.active { display: block; animation: fade .28s ease; }
+@keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.skeleton { display: grid; gap: 12px; }
+.sk {
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--line-2) 25%, var(--line) 37%, var(--line-2) 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+.sk-head { display: flex; align-items: center; gap: 12px; }
+.sk-ico { width: 46px; height: 46px; border-radius: 12px; flex: none; }
+.sk-lines { flex: 1; display: grid; gap: 8px; }
+.sk-l1 { height: 13px; width: 62%; }
+.sk-l2 { height: 11px; width: 42%; }
+.sk-block { height: 190px; border-radius: 14px; margin-top: 4px; }
+.sk-btn { height: 44px; border-radius: 12px; margin-top: 6px; }
+.loading-hint {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin-top: 16px; font-size: 12.5px; color: var(--ink-3);
+}
+.spinner {
+  width: 15px; height: 15px; border-radius: 50%;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  animation: spin .8s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.state-illust {
+  width: 66px; height: 66px; border-radius: 20px;
+  display: grid; place-items: center;
+  margin: 8px auto 16px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.state-illust.warn { background: var(--warn-soft); color: var(--warn); }
+.state-illust.danger { background: var(--danger-soft); color: var(--danger); }
+.state-title { text-align: center; font-size: 17px; font-weight: 680; }
+.state-desc { text-align: center; font-size: 13px; color: var(--ink-2); margin-top: 8px; line-height: 1.65; }
+.err-code {
+  display: inline-block; margin: 16px auto 0; padding: 4px 10px;
+  font-size: 11px; font-family: ui-monospace, Menlo, monospace;
+  color: var(--ink-3); background: var(--line-2);
+  border-radius: 7px; border: 1px solid var(--line);
+}
+.center { text-align: center; }
+
+.pwd-file {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin-top: 14px; padding: 10px 14px;
+  background: var(--line-2); border: 1px solid var(--line);
+  border-radius: 12px; font-size: 13px; color: var(--ink-2);
+  word-break: break-all;
+}
+.pwd-form { display: grid; gap: 10px; margin-top: 18px; }
+.pwd-input {
+  width: 100%; height: 46px; padding: 0 14px;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: var(--card); color: var(--ink);
+  font-size: 15px; letter-spacing: .18em;
+  outline: none; transition: border-color .2s, box-shadow .2s;
+}
+.pwd-input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.pwd-input::placeholder { letter-spacing: normal; color: var(--ink-3); font-size: 14px; }
+.btn-primary {
+  height: 46px; border: none; border-radius: 12px; cursor: pointer;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff; font-size: 14.5px; font-weight: 620;
+  box-shadow: 0 8px 20px rgba(59, 110, 245, .3);
+  transition: transform .12s ease, box-shadow .2s ease;
+  font-family: inherit;
+}
+.btn-primary:hover { box-shadow: 0 10px 26px rgba(59, 110, 245, .4); }
+.btn-primary:active { transform: translateY(1px); }
+.form-err {
+  display: none; align-items: center; gap: 7px;
+  margin-top: 12px; padding: 9px 12px;
+  font-size: 12.5px; color: var(--danger);
+  background: var(--danger-soft); border-radius: 10px;
+}
+.form-err.show { display: flex; animation: fade .2s ease; }
+
+.caching-bar { height: 7px; border-radius: 999px; background: var(--line-2); overflow: hidden; margin: 20px 4px 0; }
+.caching-bar > i {
+  display: block; height: 100%; width: 40%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  animation: indeterminate 1.5s ease-in-out infinite;
+}
+@keyframes indeterminate { 0% { transform: translateX(-110%); } 100% { transform: translateX(280%); } }
+.poll-hint { text-align: center; font-size: 11.5px; color: var(--ink-3); margin-top: 14px; }
+
+.file-head { display: flex; align-items: center; gap: 12px; }
+.file-thumb {
+  width: 48px; height: 48px; border-radius: 13px; flex: none;
+  display: grid; place-items: center;
+  font-size: 10.5px; font-weight: 800; letter-spacing: .04em; color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+.file-name { font-size: 15px; font-weight: 650; line-height: 1.35; word-break: break-all; }
+.file-sub {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 5px;
+  margin-top: 5px; font-size: 12px; color: var(--ink-3);
+}
+.file-sub .dot { opacity: .5; }
+.file-sub .pill { padding: 2px 8px; border-radius: 999px; background: var(--line-2); color: var(--ink-2); font-size: 11px; }
+.file-sub .pill.burn { background: var(--warn-soft); color: var(--warn); }
+
+.preview { margin-top: 16px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--line-2); }
+.pv-image { display: grid; place-items: center; background: #0b1220; min-height: 160px; }
+.pv-image img { display: block; max-width: 100%; height: auto; }
+.pv-pdf { background: #f3f4f7; }
+.pdf-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; background: #fff; border-bottom: 1px solid #e6e8ee;
+  font-size: 11.5px; color: #5b6478;
+}
+.pv-pdf iframe { display: block; width: 100%; height: 460px; border: 0; background: #fff; }
+.pv-md { padding: 18px; background: var(--card); max-height: 460px; overflow: auto; }
+.md-article { font-size: 13.5px; line-height: 1.75; color: var(--ink); word-wrap: break-word; }
+.md-article h1, .md-article h2, .md-article h3 { margin: 14px 0 8px; line-height: 1.35; }
+.md-article h1 { font-size: 19px; } .md-article h2 { font-size: 16.5px; } .md-article h3 { font-size: 15px; }
+.md-article p { color: var(--ink-2); margin-bottom: 10px; }
+.md-article ul, .md-article ol { margin: 0 0 10px 20px; color: var(--ink-2); }
+.md-article li { margin-bottom: 4px; }
+.md-article a { color: var(--accent); }
+.md-article blockquote { margin: 0 0 10px; padding: 4px 12px; border-left: 3px solid var(--line); color: var(--ink-3); }
+.md-article code {
+  font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+  background: var(--line-2); border: 1px solid var(--line);
+  padding: 1px 6px; border-radius: 6px; color: var(--accent);
+}
+.md-article pre {
+  background: #0f1526; color: #cdd7ee; padding: 12px 14px;
+  border-radius: 10px; font-size: 12px; overflow: auto; margin-bottom: 10px;
+  font-family: ui-monospace, Menlo, monospace; line-height: 1.6;
+}
+.md-article pre code { background: transparent; border: 0; color: inherit; padding: 0; }
+.md-article img { max-width: 100%; }
+.md-article table { border-collapse: collapse; margin-bottom: 10px; }
+.md-article th, .md-article td { border: 1px solid var(--line); padding: 5px 9px; font-size: 12.5px; }
+
+.pv-text { background: #0f1526; max-height: 460px; overflow: auto; }
+.pv-text pre {
+  margin: 0; padding: 16px; color: #cdd7ee;
+  font-family: ui-monospace, Menlo, monospace; font-size: 12.5px;
+  line-height: 1.7; white-space: pre-wrap; word-break: break-word;
+}
+.pv-video { background: #0a0f1c; }
+.pv-video video { display: block; width: 100%; max-height: 460px; background: #000; }
+.pv-audio { padding: 20px 16px; background: var(--card); }
+.pv-audio audio { width: 100%; }
+.pv-other { padding: 30px 18px; display: grid; place-items: center; gap: 10px; background: var(--card); text-align: center; }
+.other-ico {
+  width: 60px; height: 60px; border-radius: 16px; display: grid; place-items: center;
+  font-size: 13px; font-weight: 800; color: #fff;
+  background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+  box-shadow: var(--shadow-sm);
+}
+.other-t { font-size: 13.5px; color: var(--ink-2); }
+.other-s { font-size: 12px; color: var(--ink-3); }
+
+.burn-warn {
+  display: none; align-items: center; gap: 8px;
+  margin-top: 14px; padding: 10px 13px;
+  background: var(--warn-soft); color: var(--warn);
+  border-radius: 11px; font-size: 12.5px; line-height: 1.5;
+}
+.burn-warn.show { display: flex; }
+
+.ready-actions { display: flex; gap: 10px; margin-top: 16px; }
+.download-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  height: 48px; border-radius: 13px; cursor: pointer; flex: 1;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff; font-size: 14.5px; font-weight: 620; text-decoration: none;
+  box-shadow: 0 10px 24px rgba(59, 110, 245, .32);
+  transition: transform .12s ease, box-shadow .2s ease;
+}
+.download-btn:hover { box-shadow: 0 12px 30px rgba(59, 110, 245, .42); }
+.download-btn:active { transform: translateY(1px); }
+.btn-ghost {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 48px; padding: 0 18px; border-radius: 13px; cursor: pointer;
+  background: var(--card); color: var(--ink); font-size: 14px; font-weight: 600;
+  border: 1px solid var(--line); font-family: inherit; white-space: nowrap;
+  transition: border-color .2s, background .2s, color .2s;
+}
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.btn-ghost[hidden] { display: none; }
+
+.fs { position: fixed; inset: 0; z-index: 100; background: var(--bg-2); display: none; flex-direction: column; }
+.fs.open { display: flex; animation: fsIn .22s ease; }
+@keyframes fsIn { from { opacity: 0; } to { opacity: 1; } }
+.fs-top {
+  flex: none; display: flex; align-items: center; gap: 14px; padding: 11px 18px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--card) 88%, transparent);
+  backdrop-filter: blur(14px) saturate(160%);
+}
+.fs-info { min-width: 0; flex: 1; }
+.fs-name { font-size: 14px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fs-sub { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
+.fs-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.icon-btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 13px;
+  border-radius: 10px; border: 1px solid var(--line); background: var(--card);
+  color: var(--ink); cursor: pointer; font-size: 13px; font-family: inherit; text-decoration: none;
+}
+.icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+.icon-btn.primary { border: none; color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+
+/* 配色切换图标：浅色显示月亮（点击转深色），深色显示太阳（点击转浅色） */
+.ic-sun { display: none; }
+html.dark .ic-sun { display: inline; }
+html.dark .ic-moon { display: none; }
+.fs-body { flex: 1; overflow: auto; position: relative; display: grid; place-items: center; padding: 0; }
+.fs-body img { max-width: 100%; max-height: calc(100vh - 60px); display: block; }
+.fs-body iframe { width: 100%; height: calc(100vh - 60px); border: 0; background: #fff; }
+.fs-body video { max-width: 100%; max-height: calc(100vh - 60px); }
+.fs-body .md-article { width: min(820px, 100%); font-size: 15px; line-height: 1.85; padding: 36px 24px; }
+.fs-body pre { margin: 0; padding: 34px 38px; width: 100%; color: #cdd7ee; background: #0f1526;
+  font-family: ui-monospace, Menlo, monospace; font-size: 13.5px; white-space: pre-wrap; word-break: break-word; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="card-top">
+    <div class="brand-mark">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/>
+        <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-text">安全文件分享</div>
+      <div class="brand-sub" id="brandSub">文件分享短链</div>
+    </div>
+    <button class="btn-ghost" id="themeBtn" type="button" title="切换配色" style="margin-left:auto;height:34px;padding:0 10px;">
+      <span class="ic-moon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.8A8.5 8.5 0 0 1 9.2 3.5a7 7 0 1 0 11.3 11.3z"/></svg></span>
+      <span class="ic-sun"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg></span>
+    </button>
+  </div>
+
+  <div class="card-body">
+
+    <!-- 加载中 -->
+    <section class="state active" data-state="loading">
+      <div class="skeleton">
+        <div class="sk-head">
+          <div class="sk sk-ico"></div>
+          <div class="sk-lines">
+            <div class="sk sk-l1"></div>
+            <div class="sk sk-l2"></div>
+          </div>
+        </div>
+        <div class="sk sk-block"></div>
+        <div class="sk sk-btn"></div>
+      </div>
+      <div class="loading-hint"><span class="spinner"></span> 正在加载分享…</div>
+    </section>
+
+    <!-- 密码态 -->
+    <section class="state" data-state="pwd">
+      <div class="state-illust">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="10.5" width="16" height="10" rx="2.5"/>
+          <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>
+          <circle cx="12" cy="15.5" r="1.2"/>
+        </svg>
+      </div>
+      <div class="state-title">此分享需要密码</div>
+      <div class="state-desc">请输入分享者提供的访问密码后查看文件</div>
+      <div class="pwd-file" id="pwdFileName"></div>
+      <form class="pwd-form" id="pwdForm">
+        <input class="pwd-input" id="pwdInput" type="password" placeholder="请输入访问密码" autocomplete="off" />
+        <button class="btn-primary" type="submit">访问文件</button>
+      </form>
+      <div class="form-err" id="pwdErr">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <circle cx="12" cy="12" r="9"/><path d="M12 8v4"/><path d="M12 16h.01"/>
+        </svg>
+        <span id="pwdErrText">密码错误，请重试</span>
+      </div>
+    </section>
+
+    <!-- 缓存中 -->
+    <section class="state" data-state="caching">
+      <div class="state-illust"><span class="spinner" style="width:26px;height:26px;border-width:3px;"></span></div>
+      <div class="state-title">文件准备中…</div>
+      <div class="state-desc">正在从云端缓存文件，通常几秒内完成，请稍候</div>
+      <div class="caching-bar"><i></i></div>
+      <div class="poll-hint">状态轮询中 · 每 3 秒自动刷新</div>
+    </section>
+
+    <!-- 失效态 -->
+    <section class="state" data-state="gone">
+      <div class="state-illust danger">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/><path d="M9 9l6 6"/><path d="M15 9l-6 6"/>
+        </svg>
+      </div>
+      <div class="state-title" id="goneTitle">链接已失效</div>
+      <div class="state-desc" id="goneDesc">该分享已过期或被分享者手动关闭，无法再访问</div>
+      <div class="center"><span class="err-code">HTTP 410 · Gone</span></div>
+    </section>
+
+    <!-- 就绪态 -->
+    <section class="state" data-state="ready">
+      <div class="file-head">
+        <div class="file-thumb" id="fileThumb">FILE</div>
+        <div style="min-width:0;">
+          <div class="file-name" id="fileName"></div>
+          <div class="file-sub" id="fileSub"></div>
+        </div>
+      </div>
+      <div class="preview" id="preview"></div>
+      <div class="burn-warn" id="burnWarn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;">
+          <path d="M12 3c1.5 3 4 4 4 7a4 4 0 0 1-8 0c0-1 .4-1.8 1-2.6C9 9 9.5 10 10.5 10.5 10 8 11 5 12 3z"/>
+          <path d="M12 21a5 5 0 0 0 5-5"/>
+        </svg>
+        <span>阅后即焚：本次会话关闭后，该文件将立即失效</span>
+      </div>
+      <div class="ready-actions">
+        <button class="btn-ghost" id="fsBtn" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9"/>
+            <path d="M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9"/>
+            <path d="M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15"/>
+            <path d="M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/>
+          </svg>
+          全屏查看
+        </button>
+        <a class="download-btn" id="downloadBtn" href="#">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 4v11"/><path d="M7.5 11.5 12 16l4.5-4.5"/><path d="M5 20h14"/>
+          </svg>
+          下载文件
+        </a>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="card-foot">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="4" y="10.5" width="16" height="10" rx="2.5"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>
+    </svg>
+    文件经加密通道传输 · 由 s.wyantao.com 提供
+  </div>
+</div>
+
+<!-- 全屏查看层 -->
+<div class="fs" id="fs">
+  <div class="fs-top">
+    <div class="fs-info">
+      <div class="fs-name" id="fsName"></div>
+      <div class="fs-sub" id="fsSub"></div>
+    </div>
+    <div class="fs-actions">
+      <button class="icon-btn" id="fsTheme" type="button" title="切换配色">
+        <span class="ic-moon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.8A8.5 8.5 0 0 1 9.2 3.5a7 7 0 1 0 11.3 11.3z"/></svg></span>
+        <span class="ic-sun"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg></span>
+      </button>
+      <a class="icon-btn primary" id="fsDownload" href="#">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 4v11"/><path d="M7.5 11.5 12 16l4.5-4.5"/><path d="M5 20h14"/>
+        </svg>
+        下载
+      </a>
+      <button class="icon-btn" id="fsExit" type="button">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 4v3.5A1.5 1.5 0 0 1 7.5 9H4"/>
+          <path d="M20 9h-3.5A1.5 1.5 0 0 1 15 7.5V4"/>
+          <path d="M15 20v-3.5a1.5 1.5 0 0 1 1.5-1.5H20"/>
+          <path d="M4 15h3.5A1.5 1.5 0 0 1 9 16.5V20"/>
+        </svg>
+        退出全屏
+      </button>
+    </div>
+  </div>
+  <div class="fs-body" id="fsBody"></div>
+</div>
+
+<script>window.__SHARE_CODE__ = "@@SHARE_CODE@@";</script>
+<script src="/share-page/vendor/marked.min.js"></script>
+<script src="/share-page/vendor/purify.min.js"></script>
+<script>
+(function () {
+  var CODE = (function () {
+    // 服务端渲染 /s/{code} 时会把真实短码注入到上面的字符串字面量里；
+    // 直接打开本静态文件时占位符仍在，按 Base62 形状判定即可回退到从地址栏解析。
+    // 注意：占位符不能与 JS 标识符 window.__SHARE_CODE__ 重合，否则替换会破坏属性名。
+    var injected = window.__SHARE_CODE__;
+    if (typeof injected === 'string' && /^[0-9A-Za-z]+$/.test(injected)) {
+      return injected;
+    }
+    var parts = location.pathname.split('/').filter(Boolean);
+    if (parts.length && parts[parts.length - 1] !== 'index.html') {
+      return parts[parts.length - 1];
+    }
+    return '';
+  })();
+
+  var opened = false;
+  var polling = null;
+  var detail = null;
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  function show(state) {
+    var states = document.querySelectorAll('.state');
+    for (var i = 0; i < states.length; i++) {
+      states[i].classList.toggle('active', states[i].getAttribute('data-state') === state);
+    }
+  }
+
+  function fmtSize(bytes) {
+    if (!bytes && bytes !== 0) return '';
+    var units = ['B', 'KB', 'MB', 'GB'];
+    var n = bytes, i = 0;
+    while (n >= 1024 && i < units.length - 1) { n = n / 1024; i++; }
+    return (i === 0 ? n : n.toFixed(1)) + ' ' + units[i];
+  }
+
+  function fmtDate(v) {
+    if (!v) return '';
+    return String(v).replace('T', ' ').slice(0, 16);
+  }
+
+  function api(url, options) {
+    return fetch(url, options).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (body) {
+        return { status: res.status, body: body };
+      });
+    });
+  }
+
+  function ext(name) {
+    var i = (name || '').lastIndexOf('.');
+    return i >= 0 ? name.slice(i + 1).toLowerCase() : '';
+  }
+
+  function load() {
+    api('/share/public/detail?code=' + encodeURIComponent(CODE)).then(function (r) {
+      detail = (r.body && r.body.data) || null;
+      if (!detail) {
+        gone('链接不存在', '未找到对应的分享');
+        return;
+      }
+      render(detail);
+    }).catch(function () {
+      gone('加载失败', '网络异常，请稍后重试');
+    });
+  }
+
+  function render(d) {
+    $('brandSub').textContent = location.host;
+    switch (d.state) {
+      case 'caching':
+        show('caching');
+        startPolling();
+        return;
+      case 'failed':
+        gone('文件准备失败', '源文件缓存失败，请联系分享者重新缓存');
+        return;
+      case 'expired':
+        gone('链接已过期', '该分享已超过有效期，无法再访问');
+        return;
+      case 'invalid':
+        gone('链接已失效', '该分享已被分享者手动关闭，无法再访问');
+        return;
+      case 'burned':
+        gone('文件已焚毁', '该分享为阅后即焚，已被访问并销毁');
+        return;
+      case 'exhausted':
+        gone('查看次数已用尽', '该分享的可查看次数已达到上限');
+        return;
+      case 'notfound':
+        gone('链接不存在', '未找到对应的分享');
+        return;
+      default:
+        stopPolling();
+    }
+    if (d.needPwd && !d.verified) {
+      $('pwdFileName').textContent = d.fileName || '受保护的文件';
+      show('pwd');
+      return;
+    }
+    enterReady(d);
+  }
+
+  function enterReady(d) {
+    if (opened) { renderReady(d); return; }
+    opened = true;
+    api('/share/public/open?code=' + encodeURIComponent(CODE)).then(function (r) {
+      if (r.body && r.body.code === 200) {
+        var data = r.body.data || {};
+        d.remainingViews = data.remainingViews;
+        if (data.burned) { d.burnAfterRead = true; }
+        renderReady(d);
+      } else {
+        var msg = (r.body && r.body.msg) || '无法访问该分享';
+        gone('无法访问', msg);
+      }
+    }).catch(function () {
+      gone('加载失败', '网络异常，请稍后重试');
+    });
+  }
+
+  function renderReady(d) {
+    show('ready');
+    var e = (d.fileExt || '').toUpperCase() || 'FILE';
+    $('fileThumb').textContent = e;
+    $('fileThumb').style.background = 'linear-gradient(135deg, var(--accent), var(--accent-2))';
+    $('fileName').textContent = d.fileName || '未命名文件';
+
+    var sub = [];
+    if (d.fileSize != null) sub.push('<span>' + fmtSize(d.fileSize) + '</span>');
+    if (d.remainingViews == null) {
+      sub.push('<span class="dot">·</span><span>不限次数</span>');
+    } else {
+      sub.push('<span class="dot">·</span><span>剩余 ' + d.remainingViews + ' 次</span>');
+    }
+    if (d.expireAt) {
+      sub.push('<span class="dot">·</span><span>' + fmtDate(d.expireAt) + ' 过期</span>');
+    } else {
+      sub.push('<span class="dot">·</span><span>长期有效</span>');
+    }
+    if (d.burnAfterRead) sub.push('<span class="pill burn">阅后即焚</span>');
+    $('fileSub').innerHTML = sub.join('');
+
+    $('burnWarn').classList.toggle('show', !!d.burnAfterRead);
+    var fileUrl = '/share/public/file?code=' + encodeURIComponent(CODE);
+    var downloadUrl = '/share/public/download?code=' + encodeURIComponent(CODE);
+    $('downloadBtn').setAttribute('href', downloadUrl);
+    $('fsDownload').setAttribute('href', downloadUrl);
+    $('fsName').textContent = d.fileName || '';
+    $('fsSub').textContent = (d.fileSize != null ? fmtSize(d.fileSize) : '') + (d.burnAfterRead ? ' · 阅后即焚' : '');
+
+    var kind = kindOf(d);
+    $('fsBtn').hidden = (kind === 'other');
+    $('preview').innerHTML = previewHtml(kind, fileUrl, d);
+    $('fsBody').dataset.kind = kind;
+    $('fsBody').dataset.fileUrl = fileUrl;
+    if (kind === 'markdown' || kind === 'text') {
+      loadText(fileUrl, kind);
+    }
+    // 就绪后默认直接进入全屏查看（不支持在线预览的格式除外）
+    if (kind !== 'other') openFs();
+  }
+
+  function kindOf(d) {
+    var e = d.fileExt || '';
+    var ct = d.contentType || '';
+    if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].indexOf(e) >= 0 || ct.indexOf('image/') === 0) return 'image';
+    if (e === 'pdf' || ct === 'application/pdf') return 'pdf';
+    if (e === 'md' || e === 'markdown') return 'markdown';
+    if (['txt', 'log', 'json', 'xml', 'yml', 'yaml', 'csv', 'ini', 'conf'].indexOf(e) >= 0 || ct.indexOf('text/') === 0) return 'text';
+    if (['mp4', 'webm', 'ogv', 'mov', 'm4v'].indexOf(e) >= 0 || ct.indexOf('video/') === 0) return 'video';
+    if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'].indexOf(e) >= 0 || ct.indexOf('audio/') === 0) return 'audio';
+    return 'other';
+  }
+
+  function previewHtml(kind, fileUrl, d) {
+    switch (kind) {
+      case 'image':
+        return '<div class="pv-image"><img src="' + fileUrl + '" alt=""></div>';
+      case 'pdf':
+        return '<div class="pv-pdf"><div class="pdf-toolbar"><span>' + escapeHtml(d.fileName || '') + '</span><span>PDF</span></div>'
+          + '<iframe src="' + fileUrl + '" type="application/pdf"></iframe></div>';
+      case 'markdown':
+        return '<div class="pv-md"><div class="md-article" id="mdArticle">正在渲染…</div></div>';
+      case 'text':
+        return '<div class="pv-text"><pre id="textPre">正在加载…</pre></div>';
+      case 'video':
+        return '<div class="pv-video"><video controls preload="metadata" src="' + fileUrl + '"></video></div>';
+      case 'audio':
+        return '<div class="pv-audio"><audio controls src="' + fileUrl + '"></audio></div>';
+      default:
+        var e = (d.fileExt || '').toUpperCase() || 'FILE';
+        return '<div class="pv-other"><div class="other-ico">' + escapeHtml(e) + '</div>'
+          + '<div class="other-t">该格式暂不支持在线预览</div>'
+          + '<div class="other-s">请点击下方按钮下载后查看</div></div>';
+    }
+  }
+
+  function loadText(fileUrl, kind) {
+    fetch(fileUrl).then(function (res) { return res.text(); }).then(function (text) {
+      if (kind === 'markdown') {
+        var raw = (window.marked ? window.marked.parse(text) : escapeHtml(text));
+        var safe = (window.DOMPurify ? window.DOMPurify.sanitize(raw) : escapeHtml(text));
+        var el = $('mdArticle');
+        if (el) el.innerHTML = safe;
+        // 全屏层已打开时同步填充（默认全屏下先渲染占位、内容到达后回填）
+        var fsArt = document.querySelector('#fsBody .md-article');
+        if (fsArt) fsArt.innerHTML = safe;
+      } else {
+        var pre = $('textPre');
+        if (pre) pre.textContent = text;
+        var fsPre = document.querySelector('#fsBody pre');
+        if (fsPre) fsPre.textContent = text;
+      }
+    }).catch(function () {
+      var el = $('mdArticle') || $('textPre');
+      if (el) el.textContent = '加载失败';
+      var fsEl = document.querySelector('#fsBody .md-article') || document.querySelector('#fsBody pre');
+      if (fsEl) fsEl.textContent = '加载失败';
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function gone(title, desc) {
+    stopPolling();
+    $('goneTitle').textContent = title;
+    $('goneDesc').textContent = desc;
+    show('gone');
+  }
+
+  function startPolling() {
+    if (polling) return;
+    polling = setInterval(function () {
+      api('/share/public/detail?code=' + encodeURIComponent(CODE)).then(function (r) {
+        var d = (r.body && r.body.data) || null;
+        if (d && d.state !== 'caching') { stopPolling(); render(d); }
+      });
+    }, 3000);
+  }
+
+  function stopPolling() {
+    if (polling) { clearInterval(polling); polling = null; }
+  }
+
+  // 密码提交
+  $('pwdForm').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var pwd = $('pwdInput').value;
+    if (!pwd) return;
+    api('/share/public/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: CODE, password: pwd })
+    }).then(function (r) {
+      if (r.body && r.body.code === 200) {
+        $('pwdErr').classList.remove('show');
+        load();
+      } else {
+        $('pwdErrText').textContent = (r.body && r.body.msg) || '密码错误，请重试';
+        $('pwdErr').classList.add('show');
+      }
+    });
+  });
+
+  // 全屏查看（就绪后默认进入，也可由「全屏查看」按钮再次进入）
+  function openFs() {
+    var kind = $('fsBody').dataset.kind;
+    var fileUrl = $('fsBody').dataset.fileUrl;
+    var body = $('fsBody');
+    if (kind === 'markdown') {
+      var art = $('mdArticle');
+      body.innerHTML = '<div class="md-article">' + (art ? art.innerHTML : '') + '</div>';
+    } else if (kind === 'text') {
+      var pre = $('textPre');
+      body.innerHTML = '<pre>' + escapeHtml(pre ? pre.textContent : '') + '</pre>';
+    } else if (kind === 'image') {
+      body.innerHTML = '<img src="' + fileUrl + '" alt="">';
+    } else if (kind === 'pdf') {
+      body.innerHTML = '<iframe src="' + fileUrl + '" type="application/pdf"></iframe>';
+    } else if (kind === 'video') {
+      body.innerHTML = '<video controls autoplay src="' + fileUrl + '"></video>';
+    } else if (kind === 'audio') {
+      body.innerHTML = '<div style="padding:40px;width:min(640px,100%)"><audio controls style="width:100%" src="' + fileUrl + '"></audio></div>';
+    } else {
+      return;
+    }
+    $('fs').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  $('fsBtn').addEventListener('click', openFs);
+  $('fsExit').addEventListener('click', closeFs);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && $('fs').classList.contains('open')) closeFs();
+  });
+  function closeFs() {
+    $('fs').classList.remove('open');
+    $('fsBody').innerHTML = '';
+    document.body.style.overflow = '';
+  }
+
+  // 配色切换（卡片顶栏与全屏层内各一个，图标随深浅色切换）
+  function applyTheme(dark) {
+    document.documentElement.classList.toggle('dark', dark);
+    var tip = dark ? '切换到浅色' : '切换到深色';
+    var b1 = $('themeBtn');
+    var b2 = $('fsTheme');
+    if (b1) b1.title = tip;
+    if (b2) b2.title = tip;
+    try { localStorage.setItem('share-theme', dark ? 'dark' : 'light'); } catch (e) { }
+  }
+  function toggleTheme() {
+    applyTheme(!document.documentElement.classList.contains('dark'));
+  }
+  $('themeBtn').addEventListener('click', toggleTheme);
+  $('fsTheme').addEventListener('click', toggleTheme);
+  (function initTheme() {
+    var saved = null;
+    try { saved = localStorage.getItem('share-theme'); } catch (e) { }
+    var dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    applyTheme(dark);
+  })();
+
+  load();
+})();
+</script>
+</body>
+</html>

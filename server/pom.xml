@@ -33,6 +33,9 @@
         <aws-sdk.version>2.46.21</aws-sdk.version>
         <hutool.version>5.8.36</hutool.version>
         <rome.version>2.1.0</rome.version>
+        <!-- WebDAV 客户端（module-share 用）：hutool 高层 API 的 Method 枚举不含 PROPFIND，
+             故在「网络/IO 统一 hutool」红线上开一个显式例外（与 ROME 同性质） -->
+        <sardine.version>5.13</sardine.version>
         <!-- Spring AI 与 Spring AI Alibaba：AI 调用网关的模型调用底座。
              三者必须成对升级：SAA extensions 1.1.2.1 内部依赖 Spring AI 1.1.2，
              错配会出现 ChatModel 接口不兼容。 -->
@@ -238,6 +241,20 @@
                 <version>${howe.version}</version>
             </dependency>
 
+            <!-- 文件分享短链-->
+            <dependency>
+                <groupId>com.howe</groupId>
+                <artifactId>module-share</artifactId>
+                <version>${howe.version}</version>
+            </dependency>
+
+            <!-- WebDAV 客户端（sardine）：仅 module-share 使用 -->
+            <dependency>
+                <groupId>com.github.lookfirst</groupId>
+                <artifactId>sardine</artifactId>
+                <version>${sardine.version}</version>
+            </dependency>
+
         </dependencies>
     </dependencyManagement>
 
@@ -262,6 +279,7 @@
         <module>module-blog</module>
         <module>module-ai</module>
         <module>module-meal</module>
+        <module>module-share</module>
         <module>module-common</module>
     </modules>
     <packaging>pom</packaging>

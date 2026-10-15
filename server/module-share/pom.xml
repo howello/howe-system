@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>server</artifactId>
+        <groupId>com.howe</groupId>
+        <version>3.9.2</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>module-share</artifactId>
+
+    <description>
+        WebDAV 文件分享短链：配置 WebDAV 源、浏览选文件生成短链，支持密码 / 过期 / 次数 / 阅后即焚；
+        文件字节异步预缓存，按格式与大小分流到本地磁盘或 R2；公开分享页支持图片 / PDF / Markdown / 文本 / 视频预览
+    </description>
+
+    <dependencies>
+
+        <!-- 通用工具：配置读取、对象存储、Redis、分页与统一响应 -->
+        <dependency>
+            <groupId>com.howe</groupId>
+            <artifactId>module-common</artifactId>
+        </dependency>
+
+        <!-- 本模块自带后台控制器与公开端控制器（@RestController 在 spring-webmvc 里，
+             module-common 只引到 spring-web）。运行时由 module-admin 的
+             spring-boot-starter-web 提供，这里只是让编译期能解析到该类 -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webmvc</artifactId>
+        </dependency>
+
+        <!-- WebDAV 客户端：hutool 高层 API 的 Method 枚举不含 PROPFIND，
+             故在「网络/IO 统一 hutool」红线上开一个显式例外（与 ROME 同性质）。
+             连带引入 Apache HttpClient 4.5 与 jakarta JAXB（解析 PROPFIND 的 XML） -->
+        <dependency>
+            <groupId>com.github.lookfirst</groupId>
+            <artifactId>sardine</artifactId>
+        </dependency>
+
+    </dependencies>
+
+</project>

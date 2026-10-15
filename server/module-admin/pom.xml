@@ -60,6 +60,12 @@
             <artifactId>module-meal</artifactId>
         </dependency>
 
+        <!-- 文件分享短链-->
+        <dependency>
+            <groupId>com.howe</groupId>
+            <artifactId>module-share</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>

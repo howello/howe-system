@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.share.mapper.ShareSourceMapper">
+
+    <resultMap type="ShareSource" id="ShareSourceResult">
+        <result property="sourceId"       column="source_id"       />
+        <result property="name"           column="name"            />
+        <result property="baseUrl"        column="base_url"        />
+        <result property="username"       column="username"        />
+        <result property="passwordCipher" column="password_cipher" />
+        <result property="rootPath"       column="root_path"       />
+        <result property="status"         column="status"          />
+        <result property="createBy"       column="create_by"       />
+        <result property="createTime"     column="create_time"     />
+        <result property="updateBy"       column="update_by"       />
+        <result property="updateTime"     column="update_time"     />
+        <result property="remark"         column="remark"          />
+    </resultMap>
+
+    <sql id="selectShareSourceVo">
+        select source_id, name, base_url, username, password_cipher, root_path, status,
+               create_by, create_time, update_by, update_time, remark
+        from share_source
+    </sql>
+
+    <select id="selectShareSourceList" parameterType="ShareSource" resultMap="ShareSourceResult">
+        <include refid="selectShareSourceVo"/>
+        <where>
+            <if test="name != null and name != ''">
+                AND name like concat('%', #{name}, '%')
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+        </where>
+        order by source_id desc
+    </select>
+
+    <select id="selectShareSourceById" parameterType="Long" resultMap="ShareSourceResult">
+        <include refid="selectShareSourceVo"/>
+        where source_id = #{sourceId}
+    </select>
+
+    <select id="selectEnabledSourceList" resultMap="ShareSourceResult">
+        <include refid="selectShareSourceVo"/>
+        where status = '0'
+        order by source_id desc
+    </select>
+
+    <insert id="insertShareSource" parameterType="ShareSource" useGeneratedKeys="true" keyProperty="sourceId">
+        insert into share_source (
+            name, base_url, username, password_cipher, root_path, status,
+            create_by, create_time, remark
+        ) values (
+            #{name}, #{baseUrl}, #{username}, #{passwordCipher}, #{rootPath}, #{status},
+            #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateShareSource" parameterType="ShareSource">
+        update share_source
+        <set>
+            <if test="name != null and name != ''">name = #{name},</if>
+            <if test="baseUrl != null and baseUrl != ''">base_url = #{baseUrl},</if>
+            <if test="username != null and username != ''">username = #{username},</if>
+            <if test="passwordCipher != null and passwordCipher != ''">password_cipher = #{passwordCipher},</if>
+            <if test="rootPath != null">root_path = #{rootPath},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </set>
+        where source_id = #{sourceId}
+    </update>
+
+    <delete id="deleteShareSourceByIds" parameterType="Long">
+        delete from share_source where source_id in
+        <foreach item="sourceId" collection="array" open="(" separator="," close=")">
+            #{sourceId}
+        </foreach>
+    </delete>
+
+</mapper>

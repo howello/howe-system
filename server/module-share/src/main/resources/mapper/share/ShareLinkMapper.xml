@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.share.mapper.ShareLinkMapper">
+
+    <resultMap type="ShareLink" id="ShareLinkResult">
+        <result property="linkId"          column="link_id"          />
+        <result property="code"            column="code"             />
+        <result property="sourceId"        column="source_id"        />
+        <result property="filePath"        column="file_path"        />
+        <result property="fileName"        column="file_name"        />
+        <result property="fileExt"         column="file_ext"         />
+        <result property="fileSize"        column="file_size"        />
+        <result property="contentType"     column="content_type"     />
+        <result property="storageType"     column="storage_type"     />
+        <result property="storageLocation" column="storage_location" />
+        <result property="passwordHash"    column="password_hash"    />
+        <result property="expireAt"        column="expire_at"        />
+        <result property="maxViews"        column="max_views"        />
+        <result property="viewCount"       column="view_count"       />
+        <result property="burnAfterRead"   column="burn_after_read"  />
+        <result property="cacheStatus"     column="cache_status"     />
+        <result property="cacheError"      column="cache_error"      />
+        <result property="cacheRetryCount" column="cache_retry_count"/>
+        <result property="status"          column="status"           />
+        <result property="lastViewTime"    column="last_view_time"   />
+        <result property="createBy"        column="create_by"        />
+        <result property="createTime"      column="create_time"      />
+        <result property="updateBy"        column="update_by"        />
+        <result property="updateTime"      column="update_time"      />
+        <result property="remark"          column="remark"           />
+        <result property="sourceName"      column="source_name"      />
+    </resultMap>
+
+    <sql id="selectShareLinkVo">
+        select l.link_id, l.code, l.source_id, l.file_path, l.file_name, l.file_ext, l.file_size,
+               l.content_type, l.storage_type, l.storage_location, l.password_hash, l.expire_at,
+               l.max_views, l.view_count, l.burn_after_read, l.cache_status, l.cache_error,
+               l.cache_retry_count, l.status, l.last_view_time,
+               l.create_by, l.create_time, l.update_by, l.update_time, l.remark
+        from share_link l
+    </sql>
+
+    <select id="selectShareLinkList" parameterType="ShareLink" resultMap="ShareLinkResult">
+        select l.link_id, l.code, l.source_id, l.file_path, l.file_name, l.file_ext, l.file_size,
+               l.content_type, l.storage_type, l.storage_location, l.password_hash, l.expire_at,
+               l.max_views, l.view_count, l.burn_after_read, l.cache_status, l.cache_error,
+               l.cache_retry_count, l.status, l.last_view_time,
+               l.create_by, l.create_time, l.update_by, l.update_time, l.remark,
+               s.name as source_name
+        from share_link l
+        left join share_source s on s.source_id = l.source_id
+        <where>
+            <if test="fileName != null and fileName != ''">
+                AND l.file_name like concat('%', #{fileName}, '%')
+            </if>
+            <if test="code != null and code != ''">
+                AND l.code = #{code}
+            </if>
+            <if test="sourceId != null">
+                AND l.source_id = #{sourceId}
+            </if>
+            <if test="status != null and status != ''">
+                AND l.status = #{status}
+            </if>
+            <if test="cacheStatus != null and cacheStatus != ''">
+                AND l.cache_status = #{cacheStatus}
+            </if>
+        </where>
+        order by l.link_id desc
+    </select>
+
+    <select id="selectShareLinkById" parameterType="Long" resultMap="ShareLinkResult">
+        <include refid="selectShareLinkVo"/>
+        where l.link_id = #{linkId}
+    </select>
+
+    <select id="selectShareLinkByCode" parameterType="String" resultMap="ShareLinkResult">
+        <include refid="selectShareLinkVo"/>
+        where l.code = #{code}
+    </select>
+
+    <insert id="insertShareLink" parameterType="ShareLink" useGeneratedKeys="true" keyProperty="linkId">
+        insert into share_link (
+            code, source_id, file_path, file_name, file_ext, file_size, content_type,
+            storage_type, storage_location, password_hash, expire_at, max_views, view_count,
+            burn_after_read, cache_status, cache_error, cache_retry_count, status,
+            create_by, create_time, remark
+        ) values (
+            #{code}, #{sourceId}, #{filePath}, #{fileName}, #{fileExt}, #{fileSize}, #{contentType},
+            #{storageType}, #{storageLocation}, #{passwordHash}, #{expireAt}, #{maxViews}, #{viewCount},
+            #{burnAfterRead}, #{cacheStatus}, #{cacheError}, #{cacheRetryCount}, #{status},
+            #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <!-- 全量约束更新：expire_at 无条件写入（null 即改为不过期）；password_hash 仅在非 null 时更新 -->
+    <update id="updateShareLink" parameterType="ShareLink">
+        update share_link
+        <set>
+            <if test="passwordHash != null">password_hash = #{passwordHash},</if>
+            expire_at = #{expireAt},
+            <if test="maxViews != null">max_views = #{maxViews},</if>
+            <if test="burnAfterRead != null and burnAfterRead != ''">burn_after_read = #{burnAfterRead},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </set>
+        where link_id = #{linkId}
+    </update>
+
+    <delete id="deleteShareLinkByIds" parameterType="Long">
+        delete from share_link where link_id in
+        <foreach item="linkId" collection="array" open="(" separator="," close=")">
+            #{linkId}
+        </foreach>
+    </delete>
+
+    <!-- 原子计数：仅当正常且未超次数时生效；max_views <= 0 视为不限 -->
+    <update id="incrementViewCount">
+        update share_link
+        set view_count = view_count + 1, last_view_time = sysdate()
+        where link_id = #{linkId}
+          and status = '0'
+          and (max_views &lt;= 0 or view_count &lt; max_views)
+    </update>
+
+    <update id="updateCacheStatus">
+        update share_link
+        set cache_status = #{to}, update_time = sysdate()
+        where link_id = #{linkId} and cache_status = #{from}
+    </update>
+
+    <update id="markCacheReady">
+        update share_link
+        set storage_type = #{storageType},
+            storage_location = #{storageLocation},
+            file_size = coalesce(#{fileSize}, file_size),
+            content_type = coalesce(#{contentType}, content_type),
+            cache_status = '2',
+            cache_error = '',
+            update_time = sysdate()
+        where link_id = #{linkId}
+    </update>
+
+    <update id="markCacheFailed">
+        update share_link
+        set cache_status = '3',
+            cache_error = #{error},
+            cache_retry_count = cache_retry_count + 1,
+            update_time = sysdate()
+        where link_id = #{linkId}
+    </update>
+
+    <update id="markBurned">
+        update share_link set status = '2', update_time = sysdate() where link_id = #{linkId}
+    </update>
+
+    <update id="updateStatus">
+        update share_link set status = #{status}, update_time = sysdate() where link_id = #{linkId}
+    </update>
+
+    <update id="resetCacheStatus">
+        update share_link
+        set cache_status = '0', cache_error = '', update_time = sysdate()
+        where link_id = #{linkId}
+    </update>
+
+    <update id="resetForRestore">
+        update share_link
+        set view_count = 0, cache_status = '0', cache_error = '', update_time = sysdate()
+        where link_id = #{linkId}
+    </update>
+
+    <select id="selectCacheRetryList" resultMap="ShareLinkResult">
+        <include refid="selectShareLinkVo"/>
+        where l.cache_status in ('0', '3') and l.cache_retry_count &lt; #{maxRetry}
+        order by l.link_id asc
+        limit #{limit}
+    </select>
+
+    <select id="selectCleanupList" resultMap="ShareLinkResult">
+        <include refid="selectShareLinkVo"/>
+        where (l.status = '2'
+               or (l.status = '0' and l.expire_at is not null and l.expire_at &lt; sysdate()))
+          <!-- 最近 10 分钟被访问过的先不动：会话票据 TTL 内仍可能在读，避免文件被提前删除 -->
+          and (l.last_view_time is null or l.last_view_time &lt; date_sub(sysdate(), interval 10 minute))
+        order by l.link_id asc
+        limit #{limit}
+    </select>
+
+    <select id="selectAllCodes" resultType="java.lang.String">
+        select code from share_link
+    </select>
+
+    <select id="countBySourceId" resultType="long">
+        select count(1) from share_link where source_id = #{sourceId}
+    </select>
+
+</mapper>
