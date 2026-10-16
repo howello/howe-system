@@ -621,3 +621,9 @@ values('人机校验-超时时间', 'sys.turnstile.timeout', '5000', 'Y', 'admin
 insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
 values('首页-统计缓存TTL', 'sys.home.statsCacheTtl', '600', 'Y', 'admin', sysdate(), '', null, '首页博客统计聚合结果 Redis 缓存秒数，默认 600（10 分钟）；参数页修改即时生效，无需重启');
 
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
+values('首页-模块探测缓存TTL', 'sys.home.moduleCacheTtl', '300', 'Y', 'admin', sysdate(), '', null, '首页模块数据表可用性探测结果 Redis 缓存秒数，默认 300（5 分钟）');
+
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
+values('首页-卡片统计缓存TTL', 'sys.home.cardCacheTtl', '300', 'Y', 'admin', sysdate(), '', null, '首页点餐/分享/AI 等卡片统计结果 Redis 缓存秒数，默认 300（5 分钟）');
+

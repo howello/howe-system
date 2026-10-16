@@ -107,4 +107,22 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{id}
         </foreach>
     </delete>
+
+    <select id="selectHealthOverview" resultType="java.util.Map">
+        select name as name, health_status as health_status
+        from ai_channel
+        order by priority asc, id asc
+    </select>
+
+    <select id="selectDownCount" resultType="long">
+        select count(*) from ai_channel where health_status = 'DOWN'
+    </select>
+
+    <select id="selectDisabledCount" resultType="long">
+        select count(*) from ai_channel where enabled = 0
+    </select>
+
+    <select id="selectLatestCheckTime" resultType="java.util.Date">
+        select max(last_check_at) from ai_channel
+    </select>
 </mapper>

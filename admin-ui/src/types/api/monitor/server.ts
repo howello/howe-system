@@ -1,6 +1,10 @@
 /** 服务器-CPU */
 export interface ServerCpu {
   cpuNum: number
+  /** CPU 型号 */
+  name?: string
+  /** 系统 1/5/15 分钟平均负载 */
+  loadAverage?: number[]
   total: number
   sys: number
   used: number
@@ -28,6 +32,16 @@ export interface ServerJvm {
   startTime?: string
   runTime?: string
   inputArgs?: string
+  /** 非堆内存：已用（MB） */
+  nonHeapUsed?: number
+  /** 非堆内存：已提交总量（MB） */
+  nonHeapTotal?: number
+  /** 非堆内存使用率（%） */
+  nonHeapUsage?: number
+  /** GC 总次数 */
+  gcCount?: number
+  /** GC 总耗时（毫秒） */
+  gcTime?: number
 }
 
 /** 服务器-磁盘分区 */

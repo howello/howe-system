@@ -88,4 +88,32 @@ public interface AiChannelMapper
      * @return 结果
      */
     int deleteAiChannelByIds(@Param("ids") Long[] ids);
+
+    /**
+     * 首页统计：渠道健康概览（按降级顺序返回全部渠道）
+     *
+     * @return 每行含 name 与 health_status
+     */
+    java.util.List<java.util.Map<String, Object>> selectHealthOverview();
+
+    /**
+     * 首页统计：异常渠道数（health_status='DOWN'）
+     *
+     * @return 数量
+     */
+    long selectDownCount();
+
+    /**
+     * 首页统计：停用渠道数（enabled=0）
+     *
+     * @return 数量
+     */
+    long selectDisabledCount();
+
+    /**
+     * 首页统计：最近一次检测时间
+     *
+     * @return 最近检测时间；从未检测时返回 null
+     */
+    java.util.Date selectLatestCheckTime();
 }

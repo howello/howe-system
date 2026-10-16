@@ -48,6 +48,7 @@ export * from "./meal/appversion";
 
 // 首页工作台
 export * from "./home/stats";
+export * from "./home/cards";
 
 // 文件分享短链
 export * from "./share/source";

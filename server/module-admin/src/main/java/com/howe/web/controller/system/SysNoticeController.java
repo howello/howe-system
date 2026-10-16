@@ -100,8 +100,10 @@ public class SysNoticeController extends BaseController
     public AjaxResult listTop()
     {
         Long userId = getUserId();
+        // 公告不做置顶：按 notice_id 倒序（最新在前）展示
         List<SysNotice> list = noticeReadService.selectNoticeListWithReadStatus(userId, 5);
-        long unreadCount = list.stream().filter(n -> !n.getIsRead()).count();
+        // 未读数取「全部正常公告 - 当前用户已读」，而非仅这 5 条内的未读数
+        int unreadCount = noticeReadService.selectUnreadCount(userId);
         AjaxResult result = AjaxResult.success(list);
         result.put("unreadCount", unreadCount);
         return result;

@@ -25,4 +25,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where call_log_id = #{callLogId}
         order by id asc
     </select>
+
+    <select id="selectOverview" resultType="java.util.Map">
+        select count(*) as total_count, ifnull(sum(size_bytes), 0) as total_bytes
+        from ai_image_asset
+    </select>
+
+    <select id="selectLatestCreateTime" resultType="java.util.Date">
+        select max(create_time) from ai_image_asset
+    </select>
 </mapper>

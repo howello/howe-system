@@ -1,0 +1,124 @@
+/**
+ * 首页工作台的明暗主题变量
+ *
+ * 首页各卡片组件的颜色统一引用这里的 CSS 变量，暗色模式跟随应用既有的
+ * `html.dark`（由 @vueuse/core 的 useDark 控制，与布局/侧边栏同一套机制）。
+ *
+ * 用法：在组件样式中写 `background: var(--home-card-bg)`，
+ * 亮/暗两套值在本文件内切换，组件无需感知主题。
+ */
+
+:root,
+.home-scope {
+  /* 卡片容器 */
+  --home-card-bg: #ffffff;
+  --home-card-border: #ebeef5;
+  --home-card-shadow: 0 1px 2px rgba(11, 11, 11, 0.04), 0 8px 24px rgba(11, 11, 11, 0.05);
+
+  /* 数字卡 / 列表行 / 状态块（浅底元素） */
+  --home-tile-bg: #f7f8fa;
+  --home-tile-border: #ebeef5;
+  --home-tile-hover-bg: #ffffff;
+  --home-tile-hover-shadow: 0 2px 10px rgba(11, 11, 11, 0.06);
+  --home-tile-hover-ring: #ebeef5;
+
+  /* 文字 */
+  --home-text-primary: #0b0b0b;
+  --home-text-secondary: #606266;
+  --home-text-muted: #909399;
+  --home-text-inverse: #ffffff;
+
+  /* 分隔线与表格 */
+  --home-line: #ebeef5;
+  --home-line-light: #f1f4fa;
+  --home-table-head-bg: #f7f8fa;
+  --home-table-caption-from: #f7f8fa;
+  --home-table-caption-to: #ffffff;
+  --home-table-zebra: rgba(11, 11, 11, 0.012);
+  --home-table-total-bg: #f7f8fa;
+
+  /* 主色强调（各卡片主色） */
+  --home-accent: #409eff;
+  --home-accent-orange: #eb6834;
+  --home-accent-aqua: #1baf7a;
+  --home-accent-yellow: #eda100;
+  --home-accent-pink: #e87ba4;
+  --home-accent-violet: #6250d6;
+  --home-accent-red: #e34948;
+  --home-status-critical: #d03b3b;
+
+  /* 图表（ECharts 取色用，需与背景对比清晰） */
+  --home-chart-grid: #e1e0d9;
+  --home-chart-axis-text: #909399;
+  --home-chart-ink: #0b0b0b;
+
+  /* 状态色 */
+  --home-ok-bg: rgba(12, 163, 12, 0.12);
+  --home-ok-text: #006300;
+  --home-ok-border: rgba(12, 163, 12, 0.22);
+  --home-warn-bg: rgba(250, 178, 25, 0.18);
+  --home-warn-text: #8a5a00;
+  --home-warn-border: rgba(250, 178, 25, 0.35);
+  --home-bad-bg: rgba(208, 59, 59, 0.12);
+  --home-bad-text: #d03b3b;
+  --home-bad-border: rgba(208, 59, 59, 0.24);
+  --home-idle-bg: #f7f8fa;
+  --home-idle-text: #909399;
+
+  /* 页面背景 */
+  --home-page-bg: #f0f2f5;
+}
+
+/* 暗色：跟随应用既有的 html.dark（useDark 添加的类） */
+html.dark {
+  --home-card-bg: #1a1a19;
+  --home-card-border: #2c2c2a;
+  --home-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+
+  --home-tile-bg: #232322;
+  --home-tile-border: #2c2c2a;
+  --home-tile-hover-bg: #2a2a28;
+  --home-tile-hover-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  --home-tile-hover-ring: #3a3a37;
+
+  --home-text-primary: #f0efec;
+  --home-text-secondary: #c3c2b7;
+  --home-text-muted: #898781;
+  --home-text-inverse: #141414;
+
+  --home-line: #2c2c2a;
+  --home-line-light: #242423;
+  --home-table-head-bg: #232322;
+  --home-table-caption-from: #232322;
+  --home-table-caption-to: #1a1a19;
+  --home-table-zebra: rgba(255, 255, 255, 0.018);
+  --home-table-total-bg: #232322;
+
+  // 暗色下系列色改用适配深色背景的步进值（与 dataviz 调色板一致）
+  --home-accent: #3987e5;
+  --home-accent-orange: #d95926;
+  --home-accent-aqua: #199e70;
+  --home-accent-yellow: #c98500;
+  --home-accent-pink: #d55181;
+  --home-accent-violet: #9085e9;
+  --home-accent-red: #e66767;
+  --home-status-critical: #e66767;
+
+  --home-chart-grid: #2c2c2a;
+  --home-chart-axis-text: #898781;
+  --home-chart-ink: #f0efec;
+
+  --home-ok-bg: rgba(12, 163, 12, 0.18);
+  --home-ok-text: #0ca30c;
+  --home-ok-border: rgba(12, 163, 12, 0.3);
+  --home-warn-bg: rgba(250, 178, 25, 0.2);
+  --home-warn-text: #f0b429;
+  --home-warn-border: rgba(250, 178, 25, 0.4);
+  --home-bad-bg: rgba(208, 59, 59, 0.2);
+  --home-bad-text: #e66767;
+  --home-bad-border: rgba(208, 59, 59, 0.4);
+  --home-idle-bg: #232322;
+  --home-idle-text: #898781;
+
+  --home-page-bg: #0d0d0d;
+}

@@ -1,6 +1,7 @@
 package com.howe.blog.service;
 
 import com.howe.blog.domain.vo.BlogHomeStats;
+import com.howe.blog.domain.vo.BlogLinkSyncOverview;
 
 /**
  * 博客首页统计服务
@@ -18,4 +19,25 @@ public interface IBlogStatsService {
      * @return 首页博客聚合统计；blog 表缺失时为 {@code BlogHomeStats(false, null)}
      */
     BlogHomeStats getHomeStats();
+
+    /**
+     * 友链与订阅同步概况（订阅源总数、失败数、最近同步时间、失败明细）
+     *
+     * @return 订阅同步概况
+     */
+    BlogLinkSyncOverview getLinkSyncOverview();
+
+    /**
+     * 待办：未发布草稿数
+     *
+     * @return 未发布草稿数
+     */
+    long countUnpublishedDrafts();
+
+    /**
+     * 个人足迹：当前用户发布的文章数
+     *
+     * @return 文章数
+     */
+    long countMyArticles();
 }

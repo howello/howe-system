@@ -118,6 +118,12 @@ public class ConfigConstants
     /** 首页博客统计聚合结果缓存 TTL（秒），参数页修改即时生效 */
     public static final String HOME_STATS_CACHE_TTL = "sys.home.statsCacheTtl";
 
+    /** 首页模块可用性探测结果缓存 TTL（秒），参数页修改即时生效 */
+    public static final String HOME_MODULES_CACHE_TTL = "sys.home.moduleCacheTtl";
+
+    /** 首页统计类卡片结果缓存 TTL（秒），覆盖点餐/分享/AI 等模块卡片 */
+    public static final String HOME_CARD_CACHE_TTL = "sys.home.cardCacheTtl";
+
     /** waline 评论列表端点（默认 https://waline.wyantao.com/api/comment） */
     public static final String BLOG_WALINE_URL = "blog.waline.url";
 

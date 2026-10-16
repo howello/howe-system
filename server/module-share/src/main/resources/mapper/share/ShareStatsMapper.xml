@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.share.mapper.ShareStatsMapper">
+
+    <!--
+      首页统计取数：分享是平台级数据（不分家庭），直接查全表。
+      访问日志的 action 取值见 ShareAccessLog 注释：detail / verify / open / file / download。
+    -->
+
+    <select id="selectLinkTotal" resultType="long">
+        select count(*) from share_link
+    </select>
+
+    <select id="selectLinkCountByStatus" resultType="java.util.Map">
+        select l.status as status, count(*) as cnt
+        from share_link l
+        group by l.status
+    </select>
+
+    <select id="selectLinkCountByCacheStatus" resultType="java.util.Map">
+        select l.cache_status as cache_status, count(*) as cnt
+        from share_link l
+        group by l.cache_status
+    </select>
+
+    <select id="selectAccessCountByActions" resultType="long">
+        select count(*)
+        from share_access_log g
+        where g.result = 'success'
+          and g.action in
+        <foreach item="a" collection="actions" open="(" separator="," close=")">
+            #{a}
+        </foreach>
+          and g.create_time &gt;= concat(#{startDay}, ' 00:00:00')
+          and g.create_time &lt;= concat(#{endDay}, ' 23:59:59')
+    </select>
+
+    <select id="selectRecentLinks" resultType="java.util.Map">
+        select l.file_name as file_name, l.create_time as create_time
+        from share_link l
+        order by l.create_time desc
+        limit #{limit}
+    </select>
+
+    <select id="selectExpiringSoonCount" resultType="long">
+        select count(*)
+        from share_link l
+        where l.status = '0'
+          and l.expire_at is not null
+          and l.expire_at &gt; now()
+          and l.expire_at &lt;= #{before}
+    </select>
+
+    <select id="selectMyLinkCount" resultType="long">
+        select count(*) from share_link l where l.create_by = #{createBy}
+    </select>
+
+</mapper>

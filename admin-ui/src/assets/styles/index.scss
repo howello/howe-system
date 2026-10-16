@@ -4,6 +4,8 @@
 @use './sidebar.scss';
 @use './btn.scss';
 @use './common.scss';
+// 首页工作台的明暗主题变量（跟随 html.dark）
+@use '../../views/index/home-theme.scss';
 
 body {
   height: 100%;

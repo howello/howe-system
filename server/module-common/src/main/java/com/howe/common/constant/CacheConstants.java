@@ -46,4 +46,39 @@ public class CacheConstants
      * 首页统计缓存 key（完整键名，无冒号后缀）
      */
     public static final String HOME_STATS_KEY = "home:stats:summary";
+
+    /**
+     * 首页模块可用性探测缓存 key（完整键名，无冒号后缀）
+     */
+    public static final String HOME_MODULES_KEY = "home:modules:availability";
+
+    /** 首页点餐统计缓存 key 前缀（实际键按数据范围追加后缀） */
+    public static final String HOME_MEAL_STATS_KEY = "home:meal:stats";
+
+    /** 首页点餐菜品概况缓存 key 前缀 */
+    public static final String HOME_MEAL_DISH_KEY = "home:meal:dish";
+
+    /** 首页点餐 App 版本概况缓存 key（平台级，不分家庭） */
+    public static final String HOME_MEAL_VERSION_KEY = "home:meal:version";
+
+    /** 首页点餐热门菜品缓存 key 前缀 */
+    public static final String HOME_MEAL_HOT_DISH_KEY = "home:meal:hotdish";
+
+    /** 首页分享统计缓存 key（平台级，不分家庭） */
+    public static final String HOME_SHARE_STATS_KEY = "home:share:stats";
+
+    /** 首页分享缓存健康缓存 key */
+    public static final String HOME_SHARE_CACHE_KEY = "home:share:cache";
+
+    /** 首页 AI 用量统计缓存 key */
+    public static final String HOME_AI_STATS_KEY = "home:ai:stats";
+
+    /** 首页 AI 渠道健康缓存 key */
+    public static final String HOME_AI_CHANNEL_KEY = "home:ai:channel";
+
+    /** 首页 AI 图片资产概况缓存 key */
+    public static final String HOME_AI_IMAGE_KEY = "home:ai:image";
+
+    /** 首页博客友链与订阅同步缓存 key */
+    public static final String HOME_BLOG_LINK_KEY = "home:blog:link";
 }

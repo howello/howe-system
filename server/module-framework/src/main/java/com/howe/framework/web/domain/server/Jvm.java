@@ -1,6 +1,8 @@
 package com.howe.framework.web.domain.server;
 
+import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryUsage;
 import com.howe.common.utils.Arith;
 import com.howe.common.utils.DateUtils;
 
@@ -126,5 +128,80 @@ public class Jvm
     public String getInputArgs()
     {
         return ManagementFactory.getRuntimeMXBean().getInputArguments().toString();
+    }
+
+    /**
+     * JVM 非堆内存：当前占用（M）
+     *
+     * @return 非堆已用内存（MB）
+     */
+    public double getNonHeapUsed()
+    {
+        MemoryUsage nonHeap = ManagementFactory.getMemoryMXBean().getNonHeapMemoryUsage();
+        return Arith.div(nonHeap.getUsed(), (1024 * 1024), 2);
+    }
+
+    /**
+     * JVM 非堆内存：已提交总量（M），作为非堆的「上限」参考
+     *
+     * @return 非堆已提交内存（MB）
+     */
+    public double getNonHeapTotal()
+    {
+        MemoryUsage nonHeap = ManagementFactory.getMemoryMXBean().getNonHeapMemoryUsage();
+        long committed = nonHeap.getCommitted() > 0 ? nonHeap.getCommitted() : nonHeap.getMax();
+        return Arith.div(committed, (1024 * 1024), 2);
+    }
+
+    /**
+     * JVM 非堆内存使用率（%）
+     *
+     * @return 使用率百分比；总量为 0 时返回 0
+     */
+    public double getNonHeapUsage()
+    {
+        long committed = ManagementFactory.getMemoryMXBean().getNonHeapMemoryUsage().getCommitted();
+        if (committed <= 0)
+        {
+            return 0;
+        }
+        long used = ManagementFactory.getMemoryMXBean().getNonHeapMemoryUsage().getUsed();
+        return Arith.mul(Arith.div(used, committed, 4), 100);
+    }
+
+    /**
+     * GC 总次数（所有垃圾回收器累计）
+     *
+     * @return GC 次数
+     */
+    public long getGcCount()
+    {
+        long count = 0;
+        for (GarbageCollectorMXBean gc : ManagementFactory.getGarbageCollectorMXBeans())
+        {
+            if (gc.getCollectionCount() > 0)
+            {
+                count += gc.getCollectionCount();
+            }
+        }
+        return count;
+    }
+
+    /**
+     * GC 总耗时（毫秒，所有垃圾回收器累计）
+     *
+     * @return GC 耗时（毫秒）
+     */
+    public long getGcTime()
+    {
+        long time = 0;
+        for (GarbageCollectorMXBean gc : ManagementFactory.getGarbageCollectorMXBeans())
+        {
+            if (gc.getCollectionTime() > 0)
+            {
+                time += gc.getCollectionTime();
+            }
+        }
+        return time;
     }
 }

@@ -27,4 +27,18 @@ public interface AiImageAssetMapper
      * @return 资产集合
      */
     List<AiImageAsset> selectByCallLogId(@Param("callLogId") Long callLogId);
+
+    /**
+     * 首页统计：图片总数与占用空间合计
+     *
+     * @return 单行含 total_count 与 total_bytes
+     */
+    java.util.Map<String, Object> selectOverview();
+
+    /**
+     * 首页统计：最近一次生成时间
+     *
+     * @return 最近生成时间；从未生成时返回 null
+     */
+    java.util.Date selectLatestCreateTime();
 }

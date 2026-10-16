@@ -2,6 +2,7 @@ package com.howe.blog.service.impl;
 
 import com.howe.blog.domain.vo.BlogCategoryCount;
 import com.howe.blog.domain.vo.BlogHomeStats;
+import com.howe.blog.domain.vo.BlogLinkSyncOverview;
 import com.howe.blog.domain.vo.BlogStats;
 import com.howe.blog.domain.vo.BlogTodayStats;
 import com.howe.blog.domain.vo.BlogTrendPoint;
@@ -11,6 +12,8 @@ import com.howe.common.constant.CacheConstants;
 import com.howe.common.constant.ConfigConstants;
 import com.howe.common.core.redis.RedisCache;
 import com.howe.common.utils.ConfigUtils;
+import com.howe.common.utils.DateUtils;
+import com.howe.common.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.BadSqlGrammarException;
@@ -20,6 +23,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -47,6 +51,9 @@ public class BlogStatsServiceImpl implements IBlogStatsService {
 
     /** 分类溢出分组名 */
     private static final String OTHER = "其他";
+
+    /** 首页订阅同步卡展示的失败源条数上限 */
+    private static final int FEED_FAILURE_LIMIT = 3;
 
     private static final DateTimeFormatter DAY_FMT = DateTimeFormatter.ISO_LOCAL_DATE;
 
@@ -105,6 +112,46 @@ public class BlogStatsServiceImpl implements IBlogStatsService {
         BlogStats blog = new BlogStats(articleTotal, draftTotal, talkTotal, todayStats,
                 trend, aggregateCategories(blogStatsMapper.selectAllArticleCategories()));
         return new BlogHomeStats(true, blog);
+    }
+
+    @Override
+    public BlogLinkSyncOverview getLinkSyncOverview() {
+        BlogLinkSyncOverview cached = redisCache.getCacheObject(CacheConstants.HOME_BLOG_LINK_KEY);
+        if (cached != null) {
+            return cached;
+        }
+        BlogLinkSyncOverview result = computeLinkSyncOverview();
+        int ttl = ConfigUtils.getInt(ConfigConstants.HOME_CARD_CACHE_TTL, 300);
+        redisCache.setCacheObject(CacheConstants.HOME_BLOG_LINK_KEY, result, ttl, TimeUnit.SECONDS);
+        return result;
+    }
+
+    @Override
+    public long countUnpublishedDrafts() {
+        return blogStatsMapper.selectUnpublishedDraftCount();
+    }
+
+    @Override
+    public long countMyArticles() {
+        return blogStatsMapper.selectArticleCountByCreator(SecurityUtils.getUsername());
+    }
+
+    private BlogLinkSyncOverview computeLinkSyncOverview() {
+        long total = blogStatsMapper.selectFeedTotal();
+        long failed = blogStatsMapper.selectFeedFailedCount();
+        Date latest = blogStatsMapper.selectLatestFeedSyncTime();
+        String lastSync = latest == null
+                ? null
+                : DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, latest).substring(0, 16);
+        List<BlogLinkSyncOverview.FeedFailure> failures = new ArrayList<>();
+        for (Map<String, Object> row : blogStatsMapper.selectFeedFailures(FEED_FAILURE_LIMIT)) {
+            Object name = row.get("link_name");
+            Object error = row.get("last_error");
+            failures.add(new BlogLinkSyncOverview.FeedFailure(
+                    name == null ? "" : String.valueOf(name),
+                    error == null ? "" : String.valueOf(error)));
+        }
+        return new BlogLinkSyncOverview(total, failed, lastSync, failures);
     }
 
     private void fillBucket(Map<String, long[]> buckets, List<Map<String, Object>> rows, int idx) {

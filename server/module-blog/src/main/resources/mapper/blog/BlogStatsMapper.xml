@@ -41,4 +41,34 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where categories is not null and categories != ''
     </select>
 
+    <!-- 订阅源即 link_type='2'；总数含停用源（与失败数/最近同步口径一致），失败以 last_error 非空判定 -->
+    <select id="selectFeedTotal" resultType="long">
+        select count(*) from blog_link where link_type = '2'
+    </select>
+
+    <select id="selectFeedFailedCount" resultType="long">
+        select count(*) from blog_link
+        where link_type = '2' and last_error is not null and last_error != ''
+    </select>
+
+    <select id="selectLatestFeedSyncTime" resultType="java.util.Date">
+        select max(last_sync_time) from blog_link where link_type = '2'
+    </select>
+
+    <select id="selectFeedFailures" resultType="java.util.Map">
+        select link_name as link_name, last_error as last_error
+        from blog_link
+        where link_type = '2' and last_error is not null and last_error != ''
+        order by last_sync_time desc
+        limit #{limit}
+    </select>
+
+    <select id="selectUnpublishedDraftCount" resultType="long">
+        select count(*) from blog_draft where status = '0'
+    </select>
+
+    <select id="selectArticleCountByCreator" resultType="long">
+        select count(*) from blog_article where create_by = #{createBy}
+    </select>
+
 </mapper>

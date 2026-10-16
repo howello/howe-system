@@ -15,6 +15,16 @@ public class Cpu
     private int cpuNum;
 
     /**
+     * CPU 型号
+     */
+    private String name;
+
+    /**
+     * 系统 1/5/15 分钟平均负载
+     */
+    private double[] loadAverage;
+
+    /**
      * CPU总的使用率
      */
     private double total;
@@ -47,6 +57,26 @@ public class Cpu
     public void setCpuNum(int cpuNum)
     {
         this.cpuNum = cpuNum;
+    }
+
+    public String getName()
+    {
+        return name;
+    }
+
+    public void setName(String name)
+    {
+        this.name = name;
+    }
+
+    public double[] getLoadAverage()
+    {
+        return loadAverage;
+    }
+
+    public void setLoadAverage(double[] loadAverage)
+    {
+        this.loadAverage = loadAverage;
     }
 
     public double getTotal()
