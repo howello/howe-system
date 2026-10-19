@@ -195,6 +195,9 @@ public class ChatCapability
     /**
      * 按请求的 outputSchema 解析结构化结果
      *
+     * <p>部分模型会在 JSON 外再包一层 {@code <escape>} 标记或 Markdown 代码块，
+     * 这里先剥离包装、截取首个完整 JSON 对象/数组，再交给 fastjson 解析。</p>
+     *
      * @param text    模型输出
      * @param request 原始请求
      * @return 解析后的对象；未要求结构化输出时返回 null
@@ -207,12 +210,69 @@ public class ChatCapability
         }
         try
         {
-            return JSON.parse(text);
+            return JSON.parse(extractJsonPayload(text));
         }
         catch (Exception e)
         {
             throw new AiException(AiErrorCode.PROVIDER_ERROR, "结构化输出解析失败：" + e.getMessage(), e);
         }
+    }
+
+    /**
+     * 从模型输出中提取 JSON 正文
+     *
+     * <p>依次处理：去掉首尾空白与 {@code <escape>} 包装、去掉 Markdown 代码块围栏、
+     * 从首个 {@code &#123;} 或 {@code [} 开始截取到对应的最后一个闭合符号。
+     * 未找到 JSON 起始符时原样返回，由调用方按解析失败处理。</p>
+     *
+     * @param text 模型原始输出
+     * @return 供 JSON 解析的文本
+     */
+    private String extractJsonPayload(String text)
+    {
+        String cleaned = text.trim()
+                .replace("<escape>", "")
+                .replace("</escape>", "")
+                .trim();
+        if (cleaned.startsWith("```"))
+        {
+            int firstLineEnd = cleaned.indexOf('\n');
+            if (firstLineEnd >= 0)
+            {
+                cleaned = cleaned.substring(firstLineEnd + 1).trim();
+            }
+            if (cleaned.endsWith("```"))
+            {
+                cleaned = cleaned.substring(0, cleaned.length() - 3).trim();
+            }
+        }
+        int objectStart = cleaned.indexOf('{');
+        int arrayStart = cleaned.indexOf('[');
+        int start;
+        if (objectStart < 0)
+        {
+            start = arrayStart;
+        }
+        else if (arrayStart < 0)
+        {
+            start = objectStart;
+        }
+        else
+        {
+            start = Math.min(objectStart, arrayStart);
+        }
+        if (start < 0)
+        {
+            return cleaned;
+        }
+        cleaned = cleaned.substring(start);
+        char close = cleaned.charAt(0) == '{' ? '}' : ']';
+        int end = cleaned.lastIndexOf(close);
+        if (end >= 0 && end < cleaned.length() - 1)
+        {
+            cleaned = cleaned.substring(0, end + 1);
+        }
+        return cleaned;
     }
 
     /**
