@@ -198,6 +198,9 @@ public class ConfigConstants
     /** 新菜提案 AI 自动审核在 system 提示词之后追加的判定说明 */
     public static final String AI_PROMPT_MEAL_DISH_AUDIT_SUFFIX = "ai.prompt.meal.dish.auditSuffix";
 
+    /** 菜品 AI 更新（从完整做法提取字段）的 system 提示词 */
+    public static final String AI_PROMPT_MEAL_DISH_UPDATE_SYSTEM = "ai.prompt.meal.dish.updateSystem";
+
     /**
      * 点餐 App 版本发布令牌
      *

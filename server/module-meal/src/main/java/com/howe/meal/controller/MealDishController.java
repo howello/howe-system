@@ -7,6 +7,7 @@ import com.howe.common.core.page.TableDataInfo;
 import com.howe.common.enums.BusinessType;
 import com.howe.meal.domain.MealDish;
 import com.howe.meal.domain.dto.DishAiGenerateRequest;
+import com.howe.meal.domain.dto.DishAiUpdateRequest;
 import com.howe.meal.service.IMealDishService;
 import com.howe.meal.service.MealDishAiService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -72,6 +73,17 @@ public class MealDishController extends BaseController {
     @PostMapping("/ai-generate/cover")
     public AjaxResult aiGenerateCover(@RequestBody DishAiGenerateRequest request) {
         return success(mealDishAiService.generateCover(request));
+    }
+
+    @Operation(summary = "AI 更新菜品信息",
+            description = "从用户输入的完整做法中提取简介、标签、耗时、难度、份量、热量、用料、做法与小贴士，"
+                    + "非空字段直接覆盖入库；未提取到的字段保留原值，菜名、封面、分类与归属不变。"
+                    + "需要 meal:dish:edit 权限。")
+    @PreAuthorize("@ss.hasPermi('meal:dish:edit')")
+    @Log(title = "点餐菜品", businessType = BusinessType.UPDATE)
+    @PostMapping("/ai-update")
+    public AjaxResult aiUpdate(@RequestBody DishAiUpdateRequest request) {
+        return success(mealDishAiService.updateFromText(request));
     }
 
     @Operation(summary = "新增菜品")

@@ -88,7 +88,7 @@ public class MealDishServiceImpl implements IMealDishService {
         if (exist == null) {
             throw new ServiceException("菜品不存在或已删除");
         }
-        MealScopeGuard.assertWritable(exist.getDeptId(), "菜品");
+        MealScopeGuard.assertDishWritable(exist.getDeptId(), "菜品");
         // 归属不允许通过修改接口迁移
         mealDish.setDeptId(null);
         mealDish.setUpdateBy(SecurityUtils.getUsername());
@@ -112,6 +112,7 @@ public class MealDishServiceImpl implements IMealDishService {
             if (exist == null) {
                 throw new ServiceException("菜品不存在或已删除");
             }
+            // 删除公共菜会影响所有家庭，仍保持「公共数据只能由平台管理员维护」
             MealScopeGuard.assertWritable(exist.getDeptId(), "菜品");
         }
         // 菜品逻辑删除，关联表按业务物理清理，避免残留引用挡住分类删除

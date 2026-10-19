@@ -37,6 +37,28 @@ public final class MealScopeGuard {
     }
 
     /**
+     * 校验当前登录用户是否有权改动这条菜品
+     *
+     * <p>平台管理员对所有菜品可写；持有 {@code meal:dish:edit} 的厨师 / 家庭管理员
+     * 可维护公共菜谱（{@code ownerDeptId = 0}，改动对所有家庭生效）与本家庭私有菜；
+     * 其他家庭的私有菜一律拒绝。分类等其它公共数据仍使用
+     * {@link #assertWritable(Long, String)} 的严格规则。</p>
+     *
+     * @param ownerDeptId 菜品所属家庭ID
+     * @param label       数据名称，用于拼错误提示
+     */
+    public static void assertDishWritable(Long ownerDeptId, String label) {
+        if (SecurityUtils.isAdmin()) {
+            return;
+        }
+        if (ownerDeptId == null || ownerDeptId.longValue() == 0L) {
+            // 公共菜品对持有菜品编辑权限的厨师 / 家庭管理员开放
+            return;
+        }
+        assertSameDept(ownerDeptId, label);
+    }
+
+    /**
      * 校验数据属于当前登录用户的家庭
      *
      * <p>平台管理员不受家庭归属限制，可读写所有家庭的私有数据。</p>

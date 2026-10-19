@@ -13,11 +13,16 @@ import com.howe.common.exception.ServiceException;
 import com.howe.common.utils.ConfigUtils;
 import com.howe.common.utils.SecurityUtils;
 import com.howe.meal.domain.MealCategory;
+import com.howe.meal.domain.MealDish;
 import com.howe.meal.domain.dto.DishAiAuditResult;
 import com.howe.meal.domain.dto.DishAiCoverResult;
 import com.howe.meal.domain.dto.DishAiGenerateRequest;
 import com.howe.meal.domain.dto.DishAiTextResult;
+import com.howe.meal.domain.dto.DishAiUpdateRequest;
+import com.howe.meal.domain.dto.DishAiUpdateResult;
 import com.howe.meal.mapper.MealCategoryMapper;
+import com.howe.meal.service.IMealDishService;
+import com.howe.meal.util.MealScopeGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -55,6 +60,9 @@ public class MealDishAiService {
     /** 文生图场景（路由 key） */
     private static final String SCENE_COVER = "meal.dish.cover";
 
+    /** 菜品 AI 更新场景（路由 key）：从完整做法提取字段并覆盖入库 */
+    private static final String SCENE_UPDATE = "meal.dish.update";
+
     /** 封面风格后缀模板 key，对应 sys_config 的 ai.image.styleSuffix.recipe.photo */
     private static final String STYLE_KEY = "recipe.photo";
 
@@ -78,9 +86,23 @@ public class MealDishAiService {
             "另外，请先判断该菜名是否为一道可制作的家常菜品：若是，approved 填 \"true\" 并按要求补齐字段；"
             + "若不是可制作的菜品、或内容明显不当，approved 填 \"false\"，rejectReason 用一句中文说明原因，其余字段留空。";
 
+    /**
+     * 菜品 AI 更新的 system 提示词缺省值
+     *
+     * <p>实际取值优先读 sys_config（{@link ConfigConstants#AI_PROMPT_MEAL_DISH_UPDATE_SYSTEM}）。</p>
+     */
+    private static final String DEFAULT_UPDATE_SYSTEM_PROMPT =
+            "你是一位资深中餐菜谱编辑。用户会给出一道菜的完整做法，请从中提取结构化菜品信息。"
+            + "所有内容使用简体中文：简介精炼（不超过 60 字）；标签给出 3 到 6 个短词；"
+            + "耗时、难度、份量、热量按文本合理推断；用料提取名称与用量；"
+            + "做法按步骤拆分并保留原文关键信息；小贴士提取注意事项。"
+            + "文本中确实未提到的字段返回空字符串或空数组，不要编造。";
+
     private final AiClient aiClient;
 
     private final MealCategoryMapper mealCategoryMapper;
+
+    private final IMealDishService mealDishService;
 
     /**
      * 按菜名补齐当前为空的文本字段（不含封面）
@@ -90,6 +112,65 @@ public class MealDishAiService {
      */
     public DishAiTextResult generateText(DishAiGenerateRequest request) {
         return generateTextForDept(resolveName(request), request.getCurrent(), resolveDeptId(request.getDeptId()));
+    }
+
+    /**
+     * 从用户输入的完整做法中提取菜品文本字段并直接覆盖入库
+     *
+     * <p>只覆盖模型实际返回的非空字段；缺失或空字段保留数据库原值。
+     * 菜名、封面、分类、归属与来源不变。</p>
+     *
+     * @param request AI 更新请求（菜品 ID + 完整做法文本）
+     * @return 本次写入的字段与更新后的菜品
+     */
+    public DishAiUpdateResult updateFromText(DishAiUpdateRequest request) {
+        if (request == null || request.getDishId() == null) {
+            throw new ServiceException("请选择要更新的菜品");
+        }
+        String text = request.getText() == null ? "" : request.getText().trim();
+        if (text.isEmpty()) {
+            throw new ServiceException("请先输入这道菜的完整做法");
+        }
+
+        MealDish exist = mealDishService.selectMealDishById(request.getDishId());
+        MealScopeGuard.assertDishWritable(exist.getDeptId(), "菜品");
+
+        Map<String, Object> properties = new LinkedHashMap<>();
+        List<String> required = new ArrayList<>();
+        appendUpdateSchema(properties);
+
+        AiChatResult chatResult = aiClient.chat(AiChatRequest.builder()
+                .scene(SCENE_UPDATE)
+                .system(updateSystemPrompt())
+                .prompt(buildUpdatePrompt(exist.getName(), text))
+                .outputSchema(JSON.toJSONString(objectSchema(properties, required)))
+                .build());
+        Object structured = chatResult.getStructured();
+        if (!(structured instanceof Map)) {
+            throw new ServiceException("AI 未返回可解析的菜品信息，请稍后重试");
+        }
+        Map<String, Object> data = toMap(structured);
+
+        DishAiUpdateResult result = new DishAiUpdateResult();
+        result.setFields(new LinkedHashMap<>());
+
+        MealDish update = new MealDish();
+        update.setDishId(exist.getDishId());
+        fillUpdateField(update, result.getFields(), "description", toText(data.get("description")));
+        fillUpdateField(update, result.getFields(), "tags", String.join(",", toStringList(data.get("tags"))));
+        fillUpdateField(update, result.getFields(), "duration", toText(data.get("duration")));
+        fillUpdateField(update, result.getFields(), "level", toText(data.get("level")));
+        fillUpdateField(update, result.getFields(), "serve", toText(data.get("serve")));
+        fillUpdateField(update, result.getFields(), "kcal", toText(data.get("kcal")));
+        fillUpdateField(update, result.getFields(), "ingredients", nonEmptyJson(data.get("ingredients")));
+        fillUpdateField(update, result.getFields(), "steps", nonEmptyJson(data.get("steps")));
+        fillUpdateField(update, result.getFields(), "tips", nonEmptyJson(data.get("tips")));
+
+        if (!result.getFields().isEmpty()) {
+            mealDishService.updateMealDish(update);
+        }
+        result.setDish(mealDishService.selectMealDishById(exist.getDishId()));
+        return result;
     }
 
     /**
@@ -327,6 +408,91 @@ public class MealDishAiService {
         } catch (AiException e) {
             result.setImageError(e.getMessage());
         }
+    }
+
+    /**
+     * 组装 AI 更新的 JSON Schema：请求全部文本字段，允许模型对未提及字段返回空
+     *
+     * @param properties Schema properties 输出
+     */
+    private void appendUpdateSchema(Map<String, Object> properties) {
+        properties.put("description", stringSchema());
+        properties.put("tags", arrayOfStringSchema());
+        properties.put("duration", stringSchema());
+        properties.put("level", stringSchema());
+        properties.put("serve", stringSchema());
+        properties.put("kcal", stringSchema());
+        properties.put("ingredients", arrayOfIngredientSchema());
+        properties.put("steps", arrayOfStringSchema());
+        properties.put("tips", arrayOfStringSchema());
+    }
+
+    /**
+     * 读取 AI 更新的 system 提示词（可在「参数设置」修改，未配置时用缺省值）
+     */
+    private String updateSystemPrompt() {
+        return ConfigUtils.getString(ConfigConstants.AI_PROMPT_MEAL_DISH_UPDATE_SYSTEM,
+                DEFAULT_UPDATE_SYSTEM_PROMPT);
+    }
+
+    /**
+     * 组装 AI 更新的用户提示词
+     *
+     * @param name 菜名，帮助模型定位菜品
+     * @param text 用户输入的完整做法
+     * @return 提示词
+     */
+    private String buildUpdatePrompt(String name, String text) {
+        return "菜名：" + name + "\n"
+                + "完整做法：\n" + text + "\n"
+                + "请从中提取菜品信息；文本未提到的字段返回空字符串或空数组。";
+    }
+
+    /**
+     * 把非空的提取结果写入更新对象与本次写入字段集合
+     *
+     * <p>空字符串、空数组不写入，从而保留数据库原值。</p>
+     *
+     * @param update 更新对象
+     * @param fields 本次实际写入字段集合
+     * @param key    字段名
+     * @param value  提取结果
+     */
+    private void fillUpdateField(MealDish update, Map<String, Object> fields, String key, String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return;
+        }
+        switch (key) {
+            case "description" -> update.setDescription(value);
+            case "tags" -> update.setTags(value);
+            case "duration" -> update.setDuration(value);
+            case "level" -> update.setLevel(value);
+            case "serve" -> update.setServe(value);
+            case "kcal" -> update.setKcal(value);
+            case "ingredients" -> update.setIngredients(value);
+            case "steps" -> update.setSteps(value);
+            case "tips" -> update.setTips(value);
+            default -> {
+                return;
+            }
+        }
+        fields.put(key, value);
+    }
+
+    /**
+     * 把数组结果序列化为 JSON 文本
+     *
+     * <p>只接受集合：空集合、非集合（模型未按 schema 返回）一律返回 null，
+     * 避免写入非法 JSON 或覆盖原值。</p>
+     *
+     * @param value 模型返回的字段值
+     * @return JSON 文本或 null
+     */
+    private String nonEmptyJson(Object value) {
+        if (!(value instanceof Collection<?> collection) || collection.isEmpty()) {
+            return null;
+        }
+        return JSON.toJSONString(value);
     }
 
     /**
