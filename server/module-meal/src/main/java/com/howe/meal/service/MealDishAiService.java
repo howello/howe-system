@@ -12,6 +12,7 @@ import com.howe.common.constant.ConfigConstants;
 import com.howe.common.exception.ServiceException;
 import com.howe.common.utils.ConfigUtils;
 import com.howe.common.utils.SecurityUtils;
+import com.howe.common.utils.spring.SpringUtils;
 import com.howe.meal.domain.MealCategory;
 import com.howe.meal.domain.MealDish;
 import com.howe.meal.domain.dto.DishAiAuditResult;
@@ -19,8 +20,8 @@ import com.howe.meal.domain.dto.DishAiCoverResult;
 import com.howe.meal.domain.dto.DishAiGenerateRequest;
 import com.howe.meal.domain.dto.DishAiTextResult;
 import com.howe.meal.domain.dto.DishAiUpdateRequest;
-import com.howe.meal.domain.dto.DishAiUpdateResult;
 import com.howe.meal.mapper.MealCategoryMapper;
+import com.howe.meal.mapper.MealDishMapper;
 import com.howe.meal.service.IMealDishService;
 import com.howe.meal.util.MealScopeGuard;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
 
 /**
  * 菜品一键 AI 补齐服务
@@ -43,6 +45,9 @@ import java.util.Map;
  * <p>只补缺失、绝不覆盖用户已填字段；生成结果不落库，由前端回填后走原有提交。
  * 另提供 {@link #auditAndComplete} 供新菜提案的 AI 自动审核在无登录态线程中复用同一套补齐逻辑
  * （显式传入家庭 ID，不读 {@code SecurityUtils}）。</p>
+ *
+ * <p>菜品编辑页的「AI 更新」通过 {@link #submitUpdateFromText} 提交到业务线程池执行：
+ * 请求线程只校验权限并立即返回；异步落库使用 {@link MealDishMapper} 直接更新，不读取登录态。</p>
  *
  * @author howe
  */
@@ -62,6 +67,12 @@ public class MealDishAiService {
 
     /** 菜品 AI 更新场景（路由 key）：从完整做法提取字段并覆盖入库 */
     private static final String SCENE_UPDATE = "meal.dish.update";
+
+    /** 业务线程池的 bean 名，由 module-framework 提供 */
+    private static final String EXECUTOR_BEAN = "threadPoolTaskExecutor";
+
+    /** AI 更新写入的操作人标识 */
+    private static final String AI_UPDATER = "AI 自动更新";
 
     /** 封面风格后缀模板 key，对应 sys_config 的 ai.image.styleSuffix.recipe.photo */
     private static final String STYLE_KEY = "recipe.photo";
@@ -104,6 +115,11 @@ public class MealDishAiService {
 
     private final IMealDishService mealDishService;
 
+    private final MealDishMapper mealDishMapper;
+
+    /** 线程池，延迟解析：容器未就绪或模块单独使用时退化为同步执行 */
+    private volatile Executor executor;
+
     /**
      * 按菜名补齐当前为空的文本字段（不含封面）
      *
@@ -115,15 +131,15 @@ public class MealDishAiService {
     }
 
     /**
-     * 从用户输入的完整做法中提取菜品文本字段并直接覆盖入库
+     * 提交一次异步 AI 更新：校验在请求线程完成，提取与落库在线程池执行
      *
-     * <p>只覆盖模型实际返回的非空字段；缺失或空字段保留数据库原值。
-     * 菜名、封面、分类、归属与来源不变。</p>
+     * <p>请求线程只做参数校验、菜品可见性与写权限校验，随后立即返回；AI 调用与数据库更新
+     * 在业务线程池中进行。异步线程没有登录态，因此落库使用 {@link MealDishMapper} 直接更新，
+     * 操作人记为 {@link #AI_UPDATER}，不再读取 {@code SecurityUtils}。线程池不可用时退化为同步执行。</p>
      *
      * @param request AI 更新请求（菜品 ID + 完整做法文本）
-     * @return 本次写入的字段与更新后的菜品
      */
-    public DishAiUpdateResult updateFromText(DishAiUpdateRequest request) {
+    public void submitUpdateFromText(DishAiUpdateRequest request) {
         if (request == null || request.getDishId() == null) {
             throw new ServiceException("请选择要更新的菜品");
         }
@@ -132,45 +148,97 @@ public class MealDishAiService {
             throw new ServiceException("请先输入这道菜的完整做法");
         }
 
+        // 请求线程内完成可见性与写权限校验，异步线程不再访问登录态
         MealDish exist = mealDishService.selectMealDishById(request.getDishId());
         MealScopeGuard.assertDishWritable(exist.getDeptId(), "菜品");
 
-        Map<String, Object> properties = new LinkedHashMap<>();
-        List<String> required = new ArrayList<>();
-        appendUpdateSchema(properties);
-
-        AiChatResult chatResult = aiClient.chat(AiChatRequest.builder()
-                .scene(SCENE_UPDATE)
-                .system(updateSystemPrompt())
-                .prompt(buildUpdatePrompt(exist.getName(), text))
-                .outputSchema(JSON.toJSONString(objectSchema(properties, required)))
-                .build());
-        Object structured = chatResult.getStructured();
-        if (!(structured instanceof Map)) {
-            throw new ServiceException("AI 未返回可解析的菜品信息，请稍后重试");
+        Long dishId = exist.getDishId();
+        String name = exist.getName();
+        Executor target = resolveExecutor();
+        if (target == null) {
+            // 线程池不可用时同步执行，保证功能可用
+            applyUpdateFromText(dishId, name, text);
+            return;
         }
-        Map<String, Object> data = toMap(structured);
-
-        DishAiUpdateResult result = new DishAiUpdateResult();
-        result.setFields(new LinkedHashMap<>());
-
-        MealDish update = new MealDish();
-        update.setDishId(exist.getDishId());
-        fillUpdateField(update, result.getFields(), "description", toText(data.get("description")));
-        fillUpdateField(update, result.getFields(), "tags", String.join(",", toStringList(data.get("tags"))));
-        fillUpdateField(update, result.getFields(), "duration", toText(data.get("duration")));
-        fillUpdateField(update, result.getFields(), "level", toText(data.get("level")));
-        fillUpdateField(update, result.getFields(), "serve", toText(data.get("serve")));
-        fillUpdateField(update, result.getFields(), "kcal", toText(data.get("kcal")));
-        fillUpdateField(update, result.getFields(), "ingredients", nonEmptyJson(data.get("ingredients")));
-        fillUpdateField(update, result.getFields(), "steps", nonEmptyJson(data.get("steps")));
-        fillUpdateField(update, result.getFields(), "tips", nonEmptyJson(data.get("tips")));
-
-        if (!result.getFields().isEmpty()) {
-            mealDishService.updateMealDish(update);
+        try {
+            target.execute(() -> applyUpdateFromText(dishId, name, text));
+        } catch (Exception e) {
+            log.warn("提交菜品 AI 更新任务失败，dishId={}", dishId, e);
         }
-        result.setDish(mealDishService.selectMealDishById(exist.getDishId()));
-        return result;
+    }
+
+    /**
+     * 异步执行 AI 提取并落库（不依赖登录态）
+     *
+     * <p>只覆盖模型实际返回的非空字段；缺失或空字段保留数据库原值。
+     * 菜名、封面、分类、归属与来源不变。</p>
+     *
+     * @param dishId 菜品 ID
+     * @param name   菜名，用于提示词定位菜品
+     * @param text   用户输入的完整做法
+     */
+    private void applyUpdateFromText(Long dishId, String name, String text) {
+        try {
+            Map<String, Object> properties = new LinkedHashMap<>();
+            List<String> required = new ArrayList<>();
+            appendUpdateSchema(properties);
+
+            AiChatResult chatResult = aiClient.chat(AiChatRequest.builder()
+                    .scene(SCENE_UPDATE)
+                    .system(updateSystemPrompt())
+                    .prompt(buildUpdatePrompt(name, text))
+                    .outputSchema(JSON.toJSONString(objectSchema(properties, required)))
+                    .build());
+            Object structured = chatResult.getStructured();
+            if (!(structured instanceof Map)) {
+                log.warn("菜品 AI 更新未返回可解析的结构化结果，dishId={}，raw={}", dishId,
+                        abbreviate(chatResult.getText()));
+                return;
+            }
+            Map<String, Object> data = toMap(structured);
+
+            Map<String, Object> fields = new LinkedHashMap<>();
+            MealDish update = new MealDish();
+            update.setDishId(dishId);
+            fillUpdateField(update, fields, "description", toText(data.get("description")));
+            fillUpdateField(update, fields, "tags", String.join(",", toStringList(data.get("tags"))));
+            fillUpdateField(update, fields, "duration", toText(data.get("duration")));
+            fillUpdateField(update, fields, "level", toText(data.get("level")));
+            fillUpdateField(update, fields, "serve", toText(data.get("serve")));
+            fillUpdateField(update, fields, "kcal", toText(data.get("kcal")));
+            fillUpdateField(update, fields, "ingredients", nonEmptyJson(data.get("ingredients")));
+            fillUpdateField(update, fields, "steps", nonEmptyJson(data.get("steps")));
+            fillUpdateField(update, fields, "tips", nonEmptyJson(data.get("tips")));
+
+            if (fields.isEmpty()) {
+                log.info("菜品 AI 更新未提取到可用字段，dishId={}", dishId);
+                return;
+            }
+            update.setUpdateBy(AI_UPDATER);
+            mealDishMapper.updateMealDish(update);
+            log.info("菜品 AI 更新完成，dishId={}，写入字段={}", dishId, fields.keySet());
+        } catch (Exception e) {
+            // 异步失败只记录日志：数据库保持原值，用户可稍后重试
+            log.warn("菜品 AI 更新失败，dishId={}", dishId, e);
+        }
+    }
+
+    /** 解析业务线程池；容器未就绪或没有该 bean 时返回 null */
+    private Executor resolveExecutor() {
+        Executor current = this.executor;
+        if (current != null) {
+            return current;
+        }
+        try {
+            Object bean = SpringUtils.getBean(EXECUTOR_BEAN);
+            if (bean instanceof Executor target) {
+                this.executor = target;
+                return target;
+            }
+        } catch (Exception e) {
+            log.debug("未找到 {} 线程池，菜品 AI 更新改为同步执行", EXECUTOR_BEAN);
+        }
+        return null;
     }
 
     /**
