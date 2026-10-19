@@ -15,6 +15,7 @@ import com.howe.meal.mapper.MealOrderMapper;
 import com.howe.meal.mapper.MealReviewMapper;
 import com.howe.meal.service.IMealOrderService;
 import com.howe.meal.service.IMealNotifyService;
+import com.howe.meal.service.IMealWeComNotifyService;
 import com.howe.meal.service.ITransactionCommitExecutor;
 import com.howe.meal.util.MealScopeGuard;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +51,7 @@ public class MealOrderServiceImpl implements IMealOrderService {
     private final MealDishMapper mealDishMapper;
     private final MealReviewMapper mealReviewMapper;
     private final IMealNotifyService mealNotifyService;
+    private final IMealWeComNotifyService mealWeComNotifyService;
     private final ITransactionCommitExecutor transactionCommitExecutor;
     @Override
     @DataScope(deptAlias = "d")
@@ -150,6 +152,7 @@ public class MealOrderServiceImpl implements IMealOrderService {
         mealOrderMapper.insertOrderItems(items);
         transactionCommitExecutor.afterCommit(() -> mealNotifyService.pushNewOrderToChefs(order.getDeptId(),
                 order.getOrderId(), order.getOrderNo(), order.getUserName(), order.getTotalCount()));
+        transactionCommitExecutor.afterCommit(() -> mealWeComNotifyService.notifyNewOrder(order.getOrderId()));
         return order.getOrderId();
     }
 
@@ -176,6 +179,7 @@ public class MealOrderServiceImpl implements IMealOrderService {
         transactionCommitExecutor.afterCommit(() -> mealNotifyService.push("notify:user:" + order.getUserId(),
                 "ORDER_ACCEPTED", order.getOrderId(), "厨师已接单", "厨师已接单，正在准备您的餐点",
                 notificationExtra(order.getOrderNo())));
+        transactionCommitExecutor.afterCommit(() -> mealWeComNotifyService.notifyOrderAccepted(order.getOrderId()));
         return rows;
     }
 
@@ -192,6 +196,7 @@ public class MealOrderServiceImpl implements IMealOrderService {
         transactionCommitExecutor.afterCommit(() -> mealNotifyService.push("notify:user:" + order.getUserId(),
                 "ORDER_COMPLETED", order.getOrderId(), "订单已完成", "您的订单已完成",
                 notificationExtra(order.getOrderNo())));
+        transactionCommitExecutor.afterCommit(() -> mealWeComNotifyService.notifyOrderCompleted(order.getOrderId()));
         return rows;
     }
 

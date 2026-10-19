@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.meal.mapper.MealWeComConfigMapper">
+
+    <resultMap type="MealWeComConfig" id="MealWeComConfigResult">
+        <result property="configId"    column="config_id"    />
+        <result property="deptId"      column="dept_id"      />
+        <result property="deptName"    column="dept_name"    />
+        <result property="webhookKey"  column="webhook_key"  />
+        <result property="enabled"     column="enabled"      />
+        <result property="notifyOrder" column="notify_order" />
+        <result property="notifyAi"    column="notify_ai"    />
+        <result property="delFlag"     column="del_flag"     />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"  column="create_time"  />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"  column="update_time"  />
+        <result property="remark"      column="remark"       />
+    </resultMap>
+
+    <sql id="selectMealWeComConfigVo">
+        select c.config_id, c.dept_id, d.dept_name, c.webhook_key, c.enabled, c.notify_order, c.notify_ai,
+               c.del_flag, c.create_by, c.create_time, c.update_by, c.update_time, c.remark
+        from meal_wecom_config c
+        left join sys_dept d on d.dept_id = c.dept_id
+    </sql>
+
+    <select id="selectMealWeComConfigList" parameterType="MealWeComConfig" resultMap="MealWeComConfigResult">
+        <include refid="selectMealWeComConfigVo"/>
+        <where>
+            c.del_flag = '0'
+            <if test="deptId != null">
+                AND c.dept_id = #{deptId}
+            </if>
+            <if test="enabled != null and enabled != ''">
+                AND c.enabled = #{enabled}
+            </if>
+        </where>
+        order by c.update_time desc, c.config_id desc
+    </select>
+
+    <select id="selectMealWeComConfigById" parameterType="Long" resultMap="MealWeComConfigResult">
+        <include refid="selectMealWeComConfigVo"/>
+        where c.config_id = #{configId} and c.del_flag = '0'
+    </select>
+
+    <select id="selectByDeptId" resultMap="MealWeComConfigResult">
+        <include refid="selectMealWeComConfigVo"/>
+        where c.dept_id = #{deptId} and c.del_flag = '0'
+        limit 1
+    </select>
+
+    <select id="selectAnyByDeptId" resultMap="MealWeComConfigResult">
+        <include refid="selectMealWeComConfigVo"/>
+        where c.dept_id = #{deptId}
+        limit 1
+    </select>
+
+    <insert id="insertMealWeComConfig" parameterType="MealWeComConfig" useGeneratedKeys="true" keyProperty="configId">
+        insert into meal_wecom_config (
+            dept_id, webhook_key, enabled, notify_order, notify_ai,
+            del_flag, create_by, create_time, remark
+        ) values (
+            #{deptId}, #{webhookKey}, #{enabled}, #{notifyOrder}, #{notifyAi},
+            '0', #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateMealWeComConfig" parameterType="MealWeComConfig">
+        update meal_wecom_config
+        <set>
+            <if test="deptId != null">dept_id = #{deptId},</if>
+            <if test="enabled != null and enabled != ''">enabled = #{enabled},</if>
+            <if test="notifyOrder != null and notifyOrder != ''">notify_order = #{notifyOrder},</if>
+            <if test="notifyAi != null and notifyAi != ''">notify_ai = #{notifyAi},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </set>
+        where config_id = #{configId} and del_flag = '0'
+    </update>
+
+    <update id="updateWebhookKey">
+        update meal_wecom_config
+        set webhook_key = #{webhookKey}, update_by = #{updateBy}, update_time = sysdate()
+        where config_id = #{configId} and del_flag = '0'
+    </update>
+
+    <update id="restoreMealWeComConfig" parameterType="MealWeComConfig">
+        update meal_wecom_config
+        set webhook_key = #{webhookKey},
+            enabled = #{enabled},
+            notify_order = #{notifyOrder},
+            notify_ai = #{notifyAi},
+            remark = #{remark},
+            del_flag = '0',
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where config_id = #{configId}
+    </update>
+
+    <update id="deleteMealWeComConfigByIds">
+        update meal_wecom_config set del_flag = '2', update_time = sysdate()
+        where config_id in
+        <foreach item="configId" collection="array" open="(" separator="," close=")">
+            #{configId}
+        </foreach>
+    </update>
+
+</mapper>

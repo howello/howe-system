@@ -23,6 +23,7 @@ import com.howe.meal.domain.dto.DishAiUpdateRequest;
 import com.howe.meal.mapper.MealCategoryMapper;
 import com.howe.meal.mapper.MealDishMapper;
 import com.howe.meal.service.IMealDishService;
+import com.howe.meal.service.IMealWeComNotifyService;
 import com.howe.meal.util.MealScopeGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -117,6 +118,8 @@ public class MealDishAiService {
 
     private final MealDishMapper mealDishMapper;
 
+    private final IMealWeComNotifyService mealWeComNotifyService;
+
     /** 线程池，延迟解析：容器未就绪或模块单独使用时退化为同步执行 */
     private volatile Executor executor;
 
@@ -154,14 +157,19 @@ public class MealDishAiService {
 
         Long dishId = exist.getDishId();
         String name = exist.getName();
+        // 异步线程没有登录态：操作人与家庭归属在请求线程内捕获。
+        // 通知发到操作人所在家庭；公共菜（deptId=0）没有自己的家庭群。
+        Long operatorId = SecurityUtils.getUserId();
+        Long operatorDeptId = SecurityUtils.getDeptId();
+        Long deptId = operatorDeptId != null ? operatorDeptId : exist.getDeptId();
         Executor target = resolveExecutor();
         if (target == null) {
             // 线程池不可用时同步执行，保证功能可用
-            applyUpdateFromText(dishId, name, text);
+            applyUpdateFromText(dishId, name, text, deptId, operatorId);
             return;
         }
         try {
-            target.execute(() -> applyUpdateFromText(dishId, name, text));
+            target.execute(() -> applyUpdateFromText(dishId, name, text, deptId, operatorId));
         } catch (Exception e) {
             log.warn("提交菜品 AI 更新任务失败，dishId={}", dishId, e);
         }
@@ -171,13 +179,16 @@ public class MealDishAiService {
      * 异步执行 AI 提取并落库（不依赖登录态）
      *
      * <p>只覆盖模型实际返回的非空字段；缺失或空字段保留数据库原值。
-     * 菜名、封面、分类、归属与来源不变。</p>
+     * 菜名、封面、分类、归属与来源不变。结束后发送企业微信结果通知。</p>
      *
-     * @param dishId 菜品 ID
-     * @param name   菜名，用于提示词定位菜品
-     * @param text   用户输入的完整做法
+     * @param dishId     菜品 ID
+     * @param name       菜名，用于提示词定位菜品
+     * @param text       用户输入的完整做法
+     * @param deptId     菜品归属家庭 ID
+     * @param operatorId 发起更新的用户 ID
      */
-    private void applyUpdateFromText(Long dishId, String name, String text) {
+    private void applyUpdateFromText(Long dishId, String name, String text, Long deptId, Long operatorId) {
+        String model = null;
         try {
             Map<String, Object> properties = new LinkedHashMap<>();
             List<String> required = new ArrayList<>();
@@ -189,10 +200,12 @@ public class MealDishAiService {
                     .prompt(buildUpdatePrompt(name, text))
                     .outputSchema(JSON.toJSONString(objectSchema(properties, required)))
                     .build());
+            model = chatResult.getModel();
             Object structured = chatResult.getStructured();
             if (!(structured instanceof Map)) {
                 log.warn("菜品 AI 更新未返回可解析的结构化结果，dishId={}，raw={}", dishId,
                         abbreviate(chatResult.getText()));
+                notifyUpdateResult(deptId, dishId, name, operatorId, false, "AI 没有看懂这段做法，这次先不改了", model);
                 return;
             }
             Map<String, Object> data = toMap(structured);
@@ -212,15 +225,58 @@ public class MealDishAiService {
 
             if (fields.isEmpty()) {
                 log.info("菜品 AI 更新未提取到可用字段，dishId={}", dishId);
+                notifyUpdateResult(deptId, dishId, name, operatorId, false, "这段做法里没有找到能补充的菜品信息", model);
                 return;
             }
             update.setUpdateBy(AI_UPDATER);
             mealDishMapper.updateMealDish(update);
             log.info("菜品 AI 更新完成，dishId={}，写入字段={}", dishId, fields.keySet());
+            notifyUpdateResult(deptId, dishId, name, operatorId, true,
+                    humanFieldNames(fields.keySet()), model);
         } catch (Exception e) {
             // 异步失败只记录日志：数据库保持原值，用户可稍后重试
             log.warn("菜品 AI 更新失败，dishId={}", dishId, e);
+            notifyUpdateResult(deptId, dishId, name, operatorId, false, readableMessage(e), model);
         }
+    }
+
+    /** 发送菜品 AI 更新结果通知，任何异常都不影响异步任务本身 */
+    private void notifyUpdateResult(Long deptId, Long dishId, String name, Long operatorId, boolean success,
+            String detail, String model) {
+        try {
+            mealWeComNotifyService.notifyDishAiUpdate(deptId, dishId, name, operatorId, success, detail, model);
+        } catch (Exception e) {
+            log.warn("发送菜品 AI 更新企业微信通知失败，dishId={}", dishId, e);
+        }
+    }
+
+    /** 取异常的可读提示，避免把堆栈写进通知 */
+    private String readableMessage(Exception e) {
+        return e instanceof ServiceException && e.getMessage() != null ? e.getMessage() : "AI 这次没有帮上忙";
+    }
+
+    /**
+     * 把写入字段的技术名转成家庭场景可读的中文名
+     *
+     * @param keys 字段名集合
+     * @return 顿号分隔的中文名
+     */
+    private String humanFieldNames(java.util.Set<String> keys) {
+        java.util.Map<String, String> names = new java.util.LinkedHashMap<>();
+        names.put("description", "简介");
+        names.put("tags", "标签");
+        names.put("duration", "耗时");
+        names.put("level", "难度");
+        names.put("serve", "份量");
+        names.put("kcal", "热量");
+        names.put("ingredients", "用料");
+        names.put("steps", "做法");
+        names.put("tips", "小贴士");
+        java.util.List<String> result = new java.util.ArrayList<>();
+        for (String key : keys) {
+            result.add(names.getOrDefault(key, key));
+        }
+        return String.join("、", result);
     }
 
     /** 解析业务线程池；容器未就绪或没有该 bean 时返回 null */

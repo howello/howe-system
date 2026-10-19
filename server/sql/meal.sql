@@ -234,6 +234,31 @@ create table meal_app_version (
 ) engine=innodb auto_increment=1 comment = '点餐-App 版本（wgt 热更新）';
 
 -- ----------------------------
+-- 8.1、企业微信通知配置（每家庭一条）
+--
+-- 只保存企业微信群机器人 webhook 的 key，完整请求地址由后端固定拼接官方域名，
+-- 避免用户填入任意地址造成 SSRF。key 是凭证，接口只返回掩码。
+-- 每个家庭最多一条有效配置（del_flag='0'），逻辑删除后允许重新新增。
+-- ----------------------------
+drop table if exists meal_wecom_config;
+create table meal_wecom_config (
+  config_id    bigint(20)   not null auto_increment    comment '配置ID',
+  dept_id      bigint(20)   not null                   comment '所属家庭ID',
+  webhook_key  varchar(128) default ''                 comment '企业微信群机器人 key（凭证，接口返回掩码）',
+  enabled      char(1)      default '0'                comment '家庭级总开关（0停用 1启用）',
+  notify_order char(1)      default '1'                comment '订单通知开关（0停用 1启用）',
+  notify_ai    char(1)      default '1'                comment 'AI 通知开关（0停用 1启用）',
+  del_flag     char(1)      default '0'                comment '删除标记（0存在 2删除）',
+  create_by    varchar(64)  default ''                 comment '创建者',
+  create_time  datetime                                comment '创建时间',
+  update_by    varchar(64)  default ''                 comment '更新者',
+  update_time  datetime                                comment '更新时间',
+  remark       varchar(500) default null               comment '备注',
+  primary key (config_id),
+  unique key uk_meal_wecom_config_dept (dept_id)
+) engine=innodb auto_increment=1 comment = '点餐-企业微信通知配置';
+
+-- ----------------------------
 -- 9、后台菜单
 --
 -- 不硬编码 menu_id：sys_menu 的 auto_increment 与既有数据无关，写死会撞车。
@@ -276,6 +301,11 @@ insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame
 values ('App 版本管理', @mealDirId, '6', 'appversion', 'meal/appversion/index', 1, 0, 'C', '0', '0', 'meal:appVersion:list', 'download', 'admin', sysdate(), 'App 版本管理菜单（wgt 热更新）');
 
 select @mealAppVersionMenuId := LAST_INSERT_ID();
+
+insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+values ('通知管理', @mealDirId, '7', 'wecom', 'meal/wecom/index', 1, 0, 'C', '0', '0', 'meal:wecom:list', 'message', 'admin', sysdate(), '企业微信通知配置菜单');
+
+select @mealWeComMenuId := LAST_INSERT_ID();
 
 -- 菜品按钮
 insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
@@ -332,6 +362,18 @@ insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame
 values ('版本删除', @mealAppVersionMenuId, '4', '#', '', 1, 0, 'F', '0', '0', 'meal:appVersion:remove', '#', 'admin', sysdate(), '');
 insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 values ('资源包上传', @mealAppVersionMenuId, '5', '#', '', 1, 0, 'F', '0', '0', 'meal:appVersion:upload', '#', 'admin', sysdate(), '上传 wgt 资源包到 R2');
+
+-- 企业微信通知按钮
+insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+values ('通知查询', @mealWeComMenuId, '1', '#', '', 1, 0, 'F', '0', '0', 'meal:wecom:query', '#', 'admin', sysdate(), '');
+insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+values ('通知新增', @mealWeComMenuId, '2', '#', '', 1, 0, 'F', '0', '0', 'meal:wecom:add', '#', 'admin', sysdate(), '');
+insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+values ('通知修改', @mealWeComMenuId, '3', '#', '', 1, 0, 'F', '0', '0', 'meal:wecom:edit', '#', 'admin', sysdate(), '');
+insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+values ('通知删除', @mealWeComMenuId, '4', '#', '', 1, 0, 'F', '0', '0', 'meal:wecom:remove', '#', 'admin', sysdate(), '');
+insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+values ('通知测试', @mealWeComMenuId, '5', '#', '', 1, 0, 'F', '0', '0', 'meal:wecom:test', '#', 'admin', sysdate(), '发送测试消息到企业微信群');
 
 -- ----------------------------
 -- 10、三个家庭角色

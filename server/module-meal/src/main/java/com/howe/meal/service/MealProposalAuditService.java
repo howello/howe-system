@@ -13,6 +13,7 @@ import com.howe.meal.domain.dto.DishAiTextResult;
 import com.howe.meal.mapper.MealCategoryRefMapper;
 import com.howe.meal.mapper.MealDishMapper;
 import com.howe.meal.mapper.MealProposalMapper;
+import com.howe.meal.service.IMealWeComNotifyService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -59,6 +60,8 @@ public class MealProposalAuditService {
 
     private final MealDishAiService mealDishAiService;
 
+    private final IMealWeComNotifyService mealWeComNotifyService;
+
     private final TransactionTemplate transactionTemplate;
 
     /** 线程池，延迟解析：容器未就绪或模块单独使用时退化为同步执行 */
@@ -102,18 +105,59 @@ public class MealProposalAuditService {
         } catch (Exception e) {
             log.warn("新菜提案 AI 自动审核调用失败，proposalId={}", proposalId, e);
             markAuditFailed(proposalId, e);
+            notifyAuditResult(proposal, "审核未完成", readableMessage(e), null);
             return;
         }
         try {
             if (!audit.isApproved()) {
                 applyReject(proposalId, audit.getRejectReason());
+                notifyAuditResult(proposal, "已驳回", readableAuditReason(audit.getRejectReason()), null);
             } else {
                 applyApprove(proposal, audit);
+                notifyAuditResult(proposal, "已通过", "已经自动补齐资料并加进菜单", null);
             }
         } catch (Exception e) {
             // 写入失败通常是提案状态已被人工审核抢先改动，事务已回滚，不影响人工结果
             log.warn("写入新菜提案 AI 审核结果失败，proposalId={}", proposalId, e);
+            notifyAuditResult(proposal, "审核未完成", "结果没能保存成功，等家人手动看一下", null);
         }
+    }
+
+    /**
+     * 发送提案 AI 审核结果通知
+     *
+     * @param proposal 提案
+     * @param result   结果
+     * @param reason   可读原因
+     * @param model    模型名，可为空
+     */
+    private void notifyAuditResult(MealProposal proposal, String result, String reason, String model) {
+        try {
+            mealWeComNotifyService.notifyProposalAiAudit(proposal.getDeptId(), proposal.getProposalId(),
+                    proposal.getName(), proposal.getUserId(), result, reason, model);
+        } catch (Exception e) {
+            log.warn("发送提案 AI 审核企业微信通知失败，proposalId={}", proposal.getProposalId(), e);
+        }
+    }
+
+    /**
+     * 取异常的可读提示，避免把堆栈写进通知
+     *
+     * @param e 异常
+     * @return 可读提示
+     */
+    private String readableMessage(Exception e) {
+        return e instanceof ServiceException && e.getMessage() != null ? e.getMessage() : "AI 这次没有帮上忙";
+    }
+
+    /**
+     * 取审核驳回原因，缺省时用兜底文案
+     *
+     * @param rejectReason 驳回原因
+     * @return 可读原因
+     */
+    private String readableAuditReason(String rejectReason) {
+        return StringUtils.isNotEmpty(rejectReason) ? rejectReason : AI_REJECT_FALLBACK;
     }
 
     /**

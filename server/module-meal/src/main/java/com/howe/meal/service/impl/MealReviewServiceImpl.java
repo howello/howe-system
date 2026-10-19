@@ -11,6 +11,7 @@ import com.howe.meal.mapper.MealOrderMapper;
 import com.howe.meal.mapper.MealReviewMapper;
 import com.howe.meal.service.IMealReviewService;
 import com.howe.meal.service.IMealNotifyService;
+import com.howe.meal.service.IMealWeComNotifyService;
 import com.howe.meal.service.ITransactionCommitExecutor;
 import com.howe.meal.util.MealScopeGuard;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ public class MealReviewServiceImpl implements IMealReviewService {
     private final MealReviewMapper mealReviewMapper;
     private final MealOrderMapper mealOrderMapper;
     private final IMealNotifyService mealNotifyService;
+    private final IMealWeComNotifyService mealWeComNotifyService;
     private final ITransactionCommitExecutor transactionCommitExecutor;
 
     @Override
@@ -81,6 +83,9 @@ public class MealReviewServiceImpl implements IMealReviewService {
         }
         mealReview.setCreateBy(SecurityUtils.getUsername());
         int rows = mealReviewMapper.insertMealReview(mealReview);
+        // 站内通知与企微通知都在事务提交后执行；评价的 @ 对象始终是实际接单厨师
+        transactionCommitExecutor.afterCommit(() -> mealWeComNotifyService.notifyOrderRated(order.getOrderId(),
+                mealReview.getScore(), mealReview.getContent()));
         if (order.getAcceptUserId() != null) {
             transactionCommitExecutor.afterCommit(() -> mealNotifyService.push("notify:chef:" + order.getAcceptUserId(),
                     "ORDER_RATED", order.getOrderId(), "收到新评价", "您的订单收到一条新评价",

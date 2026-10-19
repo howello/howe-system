@@ -45,6 +45,7 @@ export * from "./meal/order";
 export * from "./meal/review";
 export * from "./meal/proposal";
 export * from "./meal/appversion";
+export * from "./meal/wecom";
 
 // 首页工作台
 export * from "./home/stats";
