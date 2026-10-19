@@ -49,6 +49,9 @@ public class MealDishAiService {
     /** 对话补齐场景（路由 key） */
     private static final String SCENE_GENERATE = "meal.dish.generate";
 
+    /** 新菜提案 AI 自动审核场景（路由 key），与手动补齐分开配置模型 */
+    private static final String SCENE_AUDIT = "meal.dish.audit";
+
     /** 文生图场景（路由 key） */
     private static final String SCENE_COVER = "meal.dish.cover";
 
@@ -147,7 +150,7 @@ public class MealDishAiService {
         appendFieldSchema(missing, requestCategories, properties, required);
 
         AiChatRequest chatRequest = AiChatRequest.builder()
-                .scene(SCENE_GENERATE)
+                .scene(SCENE_AUDIT)
                 .system(auditPrompt())
                 .prompt(buildAuditPrompt(name, categoryIdByName.keySet(), requestCategories))
                 .outputSchema(JSON.toJSONString(objectSchema(properties, required)))
