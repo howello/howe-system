@@ -31,9 +31,11 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executor;
 
 /**
@@ -78,6 +80,30 @@ public class MealDishAiService {
     /** 封面风格后缀模板 key，对应 sys_config 的 ai.image.styleSuffix.recipe.photo */
     private static final String STYLE_KEY = "recipe.photo";
 
+    /** 菜名相似度阈值：归一化后字符集合 Jaccard 达到该值即视为同一道菜 */
+    private static final double DUPLICATE_SIMILARITY = 0.8D;
+
+    /** 参与模糊判重的最短菜名长度，过短的菜名容易误判 */
+    private static final int DUPLICATE_MIN_NAME_LENGTH = 4;
+
+    /** 菜名常见同义词，归一化时统一写法（番茄→西红柿、土豆/马铃薯→洋芋、鸡蛋→蛋） */
+    private static final Map<String, String> DISH_NAME_SYNONYMS = linkedSynonyms();
+
+    /**
+     * 构造同义词表（保持插入顺序，长词在前避免被短词提前替换）
+     *
+     * @return 同义词映射
+     */
+    private static Map<String, String> linkedSynonyms() {
+        Map<String, String> synonyms = new LinkedHashMap<>();
+        synonyms.put("西红柿", "西红柿");
+        synonyms.put("番茄", "西红柿");
+        synonyms.put("马铃薯", "洋芋");
+        synonyms.put("土豆", "洋芋");
+        synonyms.put("鸡蛋", "蛋");
+        return synonyms;
+    }
+
     /**
      * 文本补齐 system 提示词的缺省值
      *
@@ -97,6 +123,16 @@ public class MealDishAiService {
     private static final String DEFAULT_AUDIT_SUFFIX =
             "另外，请先判断该菜名是否为一道可制作的家常菜品：若是，approved 填 \"true\" 并按要求补齐字段；"
             + "若不是可制作的菜品、或内容明显不当，approved 填 \"false\"，rejectReason 用一句中文说明原因，其余字段留空。";
+
+    /**
+     * 自动审核的判重说明（固定追加，不随 sys_config 覆盖）
+     *
+     * <p>判重属于业务红线：即使库里的审核提示词被改过，也必须让模型结合已有菜品判断是否重复。</p>
+     */
+    private static final String AUDIT_DUPLICATE_SUFFIX =
+            "如果待审核菜名与「已有菜品」中的某道菜本质上是同一道菜（只是叫法、写法、别名或加料略有不同，"
+            + "例如「西红柿炒鸡蛋」与「番茄炒蛋」「西红柿炒蛋」），也必须 approved 填 \"false\"，"
+            + "rejectReason 写明与哪道已有菜品重复，避免重复上架。";
 
     /**
      * 菜品 AI 更新的 system 提示词缺省值
@@ -335,12 +371,25 @@ public class MealDishAiService {
     /**
      * AI 自动审核：一次结构化调用同时完成「判定是否可制作」与「补齐缺失字段」
      *
+     * <p>审核前会把该家庭已有的菜品（含公共菜谱）一并交给模型，用于识别「同一道菜的不同叫法」；
+     * 本地还会对菜名做一次归一化相似度兜底，命中时直接驳回、不再调用模型。</p>
+     *
      * @param name    菜名
      * @param current 当前已填字段快照
-     * @param deptId  归属家庭 ID，决定可用分类候选
+     * @param deptId  归属家庭 ID，决定可用分类候选与已有菜品范围
      * @return 判定结果；通过时携带补齐的字段与分类匹配结果
      */
     public DishAiAuditResult auditAndComplete(String name, DishAiGenerateRequest.Current current, Long deptId) {
+        List<String> existingNames = loadExistingDishNames(deptId);
+        // 本地兜底：菜名几乎一致时直接驳回，避免明显重复的提案浪费一次模型调用
+        String duplicate = findDuplicateDish(name, existingNames);
+        if (duplicate != null) {
+            DishAiAuditResult rejected = new DishAiAuditResult();
+            rejected.setApproved(false);
+            rejected.setRejectReason(duplicateRejectReason(duplicate));
+            return rejected;
+        }
+
         Map<String, Long> categoryIdByName = loadCandidateCategories(deptId);
         Missing missing = detectMissing(current);
         boolean requestCategories = missing.categories && !categoryIdByName.isEmpty();
@@ -357,7 +406,7 @@ public class MealDishAiService {
         AiChatRequest chatRequest = AiChatRequest.builder()
                 .scene(SCENE_AUDIT)
                 .system(auditPrompt())
-                .prompt(buildAuditPrompt(name, categoryIdByName.keySet(), requestCategories))
+                .prompt(buildAuditPrompt(name, categoryIdByName.keySet(), requestCategories, existingNames))
                 .outputSchema(JSON.toJSONString(objectSchema(properties, required)))
                 .build();
         AiChatResult chatResult = aiClient.chat(chatRequest);
@@ -372,12 +421,130 @@ public class MealDishAiService {
         DishAiAuditResult audit = new DishAiAuditResult();
         audit.setApproved(toBoolean(data.get("approved")));
         audit.setRejectReason(toText(data.get("rejectReason")));
+        // 模型判定通过后仍再做一次本地相似度兜底，模型漏判时也不会重复上架
+        if (audit.isApproved()) {
+            String similar = findDuplicateDish(name, existingNames);
+            if (similar != null) {
+                audit.setApproved(false);
+                audit.setRejectReason(duplicateRejectReason(similar));
+            }
+        }
         DishAiTextResult text = emptyTextResult();
         if (audit.isApproved()) {
             extractFields(text, data, missing, requestCategories, categoryIdByName);
         }
         audit.setText(text);
         return audit;
+    }
+
+    /**
+     * 查询审核范围内已有的菜品名称（本家庭私有菜 + 公共菜谱，含已下架）
+     *
+     * @param deptId 归属家庭 ID
+     * @return 菜品名称列表
+     */
+    private List<String> loadExistingDishNames(Long deptId) {
+        List<String> names = mealDishMapper.selectDishNamesByDept(deptId);
+        return names == null ? new ArrayList<>() : names;
+    }
+
+    /**
+     * 在已有菜品中查找与待审核菜名本质相同的菜
+     *
+     * <p>先做归一化（去空白标点、统一常见同义词与写法）后比较：
+     * 完全一致直接判重；两个菜名都不少于 4 个字符时，字符集合相似度达到阈值也判重。
+     * 这样「番茄炒蛋」与「西红柿炒鸡蛋」、「炒土豆片」与「炒洋芋片」等近似叫法都能拦住。
+     * 本地无法识别的同菜异名（如别名菜）再由模型结合已有菜名判断。</p>
+     *
+     * @param name          待审核菜名
+     * @param existingNames 已有菜品名称
+     * @return 命中的已有菜名；没有重复返回 null
+     */
+    private String findDuplicateDish(String name, List<String> existingNames) {
+        String normalized = normalizeDishName(name);
+        if (normalized.isEmpty() || existingNames == null) {
+            return null;
+        }
+        for (String existing : existingNames) {
+            if (existing == null) {
+                continue;
+            }
+            String normalizedExisting = normalizeDishName(existing);
+            if (normalizedExisting.isEmpty()) {
+                continue;
+            }
+            if (normalized.equals(normalizedExisting) || isSimilarDishName(normalized, normalizedExisting)) {
+                return existing;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 归一化后的菜名是否足够相似
+     *
+     * <p>只对不少于 4 个字符的菜名做模糊比较，避免「鸡」「鱼」这类短名互相误杀。</p>
+     *
+     * @param left  归一化菜名
+     * @param right 归一化菜名
+     * @return 是否视为同一道菜
+     */
+    private boolean isSimilarDishName(String left, String right) {
+        if (left.length() < DUPLICATE_MIN_NAME_LENGTH || right.length() < DUPLICATE_MIN_NAME_LENGTH) {
+            return false;
+        }
+        return jaccard(left, right) >= DUPLICATE_SIMILARITY;
+    }
+
+    /**
+     * 菜名归一化：去掉空白与标点，统一常见同义词（番茄/西红柿、土豆/马铃薯/洋芋、鸡蛋/蛋）
+     *
+     * @param name 原始菜名
+     * @return 归一化后的菜名
+     */
+    private String normalizeDishName(String name) {
+        if (name == null) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder(name.length());
+        for (char ch : name.toCharArray()) {
+            if (Character.isLetterOrDigit(ch)) {
+                builder.append(Character.toLowerCase(ch));
+            }
+        }
+        String normalized = builder.toString();
+        for (Map.Entry<String, String> entry : DISH_NAME_SYNONYMS.entrySet()) {
+            normalized = normalized.replace(entry.getKey(), entry.getValue());
+        }
+        return normalized;
+    }
+
+    /**
+     * 字符集合 Jaccard 相似度：同时命中的字越多、并集越小，越接近同一道菜
+     *
+     * @param left  归一化菜名
+     * @param right 归一化菜名
+     * @return 0~1 的相似度
+     */
+    private double jaccard(String left, String right) {
+        Set<Character> leftSet = new HashSet<>();
+        for (char ch : left.toCharArray()) {
+            leftSet.add(ch);
+        }
+        Set<Character> rightSet = new HashSet<>();
+        for (char ch : right.toCharArray()) {
+            rightSet.add(ch);
+        }
+        Set<Character> intersection = new HashSet<>(leftSet);
+        intersection.retainAll(rightSet);
+        Set<Character> union = new HashSet<>(leftSet);
+        union.addAll(rightSet);
+        return union.isEmpty() ? 0D : (double) intersection.size() / union.size();
+    }
+
+    /** 重复菜品的驳回原因 */
+    private String duplicateRejectReason(String existingName) {
+        return "已有相似菜品「" + existingName + "」，同一道菜不重复上架";
     }
 
     /**
@@ -656,7 +823,8 @@ public class MealDishAiService {
      * 读取自动审核的 system 提示词：在补齐提示词之后追加判定说明
      */
     private String auditPrompt() {
-        return systemPrompt() + ConfigUtils.getString(ConfigConstants.AI_PROMPT_MEAL_DISH_AUDIT_SUFFIX, DEFAULT_AUDIT_SUFFIX);
+        return systemPrompt() + ConfigUtils.getString(ConfigConstants.AI_PROMPT_MEAL_DISH_AUDIT_SUFFIX,
+                DEFAULT_AUDIT_SUFFIX) + AUDIT_DUPLICATE_SUFFIX;
     }
 
     private String buildPrompt(String name, Collection<String> categoryNames, boolean withCategories) {
@@ -670,9 +838,23 @@ public class MealDishAiService {
         return builder.toString();
     }
 
-    private String buildAuditPrompt(String name, Collection<String> categoryNames, boolean withCategories) {
-        return buildPrompt(name, categoryNames, withCategories)
-                + "同时给出 approved 判定；不通过时填写 rejectReason。";
+    /**
+     * 组装自动审核的用户提示词：附带已有菜品名称，供模型判断是否为同一道菜
+     *
+     * @param name           待审核菜名
+     * @param categoryNames  可用分类名称
+     * @param withCategories 是否请求模型匹配分类
+     * @param existingNames  已有菜品名称
+     * @return 提示词
+     */
+    private String buildAuditPrompt(String name, Collection<String> categoryNames, boolean withCategories,
+            List<String> existingNames) {
+        StringBuilder builder = new StringBuilder(buildPrompt(name, categoryNames, withCategories));
+        builder.append("\n已有菜品（用于判重）：")
+                .append(existingNames == null || existingNames.isEmpty() ? "暂无" : String.join("、", existingNames))
+                .append("\n请判断待审核菜名是否与已有菜品本质上是同一道菜；是则 approved 填 \"false\" 并说明与哪道重复。");
+        builder.append("\n同时给出 approved 判定；不通过时填写 rejectReason。");
+        return builder.toString();
     }
 
     private DishAiTextResult emptyTextResult() {

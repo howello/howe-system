@@ -81,6 +81,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where d.dish_id = #{dishId} and d.del_flag = '0'
     </select>
 
+    <!--
+      新菜提案 AI 自动审核判重：返回本家庭私有菜 + 公共菜谱的名称。
+      不按 status 过滤：已下架的菜仍属于「已有菜品」，避免审核通过后与下架菜重复。
+    -->
+    <select id="selectDishNamesByDept" parameterType="Long" resultType="String">
+        select d.name
+        from meal_dish d
+        where d.del_flag = '0'
+          and (d.dept_id = 0 or d.dept_id = #{deptId})
+        order by d.dish_id asc
+    </select>
+
     <insert id="insertMealDish" parameterType="MealDish" useGeneratedKeys="true" keyProperty="dishId">
         insert into meal_dish (
             dept_id, name, cover, description, tags,

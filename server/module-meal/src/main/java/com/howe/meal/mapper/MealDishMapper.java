@@ -30,6 +30,16 @@ public interface MealDishMapper {
     MealDish selectMealDishById(Long dishId);
 
     /**
+     * 查询审核范围内的菜品名称（本家庭私有菜 + 公共菜谱，含已下架）
+     *
+     * <p>供新菜提案 AI 自动审核判断是否为已有菜品，避免同一道菜重复上架。</p>
+     *
+     * @param deptId 归属家庭ID（0 表示只查公共菜谱）
+     * @return 菜品名称集合
+     */
+    List<String> selectDishNamesByDept(Long deptId);
+
+    /**
      * 新增菜品
      *
      * @param mealDish 菜品
