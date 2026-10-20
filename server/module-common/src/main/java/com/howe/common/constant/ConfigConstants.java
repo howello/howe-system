@@ -201,6 +201,9 @@ public class ConfigConstants
     /** 菜品 AI 更新（从完整做法提取字段）的 system 提示词 */
     public static final String AI_PROMPT_MEAL_DISH_UPDATE_SYSTEM = "ai.prompt.meal.dish.updateSystem";
 
+    /** App 发版日志润色的 system 提示词 */
+    public static final String AI_PROMPT_MEAL_APP_VERSION_LOG = "ai.prompt.meal.app.versionLog";
+
     /**
      * 点餐 App 版本发布令牌
      *

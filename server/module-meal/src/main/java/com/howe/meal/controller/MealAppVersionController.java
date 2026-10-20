@@ -2,16 +2,20 @@ package com.howe.meal.controller;
 
 import com.howe.common.annotation.Anonymous;
 import com.howe.common.annotation.Log;
+import com.howe.common.annotation.RateLimiter;
 import com.howe.common.constant.ConfigConstants;
 import com.howe.common.constant.HttpStatus;
 import com.howe.common.core.controller.BaseController;
 import com.howe.common.core.domain.AjaxResult;
 import com.howe.common.core.page.TableDataInfo;
 import com.howe.common.enums.BusinessType;
+import com.howe.common.enums.LimitType;
 import com.howe.common.utils.ConfigUtils;
 import com.howe.common.utils.StringUtils;
 import com.howe.meal.domain.MealAppVersion;
+import com.howe.meal.domain.dto.AppVersionLogPolishBody;
 import com.howe.meal.service.IMealAppVersionService;
+import com.howe.meal.service.MealAppVersionLogService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -51,6 +55,8 @@ import java.util.Map;
 public class MealAppVersionController extends BaseController {
 
     private final IMealAppVersionService mealAppVersionService;
+
+    private final MealAppVersionLogService mealAppVersionLogService;
 
     /** 脚本发布用的令牌请求头 */
     private static final String PUBLISH_TOKEN_HEADER = "X-Publish-Token";
@@ -158,6 +164,36 @@ public class MealAppVersionController extends BaseController {
             data.put("fileName", version.getFileName());
             data.put("forceUpdate", version.getForceUpdate());
             return AjaxResult.success(data);
+        } catch (Exception e) {
+            return AjaxResult.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 润色发版日志（脚本用）
+     *
+     * <p>与发布接口共用 {@code X-Publish-Token} 鉴权：CI 把本次提交摘要发来，返回家庭用户可读的
+     * 更新说明；润色结果不落库，由脚本随后作为 {@code updateLog} 交给发布接口。
+     * 调用失败时脚本回退原始摘要，不影响发版。</p>
+     */
+    @Operation(summary = "润色发版日志（脚本用）",
+            description = "用发布令牌鉴权，把提交摘要交给 AI 提炼成用户可读的更新说明；结果不落库")
+    @Anonymous
+    @RateLimiter(time = 60, count = 10, limitType = LimitType.IP)
+    @PostMapping("/polish-log")
+    public AjaxResult polishLog(
+            @Parameter(description = "发布令牌") @RequestHeader(value = PUBLISH_TOKEN_HEADER, required = false) String publishToken,
+            @RequestBody AppVersionLogPolishBody body) {
+        AjaxResult tokenError = assertPublishToken(publishToken);
+        if (tokenError != null) {
+            return tokenError;
+        }
+        try {
+            String updateLog = mealAppVersionLogService.polish(
+                    body == null ? null : body.getSource(),
+                    body == null ? null : body.getVersionName(),
+                    body == null ? null : body.getVersionCode());
+            return AjaxResult.success(updateLog);
         } catch (Exception e) {
             return AjaxResult.error(e.getMessage());
         }

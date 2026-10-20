@@ -186,7 +186,7 @@ values ('raw-http', '原生异步文生图', 'raw-http', null,
 -- 「AI 管理 > 场景路由」里手工维护。
 -- 场景标识与 module-meal 代码里写死的常量一致，不要改名。
 -- ----------------------------------------------------------------------------
-delete from ai_scene_route where scene in ('meal.dish.generate', 'meal.dish.audit', 'meal.dish.update', 'meal.dish.cover');
+delete from ai_scene_route where scene in ('meal.dish.generate', 'meal.dish.audit', 'meal.dish.update', 'meal.dish.cover', 'meal.app.version.log');
 
 -- 对话补齐：优先名为 deepseek-flash 的对话模型，否则取首个启用的对话模型
 insert into ai_scene_route (scene, capability, primary_model_id, params, enabled, remark, create_by, create_time)
@@ -207,6 +207,14 @@ limit 1;
 -- 菜品 AI 更新（从完整做法提取字段）：默认与对话补齐同模型同参数，后台可单独改配
 insert into ai_scene_route (scene, capability, primary_model_id, params, enabled, remark, create_by, create_time)
 select 'meal.dish.update', 'CHAT', m.id, '{"temperature":0.5}', 1, '菜品AI更新-做法提取', 'admin', sysdate()
+from ai_model m
+where m.capability = 'CHAT' and m.enabled = 1
+order by (m.model_name = 'deepseek-flash') desc, m.id asc
+limit 1;
+
+-- App 发版日志润色：CI 发布前把提交摘要提炼成用户可读的更新说明
+insert into ai_scene_route (scene, capability, primary_model_id, params, enabled, remark, create_by, create_time)
+select 'meal.app.version.log', 'CHAT', m.id, '{"temperature":0.5}', 1, 'App发版日志AI润色', 'admin', sysdate()
 from ai_model m
 where m.capability = 'CHAT' and m.enabled = 1
 order by (m.model_name = 'deepseek-flash') desc, m.id asc
@@ -247,7 +255,8 @@ delete from sys_config where config_key in (
   'ai.image.transfer.expireMinutes',
   'ai.prompt.meal.dish.system',
   'ai.prompt.meal.dish.auditSuffix',
-  'ai.prompt.meal.dish.updateSystem'
+  'ai.prompt.meal.dish.updateSystem',
+  'ai.prompt.meal.app.versionLog'
 );
 
 insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
@@ -352,6 +361,11 @@ insert into sys_config (config_name, config_key, config_value, config_type, crea
 values ('AI-菜品更新提示词', 'ai.prompt.meal.dish.updateSystem',
         '你是一位资深中餐菜谱编辑。用户会给出一道菜的完整做法，请从中提取结构化菜品信息。所有内容使用简体中文：简介精炼（不超过 60 字）；标签给出 3 到 6 个短词；耗时、难度、份量、热量按文本合理推断；用料提取名称与用量；做法按步骤拆分并保留原文关键信息；小贴士提取注意事项。文本中确实未提到的字段返回空字符串或空数组，不要编造。',
         'Y', 'admin', sysdate(), '菜品「AI 更新」使用的 system 提示词；留空则用代码内缺省值');
+
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+values ('AI-App发版日志润色提示词', 'ai.prompt.meal.app.versionLog',
+        '你是家庭点餐 App 的版本公告编辑。用户会把本次发版的代码提交标题交给你，请把它们改写成家庭成员能看懂的更新说明。要求：只使用给定提交里明确提到的内容，不编造、不夸大、不写技术术语（如 commit、分支、重构、依赖）；每条一行，最多 3 行，整段不超过 100 个汉字；不使用序号、Markdown、emoji；语气自然平实，例如「新增菜品编辑页，可以直接修改做法」「修复下架的菜仍显示在点餐区的问题」。',
+        'Y', 'admin', sysdate(), 'CI 发版前「日志润色」使用的 system 提示词；留空则用代码内缺省值');
 
 -- ----------------------------------------------------------------------------
 -- 10. 菜单与按钮权限
