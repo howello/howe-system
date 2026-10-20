@@ -8,13 +8,13 @@
 --       meal_proposal 的标签/耗时/难度/用料/做法/小贴士扩展列已并入建表。
 --
 -- 八张表：
---   meal_category     菜品分类，dept_id=0 为平台公共分类，否则为该家庭私有分类
+--   meal_category     菜品分类（唯一主类），dept_id=0 为平台公共分类，固定 9 条
 --   meal_dish         菜品，dept_id=0 为平台公共菜谱，否则为该家庭私有菜
 --   meal_order        订单主表，只有下单时间（没有预约用餐时间）
 --   meal_order_item   订单明细，存菜名/封面快照，菜品后续改名或删除都不影响历史订单
 --   meal_review       评价，一单一评（order_id 唯一约束）
 --   meal_proposal     新菜提案，审核通过时自动往 meal_dish 落一条（source=1）
---   meal_category_ref 菜品/提案与分类的多对多关联，biz_type 区分（1=菜品 2=提案）
+--   meal_category_ref 菜品/提案与唯一主类的一对一关联，biz_type 区分（1=菜品 2=提案）
 --   meal_app_version  App（meal-ui）wgt 资源包版本，客户端启动时据此检测热更新
 --
 -- 菜品与分类承载「公共数据 + 家庭私有数据」，因此不走 @DataScope（数据权限只会
@@ -30,25 +30,31 @@
 -- ============================================================
 
 -- ----------------------------
--- 1、菜品分类
+-- 1、菜品分类（唯一主类）
+--
+-- 分类是「唯一主类」而不是标签：固定 9 条平台公共分类（dept_id = 0），
+-- 名称见 MealCategoryTaxonomy：岷县、荤菜、半荤、素菜、水产、蛋豆、凉卤、汤羹、面点。
+-- 家庭不能新增/删除分类；「招牌」不是分类，只做点餐端推荐位，不落库。
 -- ----------------------------
 drop table if exists meal_category;
 create table meal_category (
-  category_id  bigint(20)   not null auto_increment    comment '分类ID',
-  dept_id      bigint(20)   default 0                  comment '所属家庭ID（0=公共分类）',
-  name         varchar(64)  not null                   comment '分类名称',
-  icon         varchar(500) default ''                 comment '分类图标',
-  sort         int(4)       default 0                  comment '排序',
-  status       char(1)      default '0'                comment '状态（0正常 1停用）',
-  del_flag     char(1)      default '0'                comment '删除标记（0存在 2删除）',
-  create_by    varchar(64)  default ''                 comment '创建者',
-  create_time  datetime                                comment '创建时间',
-  update_by    varchar(64)  default ''                 comment '更新者',
-  update_time  datetime                                comment '更新时间',
-  remark       varchar(500) default null               comment '备注',
+  category_id  bigint(20)    not null auto_increment    comment '分类ID',
+  dept_id      bigint(20)    default 0                  comment '所属家庭ID（0=公共分类）',
+  name         varchar(64)   not null                   comment '分类名称（9 个唯一主类之一）',
+  description  varchar(255)  default ''                 comment '分类说明（一句话定位）',
+  basis        varchar(1000) default ''                 comment '分类依据（放什么、不放什么、示例）',
+  icon         varchar(500)  default ''                 comment '分类图标',
+  sort         int(4)        default 0                  comment '排序',
+  status       char(1)       default '0'                comment '状态（0正常 1停用）',
+  del_flag     char(1)       default '0'                comment '删除标记（0存在 2删除）',
+  create_by    varchar(64)   default ''                 comment '创建者',
+  create_time  datetime                                 comment '创建时间',
+  update_by    varchar(64)   default ''                 comment '更新者',
+  update_time  datetime                                 comment '更新时间',
+  remark       varchar(500)  default null               comment '备注',
   primary key (category_id),
   key idx_meal_category_dept (dept_id, status)
-) engine=innodb auto_increment=1 comment = '点餐-菜品分类';
+) engine=innodb auto_increment=1 comment = '点餐-菜品分类（唯一主类）';
 
 -- ----------------------------
 -- 2、菜品
@@ -191,17 +197,18 @@ create table meal_proposal (
 -- ----------------------------
 -- 7、菜品分类关联（菜品/提案共用一张多态关联表）
 --
--- 一道菜 / 一条提案都可挂多个分类，用 biz_type 区分业务：1=菜品(meal_dish) 2=提案(meal_proposal)。
+-- 分类是唯一主类：主键 (biz_type, biz_id) 保证一条业务只有一条分类关联，
+-- 一道菜 / 一条提案只能归一个主类。biz_type：1=菜品(meal_dish) 2=提案(meal_proposal)。
 -- 因此 meal_dish / meal_proposal 均不再有 category_id 列，分类归属统一存本表。
 -- ----------------------------
 drop table if exists meal_category_ref;
 create table meal_category_ref (
   biz_type     tinyint(4)   not null                   comment '业务类型（1=菜品 2=提案）',
   biz_id       bigint(20)   not null                   comment '业务ID（dish_id 或 proposal_id）',
-  category_id  bigint(20)   not null                   comment '分类ID',
-  primary key (biz_type, biz_id, category_id),
+  category_id  bigint(20)   not null                   comment '分类ID（唯一主类）',
+  primary key (biz_type, biz_id),
   key idx_meal_category_ref_category (category_id)
-) engine=innodb comment = '点餐-分类关联（菜品/提案共用）';
+) engine=innodb comment = '点餐-分类关联（唯一主类，菜品/提案共用）';
 
 -- ----------------------------
 -- 8、App 版本（wgt 资源热更新）
@@ -380,6 +387,7 @@ values ('通知测试', @mealWeComMenuId, '5', '#', '', 1, 0, 'F', '0', '0', 'me
 --
 -- data_scope 一律用 '3'（本部门数据权限）：订单/评价/提案的 list 查询靠它隔离到本家庭。
 -- role_key 是点餐端判断「是不是厨师」的依据（/getInfo 返回的 roles 里带 meal_chef）。
+-- 分类是固定 9 条唯一主类：分类增删改只允许平台管理员，家庭角色只保留 list/query。
 -- ----------------------------
 delete from sys_role_menu where role_id in (select role_id from sys_role where role_key in ('meal_eater', 'meal_chef', 'meal_manager'));
 delete from sys_role where role_key in ('meal_eater', 'meal_chef', 'meal_manager');
@@ -400,18 +408,21 @@ values ('家庭管理员', 'meal_manager', 12, '3', 1, 1, '0', '0', 'admin', sys
 select @managerRoleId := LAST_INSERT_ID();
 
 -- 点餐员不配后台菜单：只在家里手机端点餐，不进管理端。
--- 厨师：菜品与分类的完整维护权 + 订单的接单与完成。
+-- 厨师：菜品维护权 + 分类只读 + 订单的接单与完成；分类增删改已从家庭角色收回。
 insert into sys_role_menu (role_id, menu_id) values (@chefRoleId, @mealDirId);
 insert into sys_role_menu (role_id, menu_id)
 select @chefRoleId, menu_id from sys_menu
 where perms in ('meal:dish:list', 'meal:dish:query', 'meal:dish:add', 'meal:dish:edit', 'meal:dish:remove',
-                'meal:category:list', 'meal:category:query', 'meal:category:add', 'meal:category:edit', 'meal:category:remove',
+                'meal:category:list', 'meal:category:query',
                 'meal:order:list', 'meal:order:query', 'meal:order:dispatch', 'meal:order:finish');
 
--- 家庭管理员：点餐管理目录下的全部菜单与按钮。
+-- 家庭管理员：点餐管理目录下的全部菜单与按钮，但分类增删改仅平台管理员可用，
+-- 因此这里显式排除 meal:category:add / edit / remove。
 insert into sys_role_menu (role_id, menu_id) values (@managerRoleId, @mealDirId);
 insert into sys_role_menu (role_id, menu_id)
-select @managerRoleId, menu_id from sys_menu where perms like 'meal:%';
+select @managerRoleId, menu_id from sys_menu
+where perms like 'meal:%'
+  and perms not in ('meal:category:add', 'meal:category:edit', 'meal:category:remove');
 
 -- 家庭管理员额外获得管理端「系统管理 > 用户管理」的菜单与按钮，用于增删改本家庭成员。
 -- 数据范围仍是 data_scope='3'（本部门），用户列表只会返回本家庭成员，新增时归属部门
@@ -426,33 +437,41 @@ select distinct @managerRoleId, parent_id from sys_menu
 where perms = 'system:user:list' and parent_id is not null and parent_id <> 0;
 
 -- ----------------------------
--- 11、公共菜谱分类（dept_id = 0，所有家庭可见）
+-- 11、公共菜谱分类（唯一主类，dept_id = 0，所有家庭可见）
 --
--- 19 个公共分类，按「类型（荤菜/半荤半素/素菜）+ 食材（肉/鱼/蛋/蔬菜/豆制品）+
--- 做法（炒/炖/炸/煮/蒸/烤/凉拌/卤/汤）+ 热菜 + 地方口味（岷县）」组织。
--- 分类是多对多：一道菜同时属于多个分类，归属见 11 节的 meal_category_ref。
+-- 固定 9 个互斥主类，一道菜只能归一个；名称与代码常量
+-- MealCategoryTaxonomy 保持一致，迁移脚本也按同一份清单对齐。
+-- 「招牌」不是分类：它只做点餐端推荐位，不落库。
 -- ----------------------------
-insert into meal_category (dept_id, name, icon, sort, status, del_flag, create_by, create_time, remark)
+insert into meal_category (dept_id, name, description, basis, icon, sort, status, del_flag, create_by, create_time, remark)
 values
-(0, '热菜',     '🔥',  1, '0', '0', 'admin', sysdate(), '公共分类'),
-(0, '岷县',     '🏔️',  2, '0', '0', 'admin', sysdate(), '公共分类'),
-(0, '荤菜',     '🍖',  3, '0', '0', 'admin', sysdate(), '公共分类'),
-(0, '半荤半素', '🥘',  4, '0', '0', 'admin', sysdate(), '公共分类'),
-(0, '素菜',     '🥬',  5, '0', '0', 'admin', sysdate(), '公共分类'),
-(0, '肉',       '🥩',  6, '0', '0', 'admin', sysdate(), '公共分类'),
-(0, '鱼',       '🐟',  7, '0', '0', 'admin', sysdate(), '公共分类'),
-(0, '蛋',       '🥚',  8, '0', '0', 'admin', sysdate(), '公共分类'),
-(0, '蔬菜',     '🥦',  9, '0', '0', 'admin', sysdate(), '公共分类'),
-(0, '豆制品',   '🫘', 10, '0', '0', 'admin', sysdate(), '公共分类'),
-(0, '炒',       '🍳', 11, '0', '0', 'admin', sysdate(), '公共分类'),
-(0, '炖',       '🍲', 12, '0', '0', 'admin', sysdate(), '公共分类'),
-(0, '炸',       '🍤', 13, '0', '0', 'admin', sysdate(), '公共分类'),
-(0, '煮',       '🍜', 14, '0', '0', 'admin', sysdate(), '公共分类'),
-(0, '蒸',       '♨️', 15, '0', '0', 'admin', sysdate(), '公共分类'),
-(0, '烤',       '🍢', 16, '0', '0', 'admin', sysdate(), '公共分类'),
-(0, '凉拌',     '🥗', 17, '0', '0', 'admin', sysdate(), '公共分类'),
-(0, '卤',       '🍗', 18, '0', '0', 'admin', sysdate(), '公共分类'),
-(0, '汤',       '🥣', 19, '0', '0', 'admin', sysdate(), '公共分类');
+(0, '岷县', '岷县地方特色菜',
+ '只要顾客认「岷县」就优先归这里；普通家常菜不要硬归岷县。示例：岷县浆水面、岷县凉粉、岷县点心、当归炖鸡、洋芋拌汤、面片',
+ '🏔️', 1, '0', '0', 'admin', sysdate(), '公共主类'),
+(0, '荤菜', '以肉为主、肉量明显的菜',
+ '肉少菜多的不放；鱼虾蟹贝不放；汤羹不放。示例：红烧肉、回锅肉、辣子鸡、小炒黄牛肉、糖醋排骨、火锅',
+ '🍖', 2, '0', '0', 'admin', sysdate(), '公共主类'),
+(0, '半荤', '肉少菜多、肉丝肉片配大量蔬菜、肉末配菜',
+ '肉为主的不放；纯素不放。示例：鱼香肉丝、肉末豆角、蚂蚁上树、芹菜肉丝、蒜苔肉丝、青椒肉丝',
+ '🥘', 3, '0', '0', 'admin', sysdate(), '公共主类'),
+(0, '素菜', '纯素菜、时蔬、菌菇、素炒',
+ '含肉的不放；豆腐/蛋为主的不放。示例：清炒时蔬、手撕包菜、蒜蓉西兰花、干锅花菜、菌菇小炒',
+ '🥬', 4, '0', '0', 'admin', sysdate(), '公共主类'),
+(0, '水产', '鱼、虾、蟹、贝、蛙等水产为主料',
+ '鱼香肉丝不放；水产汤归汤羹；凉拌水产归凉卤。示例：水煮鱼、酸菜鱼、红烧鱼、辣炒虾、干锅牛蛙、辣炒花甲',
+ '🐟', 5, '0', '0', 'admin', sysdate(), '公共主类'),
+(0, '蛋豆', '蛋类菜、豆腐、豆制品为主',
+ '只有少量豆腐/蛋的荤菜不放；汤里的豆腐蛋不归这里。示例：麻婆豆腐、家常豆腐、番茄炒蛋、蒸蛋、香干炒肉丝',
+ '🥚', 6, '0', '0', 'admin', sysdate(), '公共主类'),
+(0, '凉卤', '凉拌菜、卤味冷盘、冷菜',
+ '热炒、热炖、热汤不放。示例：拍黄瓜、口水鸡、夫妻肺片、卤味拼盘、凉拌木耳',
+ '🥗', 7, '0', '0', 'admin', sysdate(), '公共主类'),
+(0, '汤羹', '汤、羹、煲汤、带汤炖品',
+ '干锅、炒菜、面点不放。示例：番茄蛋汤、酸辣汤、当归鸡汤、排骨汤、豆腐羹',
+ '🥣', 8, '0', '0', 'admin', sysdate(), '公共主类'),
+(0, '面点', '饺子、包子、饼、面条、馒头、花卷等面食，以及米饭、炒饭、粥、煲仔饭等主食',
+ '含肉面点也归面点，不归荤菜。示例：水饺、煎饺、葱油饼、牛肉面、包子、花卷、黄金炒饭、排骨煲仔饭',
+ '🍜', 9, '0', '0', 'admin', sysdate(), '公共主类');
 
 -- ----------------------------
 -- 12、公共菜谱（dept_id = 0，所有家庭可见）
@@ -505,182 +524,72 @@ values
 (0,'黄金炒饭','https://img.wyantao.com/img/ai/2026/10/09/516586369c784e60b683a7e5b6f33c55.png','粒粒分明的黄金炒饭，米饭裹满蛋香，色泽金黄，简单快手。','家常菜,炒饭,快手餐,蛋香','15分钟','简单','2人份','每份约520千卡','[{"name": "米饭", "amount": "300克（隔夜饭更佳）"}, {"name": "鸡蛋", "amount": "3个"}, {"name": "胡萝卜", "amount": "50克"}, {"name": "玉米粒", "amount": "50克"}, {"name": "青豆", "amount": "30克"}, {"name": "小葱", "amount": "2根"}, {"name": "食用油", "amount": "20毫升"}, {"name": "盐", "amount": "3克"}, {"name": "生抽", "amount": "10毫升"}]','["将米饭提前打散，胡萝卜切小丁，小葱切葱花备用。", "鸡蛋打入碗中搅匀，锅中放少许油，炒至嫩熟后盛出。", "锅中加入食用油，放入胡萝卜丁、玉米粒和青豆翻炒至断生。", "加入米饭大火翻炒，使米粒充分散开，炒至水分减少。", "倒入炒好的鸡蛋，加入盐和生抽调味，继续翻炒均匀。", "撒入葱花翻匀即可出锅。"]','["使用冷藏隔夜米饭，炒出的饭粒更松散。", "炒饭时保持大火快速翻炒，避免米饭发黏。", "鸡蛋提前炒熟再加入，可保持口感嫩滑。"]','0',41,'0','0','admin',sysdate(),'admin',sysdate(),'公共菜谱'),
 (0,'辣炒花甲','https://img.wyantao.com/img/ai/2026/10/09/e98024522bc64b669c806370a36a321e.png','辣炒花甲是一道鲜辣开胃的家常海鲜菜，花甲肉质嫩滑，裹满香辣酱汁，配啤酒或米饭都过瘾。','家常菜,海鲜,辣,快炒,下酒菜','20分钟','初级','2人份','280千卡','[{"name": "花甲", "amount": "500克"}, {"name": "小米辣", "amount": "3-4个"}, {"name": "干辣椒", "amount": "5-6个"}, {"name": "大蒜", "amount": "4瓣"}, {"name": "生姜", "amount": "1小块"}, {"name": "小葱", "amount": "2根"}, {"name": "生抽", "amount": "1汤匙"}, {"name": "蚝油", "amount": "1汤匙"}, {"name": "料酒", "amount": "1汤匙"}, {"name": "白糖", "amount": "1茶匙"}, {"name": "食用油", "amount": "2汤匙"}, {"name": "盐", "amount": "适量"}]','["花甲放入淡盐水中浸泡1-2小时，中途换水一次，让其吐净泥沙，然后搓洗干净沥干。", "小米辣切圈，干辣椒剪段，大蒜切末，生姜切丝，小葱切段备用。", "锅中烧开水，加入少许料酒，倒入花甲焯烫至开口，捞出沥干；未开口的丢弃。", "热锅倒油，中小火下姜丝、蒜末、干辣椒段和小米辣圈，炒出香味。", "转大火，倒入花甲快速翻炒，沿锅边淋入料酒去腥。", "加入生抽、蚝油、白糖和少许盐，继续翻炒均匀，让花甲裹上酱汁。", "最后撒入葱段，翻炒几下即可出锅。"]','["花甲吐沙是关键，可在水中加几滴香油促进吐沙。", "焯水时间不宜过长，开口即可捞出，避免肉质变老。", "全程大火快炒，保持花甲鲜嫩，酱汁均匀包裹。"]','0',42,'0','0','admin',sysdate(),'admin',sysdate(),'公共菜谱');
 
--- ================= 菜品↔分类关联（biz_type=1 表示菜品） =================
--- 同类标签的菜合并成一条语句；重复执行按主键去重。
+-- ================= 菜品↔唯一主类关联（biz_type=1 表示菜品） =================
+-- 分类是唯一主类：每道菜只有一条关联，归属按用户确认的口径逐组写死。
+-- 42 道公共菜全部分类完成，不存在「待分类」的公共菜。
 
--- 热菜 / 半荤半素 / 蛋 / 蔬菜 / 炒
-insert into meal_category_ref (biz_type, biz_id, category_id)
-select 1, d.dish_id, c.category_id
-from meal_dish d
-join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name in ('青椒炒鸡蛋','西红柿炒鸡蛋','韭菜炒鸡蛋','苦瓜炒蛋','西葫芦炒蛋')
-  and c.name in ('热菜','半荤半素','蛋','蔬菜','炒');
-
--- 素菜 / 蔬菜 / 炒
-insert into meal_category_ref (biz_type, biz_id, category_id)
-select 1, d.dish_id, c.category_id
-from meal_dish d
-join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name in ('酸辣白菜','炒洋芋片','炒洋芋条','淋汁上海青','清炒油麦菜','酸辣土豆丝')
-  and c.name in ('素菜','蔬菜','炒');
-
--- 热菜 / 荤菜 / 肉 / 炖
-insert into meal_category_ref (biz_type, biz_id, category_id)
-select 1, d.dish_id, c.category_id
-from meal_dish d
-join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name in ('板栗鸡','红烧肉','黄焖鸡','可乐鸡翅','大盘鸡')
-  and c.name in ('热菜','荤菜','肉','炖');
-
--- 热菜 / 荤菜 / 肉 / 炒
-insert into meal_category_ref (biz_type, biz_id, category_id)
-select 1, d.dish_id, c.category_id
-from meal_dish d
-join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name in ('小炒黄牛肉','回锅肉')
-  and c.name in ('热菜','荤菜','肉','炒');
-
--- 荤菜 / 肉 / 煮
-insert into meal_category_ref (biz_type, biz_id, category_id)
-select 1, d.dish_id, c.category_id
-from meal_dish d
-join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name in ('排骨煲仔饭','猪肉大葱饺子','牛肉饺子')
-  and c.name in ('荤菜','肉','煮');
-
--- 热菜 / 半荤半素 / 肉 / 蔬菜 / 炒
-insert into meal_category_ref (biz_type, biz_id, category_id)
-select 1, d.dish_id, c.category_id
-from meal_dish d
-join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name in ('莴笋炒肉片','青椒肉丝','蒜苔炒肉')
-  and c.name in ('热菜','半荤半素','肉','蔬菜','炒');
-
--- 热菜 / 荤菜 / 鱼 / 蒸
+-- 岷县
 insert into meal_category_ref (biz_type, biz_id, category_id)
 select 1, d.dish_id, c.category_id
 from meal_dish d join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name = '清蒸鲈鱼'
-  and c.name in ('热菜','荤菜','鱼','蒸');
+where d.dept_id = 0 and d.name in ('洋芋拌汤','面片') and c.name = '岷县';
 
--- 热菜 / 素菜 / 蔬菜 / 炖
+-- 荤菜
 insert into meal_category_ref (biz_type, biz_id, category_id)
 select 1, d.dish_id, c.category_id
 from meal_dish d join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name = '红烧茄子'
-  and c.name in ('热菜','素菜','蔬菜','炖');
+where d.dept_id = 0
+  and d.name in ('锅包肉','小炒黄牛肉','板栗鸡','牛排','红烧肉','煮猪蹄','火锅',
+                 '回锅肉','梅菜扣肉','黄焖鸡','可乐鸡翅','大盘鸡')
+  and c.name = '荤菜';
 
--- 热菜 / 荤菜 / 肉 / 炸
+-- 半荤
 insert into meal_category_ref (biz_type, biz_id, category_id)
 select 1, d.dish_id, c.category_id
 from meal_dish d join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name = '锅包肉'
-  and c.name in ('热菜','荤菜','肉','炸');
+where d.dept_id = 0 and d.name in ('莴笋炒肉片','青椒肉丝','蒜苔炒肉') and c.name = '半荤';
 
--- 岷县 / 汤 / 素菜 / 蔬菜
+-- 素菜
 insert into meal_category_ref (biz_type, biz_id, category_id)
 select 1, d.dish_id, c.category_id
 from meal_dish d join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name = '洋芋拌汤'
-  and c.name in ('岷县','汤','素菜','蔬菜');
+where d.dept_id = 0
+  and d.name in ('酸辣白菜','红烧茄子','炒洋芋片','炒洋芋条','淋汁上海青','清炒油麦菜','酸辣土豆丝')
+  and c.name = '素菜';
 
--- 煮
+-- 水产
 insert into meal_category_ref (biz_type, biz_id, category_id)
 select 1, d.dish_id, c.category_id
 from meal_dish d join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name = '面片'
-  and c.name in ('岷县','煮');
+where d.dept_id = 0 and d.name in ('清蒸鲈鱼','玉米炒虾仁','辣炒花甲') and c.name = '水产';
 
--- 热菜 / 荤菜 / 肉 / 烤
+-- 蛋豆
 insert into meal_category_ref (biz_type, biz_id, category_id)
 select 1, d.dish_id, c.category_id
 from meal_dish d join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name = '牛排'
-  and c.name in ('热菜','荤菜','肉','烤');
+where d.dept_id = 0
+  and d.name in ('青椒炒鸡蛋','西红柿炒鸡蛋','韭菜炒鸡蛋','苦瓜炒蛋','西葫芦炒蛋','香干炒肉丝')
+  and c.name = '蛋豆';
 
--- 汤 / 蛋 / 蔬菜
+-- 凉卤
 insert into meal_category_ref (biz_type, biz_id, category_id)
 select 1, d.dish_id, c.category_id
 from meal_dish d join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name = '西红柿鸡蛋汤'
-  and c.name in ('汤','蛋','蔬菜');
+where d.dept_id = 0 and d.name in ('凉拌黄瓜') and c.name = '凉卤';
 
--- 汤 / 蛋
+-- 汤羹
 insert into meal_category_ref (biz_type, biz_id, category_id)
 select 1, d.dish_id, c.category_id
 from meal_dish d join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name = '紫菜蛋花汤'
-  and c.name in ('汤','蛋');
+where d.dept_id = 0 and d.name in ('西红柿鸡蛋汤','紫菜蛋花汤') and c.name = '汤羹';
 
--- 热菜 / 荤菜 / 肉 / 煮
+-- 面点（面食 + 主食）
 insert into meal_category_ref (biz_type, biz_id, category_id)
 select 1, d.dish_id, c.category_id
 from meal_dish d join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name = '煮猪蹄'
-  and c.name in ('热菜','荤菜','肉','煮');
-
--- 素菜 / 蔬菜 / 煮
-insert into meal_category_ref (biz_type, biz_id, category_id)
-select 1, d.dish_id, c.category_id
-from meal_dish d join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name = '洋芋饺子'
-  and c.name in ('素菜','蔬菜','煮');
-
--- 素菜 / 蔬菜
-insert into meal_category_ref (biz_type, biz_id, category_id)
-select 1, d.dish_id, c.category_id
-from meal_dish d join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name = '绿辣子夹馍'
-  and c.name in ('素菜','蔬菜');
-
--- 热菜 / 煮
-insert into meal_category_ref (biz_type, biz_id, category_id)
-select 1, d.dish_id, c.category_id
-from meal_dish d join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name = '火锅'
-  and c.name in ('热菜','煮');
-
--- 热菜 / 半荤半素 / 蔬菜 / 炒
-insert into meal_category_ref (biz_type, biz_id, category_id)
-select 1, d.dish_id, c.category_id
-from meal_dish d join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name = '玉米炒虾仁'
-  and c.name in ('热菜','半荤半素','蔬菜','炒');
-
--- 热菜 / 荤菜 / 肉 / 蒸
-insert into meal_category_ref (biz_type, biz_id, category_id)
-select 1, d.dish_id, c.category_id
-from meal_dish d join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name = '梅菜扣肉'
-  and c.name in ('热菜','荤菜','肉','蒸');
-
--- 素菜 / 蔬菜 / 凉拌
-insert into meal_category_ref (biz_type, biz_id, category_id)
-select 1, d.dish_id, c.category_id
-from meal_dish d join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name = '凉拌黄瓜'
-  and c.name in ('素菜','蔬菜','凉拌');
-
--- 热菜 / 半荤半素 / 豆制品 / 肉 / 炒
-insert into meal_category_ref (biz_type, biz_id, category_id)
-select 1, d.dish_id, c.category_id
-from meal_dish d join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name = '香干炒肉丝'
-  and c.name in ('热菜','半荤半素','豆制品','肉','炒');
-
--- 蛋 / 炒
-insert into meal_category_ref (biz_type, biz_id, category_id)
-select 1, d.dish_id, c.category_id
-from meal_dish d join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name = '黄金炒饭'
-  and c.name in ('蛋','炒');
-
--- 热菜 / 荤菜 / 炒
-insert into meal_category_ref (biz_type, biz_id, category_id)
-select 1, d.dish_id, c.category_id
-from meal_dish d join meal_category c on c.dept_id = 0 and c.del_flag = '0'
-where d.dept_id = 0 and d.name = '辣炒花甲'
-  and c.name in ('热菜','荤菜','炒');
+where d.dept_id = 0
+  and d.name in ('排骨煲仔饭','猪肉大葱饺子','洋芋饺子','牛肉饺子','绿辣子夹馍','黄金炒饭')
+  and c.name = '面点';
 
 -- ----------------------------
 -- 13、参数配置（App 版本发布令牌）

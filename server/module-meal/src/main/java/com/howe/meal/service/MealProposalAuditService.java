@@ -3,6 +3,8 @@ package com.howe.meal.service;
 import com.howe.common.exception.ServiceException;
 import com.howe.common.utils.StringUtils;
 import com.howe.common.utils.spring.SpringUtils;
+import com.howe.meal.constant.MealCategoryTaxonomy;
+import com.howe.meal.domain.MealCategory;
 import com.howe.meal.domain.MealCategoryRef;
 import com.howe.meal.domain.MealDish;
 import com.howe.meal.domain.MealProposal;
@@ -10,6 +12,7 @@ import com.howe.meal.domain.dto.DishAiAuditResult;
 import com.howe.meal.domain.dto.DishAiCoverResult;
 import com.howe.meal.domain.dto.DishAiGenerateRequest;
 import com.howe.meal.domain.dto.DishAiTextResult;
+import com.howe.meal.mapper.MealCategoryMapper;
 import com.howe.meal.mapper.MealCategoryRefMapper;
 import com.howe.meal.mapper.MealDishMapper;
 import com.howe.meal.mapper.MealProposalMapper;
@@ -19,6 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -57,6 +61,8 @@ public class MealProposalAuditService {
     private final MealDishMapper mealDishMapper;
 
     private final MealCategoryRefMapper mealCategoryRefMapper;
+
+    private final MealCategoryMapper mealCategoryMapper;
 
     private final MealDishAiService mealDishAiService;
 
@@ -164,14 +170,14 @@ public class MealProposalAuditService {
      * 用提案现有字段创建菜品（人工审核通过时使用），返回菜品 ID
      *
      * @param proposal    提案
-     * @param categoryIds 菜品分类 ID 列表
+     * @param categoryId  唯一主类 ID（可为空，表示待分类）
      * @param operator    操作人
      * @return 新菜品 ID
      */
-    public Long createDishFromProposal(MealProposal proposal, List<Long> categoryIds, String operator) {
+    public Long createDishFromProposal(MealProposal proposal, Long categoryId, String operator) {
         return insertDish(proposal.getDeptId(), proposal.getName(), proposal.getImage(), proposal.getDescription(),
                 proposal.getTags(), proposal.getDuration(), proposal.getLevel(), null, null,
-                proposal.getIngredients(), proposal.getSteps(), proposal.getTips(), categoryIds, operator);
+                proposal.getIngredients(), proposal.getSteps(), proposal.getTips(), categoryId, operator);
     }
 
     /**
@@ -197,15 +203,15 @@ public class MealProposalAuditService {
         if (fields == null) {
             fields = Map.of();
         }
-        // 分类：优先 AI 匹配结果；提案原本已选分类或 AI 未匹配时沿用提案原分类
-        List<Long> existingCategoryIds = mealCategoryRefMapper.selectCategoryIds(MealCategoryRef.BIZ_PROPOSAL,
+        // 唯一主类：优先 AI 匹配结果；提案原本已选主类或 AI 未匹配时沿用提案原分类
+        Long existingCategoryId = mealCategoryRefMapper.selectCategoryId(MealCategoryRef.BIZ_PROPOSAL,
                 proposal.getProposalId());
-        List<Long> matchedCategoryIds = text.getMatchedCategoryIds();
-        List<Long> categoryIds = matchedCategoryIds != null && !matchedCategoryIds.isEmpty()
-                ? matchedCategoryIds : existingCategoryIds;
+        Long matchedCategoryId = text.getMatchedCategoryId();
+        Long categoryId = matchedCategoryId != null ? matchedCategoryId : existingCategoryId;
+        // 无论是 AI 匹配还是沿用提案，都再校验一次：只接受 9 个公共主类，避免历史/异常关联写进菜品
+        categoryId = requirePrimaryCategoryOrNull(categoryId);
         // 提案原本没有分类时，把 AI 匹配到的分类一并写入提案，便于人工查看与后续改判
-        boolean fillProposalCategories = (existingCategoryIds == null || existingCategoryIds.isEmpty())
-                && categoryIds != null && !categoryIds.isEmpty();
+        boolean fillProposalCategory = existingCategoryId == null && categoryId != null;
 
         String cover = proposal.getImage();
         if (isBlank(cover)) {
@@ -222,11 +228,12 @@ public class MealProposalAuditService {
         String kcal = fieldText(fields, "kcal");
 
         String finalCover = cover;
+        Long finalCategoryId = categoryId;
         transactionTemplate.executeWithoutResult(status -> {
             Long dishId = insertDish(proposal.getDeptId(), proposal.getName(), finalCover, description, tags,
-                    duration, level, serve, kcal, ingredients, steps, tips, categoryIds, AI_AUDITOR);
-            if (fillProposalCategories) {
-                saveProposalCategories(proposal.getProposalId(), categoryIds);
+                    duration, level, serve, kcal, ingredients, steps, tips, finalCategoryId, AI_AUDITOR);
+            if (fillProposalCategory) {
+                saveProposalCategory(proposal.getProposalId(), finalCategoryId);
             }
 
             MealProposal update = new MealProposal();
@@ -282,23 +289,44 @@ public class MealProposalAuditService {
         transactionTemplate.executeWithoutResult(status -> mealProposalMapper.updateMealProposal(update));
     }
 
-    /** 写入提案的分类关联；categoryIds 为空则不做任何事 */
-    private void saveProposalCategories(Long proposalId, List<Long> categoryIds) {
-        if (proposalId == null || categoryIds == null || categoryIds.isEmpty()) {
+    /**
+     * 校验分类 ID 是否为 9 个公共主类之一
+     *
+     * <p>AI 匹配结果与提案历史关联都要过这一道：不是公共主类（含旧分类、家庭私有分类、
+     * 已删除分类）一律视为未分类，返回 null，让菜品落到「待分类」而不是写进非法分类。</p>
+     *
+     * @param categoryId 待校验的分类 ID
+     * @return 合法的主类 ID；非法或为空返回 null
+     */
+    private Long requirePrimaryCategoryOrNull(Long categoryId) {
+        if (categoryId == null) {
+            return null;
+        }
+        MealCategory category = mealCategoryMapper.selectMealCategoryById(categoryId);
+        if (category == null || category.getDeptId() == null
+                || category.getDeptId() != MealCategoryTaxonomy.PUBLIC_DEPT_ID) {
+            return null;
+        }
+        return MealCategoryTaxonomy.isPrimaryCategory(category.getName()) ? categoryId : null;
+    }
+
+    /** 写入提案的唯一主类关联；categoryId 为空则不做任何事 */
+    private void saveProposalCategory(Long proposalId, Long categoryId) {        if (proposalId == null || categoryId == null) {
             return;
         }
         MealCategoryRef ref = new MealCategoryRef();
         ref.setBizType(MealCategoryRef.BIZ_PROPOSAL);
         ref.setBizId(proposalId);
-        ref.setCategoryIds(categoryIds);
-        mealCategoryRefMapper.insertMealCategoryRefs(ref);
+        ref.setCategoryId(categoryId);
+        mealCategoryRefMapper.insertMealCategoryRef(ref);
     }
 
     /** 提案当前已填字段快照（供只补缺失判断） */
     private DishAiGenerateRequest.Current snapshotCurrent(MealProposal proposal) {
         DishAiGenerateRequest.Current current = new DishAiGenerateRequest.Current();
-        current.setCategoryIds(
-                mealCategoryRefMapper.selectCategoryIds(MealCategoryRef.BIZ_PROPOSAL, proposal.getProposalId()));
+        Long categoryId = mealCategoryRefMapper.selectCategoryId(MealCategoryRef.BIZ_PROPOSAL,
+                proposal.getProposalId());
+        current.setCategoryIds(categoryId == null ? new ArrayList<>() : new ArrayList<>(List.of(categoryId)));
         current.setDescription(proposal.getDescription());
         current.setCover(proposal.getImage());
         current.setTags(proposal.getTags());
@@ -323,10 +351,10 @@ public class MealProposalAuditService {
         }
     }
 
-    /** 落一条菜品并写入分类关联 */
+    /** 落一条菜品并写入唯一主类关联 */
     private Long insertDish(Long deptId, String name, String cover, String description, String tags, String duration,
             String level, String serve, String kcal, String ingredients, String steps, String tips,
-            List<Long> categoryIds, String operator) {
+            Long categoryId, String operator) {
         MealDish dish = new MealDish();
         dish.setDeptId(deptId);
         dish.setName(name);
@@ -345,20 +373,20 @@ public class MealProposalAuditService {
         dish.setSource("1");
         dish.setCreateBy(operator);
         mealDishMapper.insertMealDish(dish);
-        saveDishCategories(dish.getDishId(), categoryIds);
+        saveDishCategory(dish.getDishId(), categoryId);
         return dish.getDishId();
     }
 
-    /** 写入菜品的分类关联；categoryIds 为空则不做任何事 */
-    private void saveDishCategories(Long dishId, List<Long> categoryIds) {
-        if (dishId == null || categoryIds == null || categoryIds.isEmpty()) {
+    /** 写入菜品的唯一主类关联；categoryId 为空则不做任何事 */
+    private void saveDishCategory(Long dishId, Long categoryId) {
+        if (dishId == null || categoryId == null) {
             return;
         }
         MealCategoryRef ref = new MealCategoryRef();
         ref.setBizType(MealCategoryRef.BIZ_DISH);
         ref.setBizId(dishId);
-        ref.setCategoryIds(categoryIds);
-        mealCategoryRefMapper.insertMealCategoryRefs(ref);
+        ref.setCategoryId(categoryId);
+        mealCategoryRefMapper.insertMealCategoryRef(ref);
     }
 
     /** 解析业务线程池；容器未就绪或没有该 bean 时返回 null */

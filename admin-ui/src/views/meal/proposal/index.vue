@@ -41,7 +41,12 @@
       </el-table-column>
       <el-table-column label="菜名" align="left" prop="name" :show-overflow-tooltip="true" min-width="140" />
       <el-table-column label="提交人" align="center" prop="userName" width="100" />
-      <el-table-column label="建议分类" align="center" prop="categoryNames" :show-overflow-tooltip="true" min-width="110" />
+      <el-table-column label="建议主类" align="center" prop="categoryNames" :show-overflow-tooltip="true" min-width="110">
+        <template #default="scope">
+          <el-tag v-if="scope.row.categoryNames" size="small">{{ scope.row.categoryNames }}</el-tag>
+          <el-tag v-else type="warning" size="small">待分类</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column label="想吃的理由" align="left" prop="reason" :show-overflow-tooltip="true" min-width="180" />
       <el-table-column label="状态" align="center" width="90">
         <template #default="scope">
@@ -131,7 +136,7 @@
         </el-descriptions-item>
         <el-descriptions-item label="菜名">{{ detail.name || "—" }}</el-descriptions-item>
         <el-descriptions-item label="提交人">{{ detail.userName || "—" }}</el-descriptions-item>
-        <el-descriptions-item label="建议分类">{{ detail.categoryNames || "—" }}</el-descriptions-item>
+        <el-descriptions-item label="建议主类">{{ detail.categoryNames || "—" }}</el-descriptions-item>
         <el-descriptions-item label="简介">{{ detail.description || "—" }}</el-descriptions-item>
         <el-descriptions-item label="想吃的理由">{{ detail.reason || "—" }}</el-descriptions-item>
         <el-descriptions-item label="状态">

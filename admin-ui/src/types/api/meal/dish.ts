@@ -16,7 +16,8 @@ export interface MealDishQueryParams extends PageDomain {
  * 点餐-菜品
  *
  * deptId = 0 表示平台公共菜谱，所有家庭可见。
- * 菜品与分类是多对多：categoryIds 为关联分类，categoryNames 为顿号拼接的展示名。
+ * 分类是唯一主类：categoryIds 最多 1 个元素，categoryNames 为唯一主类名称；
+ * 未绑定主类时 categoryIds 为空、categoryNames 为空（管理端显示「待分类」）。
  * ingredients / steps / tips 在库里是 json，接口层按 JSON 字符串收发。
  */
 export interface MealDish extends BaseEntity {
@@ -24,9 +25,9 @@ export interface MealDish extends BaseEntity {
   dishId?: number;
   /** 所属家庭ID（0=公共菜谱） */
   deptId?: number;
-  /** 关联分类ID列表 */
+  /** 关联分类ID列表（最多 1 个主类） */
   categoryIds?: number[];
-  /** 分类名称（列表附带，顿号拼接） */
+  /** 分类名称（唯一主类名） */
   categoryNames?: string;
   /** 菜名 */
   name?: string;
@@ -75,14 +76,14 @@ export interface MealDishAiCurrent {
   tips?: string;
 }
 
-/** 一键 AI 文本补齐结果：只含被补齐的文本字段与分类匹配结果 */
+/** 一键 AI 文本补齐结果：只含被补齐的文本字段与唯一主类匹配结果 */
 export interface MealDishAiTextResult {
   /** 本次生成的文本字段集合 */
   fields?: Record<string, string>;
-  /** 匹配到的分类ID */
-  matchedCategoryIds?: number[];
-  /** 未匹配到现有分类的分类名 */
-  unmatchedCategoryNames?: string[];
+  /** 匹配到的唯一主类ID；未匹配时为 null */
+  matchedCategoryId?: number | null;
+  /** 模型返回但不在 9 个主类内的名称（仅提示，不落库） */
+  unmatchedCategoryName?: string | null;
 }
 
 /** 一键 AI 封面生成结果 */

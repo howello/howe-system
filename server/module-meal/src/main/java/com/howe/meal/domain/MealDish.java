@@ -15,8 +15,8 @@ import java.util.List;
  * <p>{@code deptId = 0} 表示平台预置的公共菜谱，所有家庭可见；具体家庭 ID 表示该家庭的私有菜。
  * 与分类同理，本表<b>不能走 {@code @DataScope}</b>，隔离条件在 MealDishMapper.xml 里手写。</p>
  *
- * <p>菜品与分类是多对多：分类归属存在 {@code meal_category_ref}（biz_type=1），
- * 本表不再有 category_id 列。</p>
+ * <p>菜品与分类是<b>唯一主类</b>关系：分类归属存在 {@code meal_category_ref}（biz_type=1），
+ * 一道菜最多一条关联；本表不再有 category_id 列。</p>
  *
  * <p>用料 / 做法 / 小贴士三列在库里是 json，Java 侧用字符串承载 JSON 文本，
  * 由前端负责组装与解析，避免为三列各引一个 TypeHandler。</p>
@@ -35,12 +35,12 @@ public class MealDish extends BaseEntity {
     @Schema(description = "所属家庭ID（0=公共菜谱）", example = "0")
     private Long deptId;
 
-    /** 查询用：按分类筛选（不落库，多分类下命中任一分类即返回） */
+    /** 查询用：按分类筛选（不落库，命中该主类即返回） */
     @Schema(description = "分类ID（查询条件，不落库）", example = "1")
     private Long categoryId;
 
-    /** 关联分类ID列表：新增/修改入参，详情回显 */
-    @Schema(description = "关联分类ID列表", example = "[1, 3]")
+    /** 关联分类ID列表：新增/修改入参，详情回显；最多 1 个元素 */
+    @Schema(description = "关联分类ID列表（最多 1 个主类）", example = "[1]")
     private List<Long> categoryIds;
 
     @Schema(description = "菜名", example = "红烧肉")
@@ -97,11 +97,15 @@ public class MealDish extends BaseEntity {
     @Schema(description = "删除标记（0存在 2删除）", example = "0")
     private String delFlag;
 
-    /** 查询用：分类名称（顿号拼接，不落库） */
-    @Schema(description = "分类名称（查询结果附带，顿号拼接，不落库）")
+    /** 查询用：分类名称（唯一主类名，不落库） */
+    @Schema(description = "分类名称（查询结果附带，不落库）")
     private String categoryNames;
 
     /** 查询用：关键词（菜名或食材，不落库） */
     @Schema(description = "关键词（按菜名或食材模糊匹配，不落库）")
     private String keyword;
+
+    /** 招牌聚合用：近 90 天被点份数（仅招牌接口返回，不落库） */
+    @Schema(description = "近 90 天被点份数（仅招牌接口返回，不落库）", example = "12")
+    private Long orderCount;
 }

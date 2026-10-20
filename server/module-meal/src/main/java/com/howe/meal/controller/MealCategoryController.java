@@ -63,7 +63,8 @@ public class MealCategoryController extends BaseController {
         return toAjax(mealCategoryService.insertMealCategory(mealCategory));
     }
 
-    @Operation(summary = "修改分类")
+    @Operation(summary = "修改分类", description = "仅平台管理员；只能改分类说明、分类依据、图标、排序、状态与备注。"
+            + "名称是唯一主类标识，回传原名称可以通过校验，改动则被拒绝")
     @PreAuthorize("@ss.hasPermi('meal:category:edit')")
     @Log(title = "点餐分类", businessType = BusinessType.UPDATE)
     @PutMapping

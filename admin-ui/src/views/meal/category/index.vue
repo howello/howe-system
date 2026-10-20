@@ -1,5 +1,13 @@
 <template>
   <div class="app-container">
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      title="分类固定为 9 个唯一主类，一道菜只能归一个主类；「招牌」不是分类，由点餐端按近 90 天点单量自动推荐。"
+      style="margin-bottom: 12px"
+    />
+
     <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="80px">
       <el-form-item label="分类名称" prop="name">
         <el-input v-model="queryParams.name" placeholder="请输入分类名称" clearable style="width: 200px" @keyup.enter="handleQuery" />
@@ -18,31 +26,29 @@
 
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5">
-        <el-button type="primary" plain icon="Plus" @click="handleAdd" v-hasPermi="['meal:category:add']">新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button type="success" plain icon="Edit" :disabled="single" @click="handleUpdate()" v-hasPermi="['meal:category:edit']">修改</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button type="danger" plain icon="Delete" :disabled="multiple" @click="handleDelete()" v-hasPermi="['meal:category:remove']">删除</el-button>
+        <el-button
+          type="success"
+          plain
+          icon="Edit"
+          :disabled="single"
+          @click="handleUpdate()"
+          v-hasPermi="['meal:category:edit']"
+        >修改</el-button>
       </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
     <el-table v-loading="loading" :data="categoryList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="分类名称" align="left" prop="name" :show-overflow-tooltip="true" min-width="160">
+      <el-table-column label="分类名称" align="left" prop="name" min-width="110">
         <template #default="scope">
-          <a class="link-type" style="cursor: pointer" @click="handleUpdate(scope.row)">{{ scope.row.name }}</a>
+          <a class="link-type" style="cursor: pointer" @click="handleUpdate(scope.row)">
+            {{ scope.row.icon }} {{ scope.row.name }}
+          </a>
         </template>
       </el-table-column>
-      <el-table-column label="归属" align="center" width="110">
-        <template #default="scope">
-          <el-tag :type="scope.row.deptId === 0 ? 'warning' : 'success'" size="small">
-            {{ scope.row.deptId === 0 ? "公共" : "本家庭" }}
-          </el-tag>
-        </template>
-      </el-table-column>
+      <el-table-column label="分类说明" align="left" prop="description" :show-overflow-tooltip="true" min-width="180" />
+      <el-table-column label="分类依据" align="left" prop="basis" :show-overflow-tooltip="true" min-width="260" />
       <el-table-column label="排序" align="center" prop="sort" width="80" />
       <el-table-column label="状态" align="center" width="90">
         <template #default="scope">
@@ -51,28 +57,36 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="备注" align="left" prop="remark" :show-overflow-tooltip="true" min-width="160" />
-      <el-table-column label="创建时间" align="center" prop="createTime" width="170" />
-      <el-table-column label="操作" align="center" width="150" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="100" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['meal:category:edit']">修改</el-button>
-          <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['meal:category:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
 
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
 
-    <el-dialog :title="title" v-model="open" width="600px" append-to-body>
+    <el-dialog :title="title" v-model="open" width="680px" append-to-body>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
         <el-form-item label="分类名称" prop="name">
-          <el-input v-model="form.name" placeholder="请输入分类名称" maxlength="64" />
+          <el-input v-model="form.name" disabled />
+          <div class="form-tip">分类名称是唯一主类的稳定标识，不支持修改</div>
         </el-form-item>
-        <el-form-item v-if="isAdmin && !form.categoryId" label="归属">
-          <el-checkbox v-model="asPublic">建为平台公共分类（所有家庭可见）</el-checkbox>
+        <el-form-item label="分类说明" prop="description">
+          <el-input v-model="form.description" placeholder="一句话定位，如「以肉为主、肉量明显的菜」" maxlength="255" show-word-limit />
         </el-form-item>
-        <el-form-item label="图标地址" prop="icon">
-          <el-input v-model="form.icon" placeholder="选填，图片地址" />
+        <el-form-item label="分类依据" prop="basis">
+          <el-input
+            v-model="form.basis"
+            type="textarea"
+            :rows="4"
+            placeholder="放什么、不放什么、示例"
+            maxlength="1000"
+            show-word-limit
+          />
+        </el-form-item>
+        <el-form-item label="图标" prop="icon">
+          <el-input v-model="form.icon" placeholder="emoji 或图片地址" />
         </el-form-item>
         <el-form-item label="排序" prop="sort">
           <el-input-number v-model="form.sort" :min="0" controls-position="right" />
@@ -98,14 +112,10 @@
 </template>
 
 <script setup lang="ts" name="MealCategory">
-import { getCategory, listCategory, addCategory, updateCategory, delCategory } from "@/api/meal/category"
+import { getCategory, listCategory, updateCategory } from "@/api/meal/category"
 import type { MealCategory, MealCategoryQueryParams } from "@/types/api/meal/category"
-import useUserStore from "@/store/modules/user"
 
 const { proxy } = getCurrentInstance() as any
-
-const userStore = useUserStore()
-const isAdmin = computed(() => userStore.roles.includes("admin"))
 
 const categoryList = ref<MealCategory[]>([])
 const open = ref<boolean>(false)
@@ -114,11 +124,8 @@ const submitting = ref<boolean>(false)
 const showSearch = ref<boolean>(true)
 const ids = ref<number[]>([])
 const single = ref<boolean>(true)
-const multiple = ref<boolean>(true)
 const total = ref<number>(0)
 const title = ref<string>("")
-/** 新增时是否建成平台公共分类 */
-const asPublic = ref<boolean>(false)
 
 const data = reactive({
   form: {} as MealCategory,
@@ -129,7 +136,8 @@ const data = reactive({
     status: undefined
   } as MealCategoryQueryParams,
   rules: {
-    name: [{ required: true, message: "分类名称不能为空", trigger: "blur" }]
+    description: [{ required: true, message: "分类说明不能为空", trigger: "blur" }],
+    basis: [{ required: true, message: "分类依据不能为空", trigger: "blur" }]
   }
 })
 
@@ -153,10 +161,11 @@ function cancel() {
 }
 
 function reset() {
-  asPublic.value = false
   form.value = {
     categoryId: undefined,
     name: undefined,
+    description: undefined,
+    basis: undefined,
     icon: undefined,
     sort: 0,
     status: "0",
@@ -178,13 +187,6 @@ function resetQuery() {
 function handleSelectionChange(selection: MealCategory[]) {
   ids.value = selection.map((item) => item.categoryId as number)
   single.value = selection.length !== 1
-  multiple.value = !selection.length
-}
-
-function handleAdd() {
-  reset()
-  open.value = true
-  title.value = "新增分类"
 }
 
 function handleUpdate(row?: MealCategory) {
@@ -203,17 +205,20 @@ function submitForm() {
       return
     }
     submitting.value = true
-    // 归属由后端按当前登录用户决定；只有超管勾选「平台公共」时才显式传 0
-    const payload: MealCategory = { ...form.value }
-    if (!payload.categoryId) {
-      payload.deptId = asPublic.value ? 0 : undefined
-    } else {
-      payload.deptId = undefined
+    // 名称是唯一主类标识：原样回传（后端会校验是否被改动），只改可维护字段
+    const payload: MealCategory = {
+      categoryId: form.value.categoryId,
+      name: form.value.name,
+      description: form.value.description,
+      basis: form.value.basis,
+      icon: form.value.icon,
+      sort: form.value.sort,
+      status: form.value.status,
+      remark: form.value.remark
     }
-    const action = payload.categoryId ? updateCategory(payload) : addCategory(payload)
-    action
+    updateCategory(payload)
       .then(() => {
-        proxy.$modal.msgSuccess(payload.categoryId ? "修改成功" : "新增成功")
+        proxy.$modal.msgSuccess("修改成功")
         open.value = false
         getList()
       })
@@ -223,17 +228,14 @@ function submitForm() {
   })
 }
 
-function handleDelete(row?: MealCategory) {
-  const categoryIds = row?.categoryId ? [row.categoryId] : ids.value
-  proxy.$modal
-    .confirm("是否确认删除选中的分类？分类下还有菜品时会被拒绝。")
-    .then(() => delCategory(categoryIds))
-    .then(() => {
-      getList()
-      proxy.$modal.msgSuccess("删除成功")
-    })
-    .catch(() => {})
-}
-
 getList()
 </script>
+
+<style scoped>
+.form-tip {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.5;
+}
+</style>

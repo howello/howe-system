@@ -8,6 +8,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="categoryId"  column="category_id"  />
         <result property="deptId"      column="dept_id"      />
         <result property="name"        column="name"         />
+        <result property="description" column="description"  />
+        <result property="basis"       column="basis"        />
         <result property="icon"        column="icon"         />
         <result property="sort"        column="sort"         />
         <result property="status"      column="status"       />
@@ -20,7 +22,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectMealCategoryVo">
-        select category_id, dept_id, name, icon, sort, status, del_flag,
+        select category_id, dept_id, name, description, basis, icon, sort, status, del_flag,
                create_by, create_time, update_by, update_time, remark
         from meal_category
     </sql>
@@ -28,7 +30,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <!--
       公共分类（dept_id = 0）与当前家庭的私有分类一起返回。
       这里刻意不用 @DataScope：数据权限只会拼出「dept_id = 本部门」，
-      会把公共分类一并过滤掉。
+      会把公共分类一并过滤掉。迁移后库中只剩 9 条公共主类。
     -->
     <select id="selectMealCategoryList" parameterType="MealCategory" resultMap="MealCategoryResult">
         <include refid="selectMealCategoryVo"/>
@@ -52,12 +54,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where category_id = #{categoryId} and del_flag = '0'
     </select>
 
+    <select id="selectPrimaryCategoryId" resultType="java.lang.Long">
+        select category_id from meal_category
+        where dept_id = 0 and del_flag = '0' and name = #{name}
+        order by sort asc, category_id asc
+        limit 1
+    </select>
+
     <insert id="insertMealCategory" parameterType="MealCategory" useGeneratedKeys="true" keyProperty="categoryId">
         insert into meal_category (
-            dept_id, name, icon, sort, status, del_flag,
+            dept_id, name, description, basis, icon, sort, status, del_flag,
             create_by, create_time, remark
         ) values (
-            #{deptId}, #{name}, #{icon}, #{sort}, #{status}, '0',
+            #{deptId}, #{name}, #{description}, #{basis}, #{icon}, #{sort}, #{status}, '0',
             #{createBy}, sysdate(), #{remark}
         )
     </insert>
@@ -65,8 +74,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <update id="updateMealCategory" parameterType="MealCategory">
         update meal_category
         <set>
-            <if test="deptId != null">dept_id = #{deptId},</if>
-            <if test="name != null and name != ''">name = #{name},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="basis != null">basis = #{basis},</if>
             <if test="icon != null">icon = #{icon},</if>
             <if test="sort != null">sort = #{sort},</if>
             <if test="status != null and status != ''">status = #{status},</if>

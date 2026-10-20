@@ -34,7 +34,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <!--
-      期望分类名走子查询拼接：提案与分类是多对多（meal_category_ref, biz_type=2）。
+      期望分类名走子查询：提案与分类是唯一主类关系（meal_category_ref, biz_type=2），
+      每条提案最多一条关联，取该主类名称即可。
     -->
     <sql id="selectMealProposalVo">
         select d.proposal_id, d.dept_id, d.user_id, d.user_name, d.name,
@@ -42,10 +43,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                d.reason, d.status, d.audit_by, d.audit_time,
                d.audit_remark, d.dish_id, d.del_flag,
                d.create_by, d.create_time, d.update_by, d.update_time, d.remark,
-               (select group_concat(c.name order by c.sort separator '、')
+               (select c.name
                   from meal_category_ref r
                   join meal_category c on c.category_id = r.category_id and c.del_flag = '0'
-                 where r.biz_type = 2 and r.biz_id = d.proposal_id) as category_names
+                 where r.biz_type = 2 and r.biz_id = d.proposal_id
+                 limit 1) as category_names
         from meal_proposal d
     </sql>
 

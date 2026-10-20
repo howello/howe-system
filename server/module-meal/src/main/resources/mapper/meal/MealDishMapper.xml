@@ -28,21 +28,23 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="updateTime"   column="update_time"   />
         <result property="remark"       column="remark"        />
         <result property="categoryNames" column="category_names" />
+        <result property="orderCount"   column="order_count"   />
     </resultMap>
 
     <!--
-      分类名走子查询拼接：菜品与分类是多对多（meal_category_ref, biz_type=1），
-      用 group_concat 一次拼出「热菜、下饭」这样的展示串，避免结果集被 join 放大。
+      分类名走子查询：菜品与分类是唯一主类关系（meal_category_ref, biz_type=1），
+      每条菜品最多一条关联，取该主类名称即可，不会放大结果集。
     -->
     <sql id="selectMealDishVo">
         select d.dish_id, d.dept_id, d.name, d.cover, d.description, d.tags,
                d.duration, d.level, d.serve, d.kcal, d.ingredients, d.steps, d.tips,
                d.status, d.sort, d.source, d.del_flag,
                d.create_by, d.create_time, d.update_by, d.update_time, d.remark,
-               (select group_concat(c.name order by c.sort separator '、')
+               (select c.name
                   from meal_category_ref r
                   join meal_category c on c.category_id = r.category_id and c.del_flag = '0'
-                 where r.biz_type = 1 and r.biz_id = d.dish_id) as category_names
+                 where r.biz_type = 1 and r.biz_id = d.dish_id
+                 limit 1) as category_names
         from meal_dish d
     </sql>
 
@@ -136,5 +138,42 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{dishId}
         </foreach>
     </update>
+
+    <!--
+      招牌推荐位：本家庭近 90 天「已完成」订单的菜品按份数汇总，取前 3 道。
+      先在聚合结果上关联菜品表，再过滤「仍上架且未删除」，最后才截断 —— 这样下架/删除的
+      候选不会占用名额，后续菜品会自动顺延补位。
+      不按菜名合并：同一道菜改过名仍按 dish_id 聚合。
+    -->
+    <select id="selectSignatureDishes" resultMap="MealDishResult">
+        select d.dish_id, d.dept_id, d.name, d.cover, d.description, d.tags,
+               d.duration, d.level, d.serve, d.kcal, d.ingredients, d.steps, d.tips,
+               d.status, d.sort, d.source, d.del_flag,
+               d.create_by, d.create_time, d.update_by, d.update_time, d.remark,
+               (select c.name
+                  from meal_category_ref r
+                  join meal_category c on c.category_id = r.category_id and c.del_flag = '0'
+                 where r.biz_type = 1 and r.biz_id = d.dish_id
+                 limit 1) as category_names,
+               t.cnt as order_count
+        from (
+            select i.dish_id as dish_id, sum(i.count) as cnt
+            from meal_order_item i
+            inner join meal_order o on o.order_id = i.order_id
+            where o.del_flag = '0'
+              and o.status = '2'
+              and o.create_time &gt;= concat(#{startDay}, ' 00:00:00')
+              and o.create_time &lt;= concat(#{endDay}, ' 23:59:59')
+              and i.dish_id is not null
+            <if test="deptId != null">
+                and o.dept_id = #{deptId}
+            </if>
+            group by i.dish_id
+        ) t
+        inner join meal_dish d on d.dish_id = t.dish_id
+        where d.del_flag = '0' and d.status = '0'
+        order by t.cnt desc, d.sort asc, d.dish_id asc
+        limit #{limit}
+    </select>
 
 </mapper>

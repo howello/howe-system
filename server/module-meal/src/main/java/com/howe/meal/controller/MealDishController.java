@@ -87,6 +87,13 @@ public class MealDishController extends BaseController {
         return success("AI 正在更新菜品，请稍后刷新查看");
     }
 
+    @Operation(summary = "招牌推荐位", description = "本家庭近 90 天已完成订单中按份数取前 3 道仍上架的菜；"
+            + "招牌不是分类、不落库、不可写入。登录即可调用，点餐端使用。")
+    @GetMapping("/signature")
+    public AjaxResult signature() {
+        return success(mealDishService.selectSignatureDishes());
+    }
+
     @Operation(summary = "新增菜品")
     @PreAuthorize("@ss.hasPermi('meal:dish:add')")
     @Log(title = "点餐菜品", businessType = BusinessType.INSERT)

@@ -7,6 +7,8 @@ import java.util.List;
 /**
  * 点餐-菜品 服务层
  *
+ * <p>分类是唯一主类：菜品最多绑定 1 个分类；未选主类允许保存并标记「待分类」。</p>
+ *
  * @author howe
  */
 public interface IMealDishService {
@@ -49,4 +51,11 @@ public interface IMealDishService {
      * @return 结果
      */
     int deleteMealDishByIds(Long[] dishIds);
+
+    /**
+     * 招牌推荐位：本家庭近 90 天已完成订单中按份数取前 3 道仍上架的菜
+     *
+     * @return 按份数倒序的招牌菜品
+     */
+    List<MealDish> selectSignatureDishes();
 }

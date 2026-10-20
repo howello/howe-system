@@ -1,6 +1,7 @@
 package com.howe.meal.mapper;
 
 import com.howe.meal.domain.MealDish;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -62,4 +63,18 @@ public interface MealDishMapper {
      * @return 结果
      */
     int deleteMealDishByIds(Long[] dishIds);
+
+    /**
+     * 招牌推荐位：本家庭窗口内已完成订单的菜品按份数排序，只取仍上架的菜
+     *
+     * @param deptId   家庭ID；null 表示不限（平台管理员）
+     * @param startDay 起始日期 yyyy-MM-dd（含）
+     * @param endDay   截止日期 yyyy-MM-dd（含）
+     * @param limit    取前 N 条
+     * @return 菜品列表（附带 orderCount）
+     */
+    List<MealDish> selectSignatureDishes(@Param("deptId") Long deptId,
+                                         @Param("startDay") String startDay,
+                                         @Param("endDay") String endDay,
+                                         @Param("limit") int limit);
 }

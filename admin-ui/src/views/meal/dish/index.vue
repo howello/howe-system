@@ -76,7 +76,12 @@
           <a class="link-type" style="cursor: pointer" @click="handleUpdate(scope.row)">{{ scope.row.name }}</a>
         </template>
       </el-table-column>
-      <el-table-column label="分类" align="center" prop="categoryNames" :show-overflow-tooltip="true" min-width="120" />
+      <el-table-column label="分类" align="center" prop="categoryNames" :show-overflow-tooltip="true" min-width="120">
+        <template #default="scope">
+          <el-tag v-if="scope.row.categoryNames" size="small">{{ scope.row.categoryNames }}</el-tag>
+          <el-tag v-else type="warning" size="small">待分类</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column label="归属" align="center" width="100">
         <template #default="scope">
           <el-tag :type="scope.row.deptId === 0 ? 'warning' : 'success'" size="small">
@@ -135,9 +140,10 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="分类" prop="categoryIds">
-              <el-select v-model="form.categoryIds" placeholder="请选择分类（可多选）" multiple collapse-tags collapse-tags-tooltip clearable style="width: 100%">
+              <el-select v-model="selectedCategoryId" placeholder="请选择唯一主类（单选）" clearable style="width: 100%">
                 <el-option v-for="item in categoryOptions" :key="item.categoryId" :label="item.name" :value="item.categoryId" />
               </el-select>
+              <div class="form-tip">一道菜只能归一个主类；留空表示待分类</div>
             </el-form-item>
           </el-col>
         </el-row>
@@ -292,6 +298,9 @@ const total = ref<number>(0)
 const title = ref<string>("")
 const asPublic = ref<boolean>(false)
 
+/** 表单里的唯一主类（单选；提交时包成单元素 categoryIds） */
+const selectedCategoryId = ref<number | undefined>(undefined)
+
 /** 可视化编辑用的三段列表：用料、做法、小贴士 */
 interface IngredientItem {
   name: string
@@ -430,6 +439,7 @@ function cancel() {
 
 function reset() {
   asPublic.value = false
+  selectedCategoryId.value = undefined
   ingredientList.value = []
   stepList.value = []
   tipList.value = []
@@ -483,6 +493,9 @@ function handleUpdate(row?: MealDish) {
   const dishId = row?.dishId || ids.value[0]
   getDish(dishId).then((response: any) => {
     form.value = response.data
+    // 唯一主类：详情最多返回 1 个，回填到单选控件
+    selectedCategoryId.value =
+      form.value.categoryIds && form.value.categoryIds.length ? form.value.categoryIds[0] : undefined
     loadListsFromForm()
     open.value = true
     title.value = "修改菜品"
@@ -527,16 +540,12 @@ function applyTextResult(result: MealDishAiTextResult) {
       ;(form.value as any)[key] = value
     }
   })
-  // 只在用户没选分类时回填，避免覆盖已选
-  if (
-    result.matchedCategoryIds &&
-    result.matchedCategoryIds.length &&
-    !(form.value.categoryIds && form.value.categoryIds.length)
-  ) {
-    form.value.categoryIds = result.matchedCategoryIds
+  // 只在用户没选分类时回填唯一主类，避免覆盖已选
+  if (result.matchedCategoryId && !selectedCategoryId.value) {
+    selectedCategoryId.value = result.matchedCategoryId
   }
-  if (result.unmatchedCategoryNames && result.unmatchedCategoryNames.length) {
-    proxy.$modal.msgWarning(`以下分类不在现有分类中，未回填：${result.unmatchedCategoryNames.join("、")}`)
+  if (result.unmatchedCategoryName) {
+    proxy.$modal.msgWarning(`「${result.unmatchedCategoryName}」不在 9 个主类中，未回填`)
   }
   // 用料 / 做法 / 小贴士 可能被补齐，重新解析进可视化列表
   loadListsFromForm()
@@ -555,7 +564,7 @@ async function handleAiGenerate() {
   // 先把可视化列表写回表单，保证 current 快照包含用户已填的用料 / 做法 / 小贴士
   saveListsToForm()
   const current = {
-    categoryIds: form.value.categoryIds && form.value.categoryIds.length ? form.value.categoryIds : undefined,
+    categoryIds: selectedCategoryId.value ? [selectedCategoryId.value] : undefined,
     description: form.value.description || undefined,
     cover: form.value.cover || undefined,
     tags: form.value.tags || undefined,
@@ -675,12 +684,8 @@ async function runBatchAi(rows: MealDish[]) {
               ;(dish as any)[key] = value
             }
           })
-          if (
-            result.matchedCategoryIds &&
-            result.matchedCategoryIds.length &&
-            !(dish.categoryIds && dish.categoryIds.length)
-          ) {
-            dish.categoryIds = result.matchedCategoryIds
+          if (result.matchedCategoryId && !(dish.categoryIds && dish.categoryIds.length)) {
+            dish.categoryIds = [result.matchedCategoryId]
           }
           batchTextState.value = "done"
         })
@@ -743,6 +748,8 @@ function submitForm() {
     }
     // 可视化列表统一序列化后再提交
     saveListsToForm()
+    // 唯一主类：单选值包成单元素列表，空值提交空数组表示待分类
+    form.value.categoryIds = selectedCategoryId.value ? [selectedCategoryId.value] : []
     submitting.value = true
     const payload: MealDish = { ...form.value }
     if (!payload.dishId) {
@@ -784,6 +791,13 @@ loadCategories()
   margin-left: 12px;
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+
+.form-tip {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.5;
 }
 
 .cover-field {

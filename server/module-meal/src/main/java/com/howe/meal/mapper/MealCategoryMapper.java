@@ -1,13 +1,14 @@
 package com.howe.meal.mapper;
 
 import com.howe.meal.domain.MealCategory;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
 /**
  * 点餐-菜品分类 数据层
  *
- * <p>本表承载「公共分类 + 家庭私有分类」，因此<b>不走 {@code @DataScope}</b>：
+ * <p>本表承载 9 个平台公共主类，因此<b>不走 {@code @DataScope}</b>：
  * 数据权限只会拼出「本部门」，会把 {@code dept_id = 0} 的公共分类一起过滤掉。
  * 隔离条件在 XML 里手写，调用方通过 {@code deptId} 传当前家庭。</p>
  *
@@ -15,7 +16,7 @@ import java.util.List;
  */
 public interface MealCategoryMapper {
     /**
-     * 查询分类列表（公共分类 + 指定家庭的私有分类）
+     * 查询分类列表（公共主类 + 指定家庭的私有分类）
      *
      * @param mealCategory 查询条件，deptId 为当前登录用户所属家庭
      * @return 分类集合
@@ -29,6 +30,14 @@ public interface MealCategoryMapper {
      * @return 分类
      */
     MealCategory selectMealCategoryById(Long categoryId);
+
+    /**
+     * 按主类名称查询平台公共主类 ID
+     *
+     * @param name 主类名称（9 个之一）
+     * @return 分类ID；不存在返回 null
+     */
+    Long selectPrimaryCategoryId(@Param("name") String name);
 
     /**
      * 新增分类

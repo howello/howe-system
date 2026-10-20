@@ -5,35 +5,34 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 <mapper namespace="com.howe.meal.mapper.MealCategoryRefMapper">
 
     <!--
-      菜品 / 提案与分类的多对多关联，biz_type 区分：1=菜品 2=提案。
-      调用方需保证 categoryIds 非空，否则会拼出空的 values 导致语法错误。
+      菜品 / 提案与唯一主类的关联，biz_type 区分：1=菜品 2=提案。
+      表主键为 (biz_type, biz_id)：同一业务在库里最多一条分类关联。
+      调用方需保证 categoryId 非空。
     -->
-    <insert id="insertMealCategoryRefs" parameterType="MealCategoryRef">
-        insert into meal_category_ref (biz_type, biz_id, category_id) values
-        <foreach collection="categoryIds" item="categoryId" separator=",">
-            (#{bizType}, #{bizId}, #{categoryId})
-        </foreach>
+    <insert id="insertMealCategoryRef" parameterType="MealCategoryRef">
+        insert into meal_category_ref (biz_type, biz_id, category_id)
+        values (#{bizType}, #{bizId}, #{categoryId})
     </insert>
 
     <delete id="deleteMealCategoryRefs">
         delete from meal_category_ref
         where biz_type = #{bizType} and biz_id in
-        <foreach collection="bizIds" item="bizId" open="(" separator="," close=")">
+        <foreach item="bizId" collection="bizIds" open="(" separator="," close=")">
             #{bizId}
         </foreach>
     </delete>
 
-    <select id="selectCategoryIds" resultType="java.lang.Long">
+    <select id="selectCategoryId" resultType="java.lang.Long">
         select category_id from meal_category_ref
         where biz_type = #{bizType} and biz_id = #{bizId}
-        order by category_id
+        limit 1
     </select>
 
     <select id="selectRefsByBizIds" resultType="MealCategoryRef">
-        select biz_id as bizId, category_id as categoryId
+        select biz_type as bizType, biz_id as bizId, category_id as categoryId
         from meal_category_ref
         where biz_type = #{bizType} and biz_id in
-        <foreach collection="bizIds" item="bizId" open="(" separator="," close=")">
+        <foreach item="bizId" collection="bizIds" open="(" separator="," close=")">
             #{bizId}
         </foreach>
     </select>
