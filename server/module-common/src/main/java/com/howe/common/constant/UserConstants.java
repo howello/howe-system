@@ -33,6 +33,19 @@ public class UserConstants
     /** 部门停用状态 */
     public static final String DEPT_DISABLE = "1";
 
+    /**
+     * 部门类型：组织部门
+     *
+     * <p>
+     * 平台组织架构（公司、部门）用这个类型；家庭用 {@link #DEPT_TYPE_FAMILY}。
+     * 只有家庭类型能生成邀请码、被家庭注册加入。
+     * </p>
+     */
+    public static final String DEPT_TYPE_ORG = "D";
+
+    /** 部门类型：家庭 */
+    public static final String DEPT_TYPE_FAMILY = "F";
+
     /** 字典正常状态 */
     public static final String DICT_NORMAL = "0";
 

@@ -34,6 +34,8 @@ export interface SysDept extends BaseEntity {
   email?: string;
   /** 状态（0正常 1停用） */
   status?: '0' | '1';
+  /** 部门类型（D组织部门 F家庭）；只有 F 可以生成邀请码、被家庭注册加入 */
+  deptType?: 'D' | 'F';
   /** 子部门 */
   children?: SysDept[];
 }

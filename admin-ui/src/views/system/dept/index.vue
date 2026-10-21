@@ -65,6 +65,12 @@
          :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
       >
          <el-table-column prop="deptName" label="部门名称" width="260"></el-table-column>
+         <el-table-column prop="deptType" label="类型" width="100" align="center">
+            <template #default="scope">
+               <el-tag v-if="scope.row.deptType === 'F'" size="small" type="success" effect="plain">家庭</el-tag>
+               <el-tag v-else size="small" type="info" effect="plain">组织</el-tag>
+            </template>
+         </el-table-column>
          <el-table-column prop="orderNum" label="排序" width="200">
             <template #default="scope">
                <el-input-number v-model="scope.row.orderNum" controls-position="right" :min="0" style="width: 88px" />
@@ -84,6 +90,14 @@
             <template #default="scope">
                <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['system:dept:edit']">修改</el-button>
                <el-button link type="primary" icon="Plus" @click="handleAdd(scope.row)" v-hasPermi="['system:dept:add']">新增</el-button>
+               <el-button
+                  v-if="scope.row.deptType === 'F'"
+                  link
+                  type="success"
+                  icon="Key"
+                  @click="handleFamilyCode(scope.row)"
+                  v-hasPermi="['system:dept:edit']"
+               >邀请码</el-button>
                <el-button v-if="scope.row.parentId != 0" link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['system:dept:remove']">删除</el-button>
             </template>
          </el-table-column>
@@ -132,6 +146,15 @@
                   </el-form-item>
                </el-col>
                <el-col :span="12">
+                  <el-form-item label="部门类型">
+                     <el-radio-group v-model="form.deptType">
+                        <el-radio value="D">组织部门</el-radio>
+                        <el-radio value="F">家庭</el-radio>
+                     </el-radio-group>
+                     <div class="form-tip">只有「家庭」可以生成邀请码、被家庭注册加入</div>
+                  </el-form-item>
+               </el-col>
+               <el-col :span="12">
                   <el-form-item label="部门状态">
                      <el-radio-group v-model="form.status">
                         <el-radio
@@ -151,11 +174,33 @@
             </div>
          </template>
       </el-dialog>
+
+      <!-- 家庭邀请码对话框 -->
+      <el-dialog title="家庭邀请码" v-model="codeOpen" width="480px" append-to-body>
+         <div class="code-box">
+            <div class="code-box__label">{{ codeDeptName }}</div>
+            <div class="code-box__value">{{ familyCodeInfo?.code || "尚未生成或已过期" }}</div>
+            <div class="code-box__hint">{{ codeExpireText }}</div>
+         </div>
+         <el-alert
+            type="info"
+            :closable="false"
+            show-icon
+            title="邀请码 1 天有效，只存 Redis 不入库。重新生成会让旧码立即失效，已拿到旧码的家人将无法再用它注册。"
+         />
+         <template #footer>
+            <div class="dialog-footer">
+               <el-button v-if="familyCodeInfo?.code" @click="copyCode">复 制</el-button>
+               <el-button type="primary" :loading="codeLoading" @click="handleGenerateCode">重新生成</el-button>
+               <el-button @click="codeOpen = false">关 闭</el-button>
+            </div>
+         </template>
+      </el-dialog>
    </div>
 </template>
 
 <script setup lang="ts" name="Dept">
-import { listDept, getDept, delDept, addDept, updateDept, updateDeptSort, listDeptExcludeChild } from "@/api/system/dept"
+import { listDept, getDept, delDept, addDept, updateDept, updateDeptSort, listDeptExcludeChild, getFamilyCode, generateFamilyCode, type FamilyCodeInfo } from "@/api/system/dept"
 import type { SysDept, DeptQueryParams } from '@/types/api/system/dept'
 import type { TreeSelect } from '@/types/api/common'
 
@@ -171,6 +216,12 @@ const deptOptions = ref<TreeSelect[]>([])
 const isExpandAll = ref<boolean>(true)
 const refreshTable = ref<boolean>(true)
 const originalOrders = ref<Record<number, number>>({})
+// 家庭邀请码弹窗
+const codeOpen = ref<boolean>(false)
+const codeLoading = ref<boolean>(false)
+const codeDeptId = ref<number | undefined>(undefined)
+const codeDeptName = ref<string>("")
+const familyCodeInfo = ref<FamilyCodeInfo | null>(null)
 
 const data = reactive({
   form: {} as SysDept,
@@ -214,7 +265,8 @@ function reset() {
     leader: undefined,
     phone: undefined,
     email: undefined,
-    status: "0"
+    status: "0",
+    deptType: "D"
   }
   proxy.resetForm("deptRef")
 }
@@ -336,5 +388,100 @@ function handleDelete(row: SysDept) {
   }).catch(() => {})
 }
 
+/** 打开家庭邀请码弹窗 */
+function handleFamilyCode(row: any) {
+  codeDeptId.value = row.deptId
+  codeDeptName.value = row.deptName
+  familyCodeInfo.value = null
+  codeOpen.value = true
+  if (row.deptId) {
+    getFamilyCode(row.deptId).then(response => {
+      familyCodeInfo.value = response.data ?? null
+    }).catch(() => {})
+  }
+}
+
+/** 生成（或重新生成）邀请码 */
+function handleGenerateCode() {
+  if (!codeDeptId.value) {
+    return
+  }
+  const doGenerate = () => {
+    codeLoading.value = true
+    generateFamilyCode(codeDeptId.value!).then(response => {
+      familyCodeInfo.value = response.data ?? null
+      proxy.$modal.msgSuccess("邀请码已生成")
+    }).catch(() => {}).finally(() => {
+      codeLoading.value = false
+    })
+  }
+  if (!familyCodeInfo.value?.code) {
+    doGenerate()
+    return
+  }
+  proxy.$modal.confirm("旧邀请码会立即失效，已拿到旧码的家人将无法再用它注册。确定继续？").then(doGenerate).catch(() => {})
+}
+
+/** 复制邀请码 */
+function copyCode() {
+  const code = familyCodeInfo.value?.code
+  if (!code) {
+    return
+  }
+  navigator.clipboard?.writeText(code).then(() => {
+    proxy.$modal.msgSuccess("已复制")
+  }).catch(() => {
+    proxy.$modal.msgError("复制失败，请手动选中复制")
+  })
+}
+
+/** 剩余有效期文案 */
+const codeExpireText = computed(() => {
+  const seconds = familyCodeInfo.value?.expireSeconds ?? 0
+  if (!familyCodeInfo.value?.code || seconds <= 0) {
+    return "点击「重新生成」获取新的邀请码"
+  }
+  const hours = Math.floor(seconds / 3600)
+  if (hours >= 1) {
+    return `剩余 ${hours} 小时`
+  }
+  return `剩余 ${Math.max(1, Math.floor(seconds / 60))} 分钟`
+})
+
 getList()
 </script>
+
+<style scoped>
+.form-tip {
+  margin-top: 4px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.code-box {
+  text-align: center;
+  padding: 12px 0 20px;
+}
+
+.code-box__label {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.code-box__value {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: var(--el-color-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+}
+
+.code-box__hint {
+  margin-top: 8px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+</style>

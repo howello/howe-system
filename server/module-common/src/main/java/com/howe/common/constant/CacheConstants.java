@@ -43,6 +43,16 @@ public class CacheConstants
     public static final String PWD_ERR_CNT_KEY = "pwd_err_cnt:";
 
     /**
+     * 家庭邀请码 redis key 前缀
+     *
+     * <p>
+     * 键名形如 {@code family_code:{邀请码}}，值是部门ID。邀请码是短期凭证，
+     * 放 Redis 天然带 TTL，不入库——过期即失效，也不用担心历史码残留在表里。
+     * </p>
+     */
+    public static final String FAMILY_CODE_KEY = "family_code:";
+
+    /**
      * 首页统计缓存 key（完整键名，无冒号后缀）
      */
     public static final String HOME_STATS_KEY = "home:stats:summary";

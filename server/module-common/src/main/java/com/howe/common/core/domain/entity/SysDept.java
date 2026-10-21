@@ -61,6 +61,18 @@ public class SysDept extends BaseEntity
     @Schema(description = "删除标志（0代表存在 2代表删除）", example = "0")
     private String delFlag;
 
+    /**
+     * 部门类型（D组织部门 F家庭）
+     *
+     * <p>
+     * 只有 {@code F} 可以生成家庭邀请码、被家庭注册加入。新增这个字段是为了堵住
+     * 「用根部门 ID 注册进平台组织架构」的漏洞：此前 {@code registerFamily}
+     * 只校验部门存在且启用，攻击者传 {@code familyCode=100} 就能落进根部门。
+     * </p>
+     */
+    @Schema(description = "部门类型（D组织部门 F家庭）", example = "D")
+    private String deptType;
+
     /** 父部门名称 */
     @Schema(description = "父部门名称", example = "howe科技")
     private String parentName;
@@ -175,6 +187,16 @@ public class SysDept extends BaseEntity
         this.delFlag = delFlag;
     }
 
+    public String getDeptType()
+    {
+        return deptType;
+    }
+
+    public void setDeptType(String deptType)
+    {
+        this.deptType = deptType;
+    }
+
     public String getParentName()
     {
         return parentName;
@@ -208,6 +230,7 @@ public class SysDept extends BaseEntity
             .append("email", getEmail())
             .append("status", getStatus())
             .append("delFlag", getDelFlag())
+            .append("deptType", getDeptType())
             .append("createBy", getCreateBy())
             .append("createTime", getCreateTime())
             .append("updateBy", getUpdateBy())

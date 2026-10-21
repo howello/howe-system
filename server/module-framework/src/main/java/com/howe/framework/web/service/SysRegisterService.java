@@ -19,6 +19,7 @@ import com.howe.framework.captcha.TurnstileService;
 import com.howe.framework.manager.AsyncManager;
 import com.howe.framework.manager.factory.AsyncFactory;
 import com.howe.system.service.ISysDeptService;
+import com.howe.system.service.IFamilyCodeService;
 import com.howe.system.service.ISysRoleService;
 import com.howe.system.service.ISysUserService;
 
@@ -38,6 +39,9 @@ public class SysRegisterService
 
     @Autowired
     private ISysRoleService roleService;
+
+    @Autowired
+    private IFamilyCodeService familyCodeService;
 
     @Autowired
     private CaptchaService captchaService;
@@ -104,12 +108,15 @@ public class SysRegisterService
     }
 
     /**
-     * 家庭注册：通过家庭代码加入已有家庭
+     * 家庭注册：通过家庭邀请码加入已有家庭
      *
      * <p>与既有匿名注册 {@code /register} 相互独立：不受
      * {@code sys.account.registerUser} 开关约束；校验通过后立即创建用户，
-     * 绑定目标家庭（家庭代码即 {@code sys_dept.dept_id}），并赋予默认家庭角色
-     * 「点餐员」（{@code meal_eater}）。</p>
+     * 绑定邀请码对应的家庭，并赋予默认家庭角色「点餐员」。</p>
+     *
+     * <p><b>邀请码取代了原来的 deptId</b>：部门ID是自增主键，天然可枚举
+     * （100~109 只是几十个候选），且会泄漏内部结构。邀请码是 16 位随机串、
+     * 只存 Redis、1 天过期，重新生成后旧码立即失效。</p>
      *
      * @param registerBody 家庭注册参数
      * @return 空字符串表示注册成功，否则为可读的错误原因
@@ -131,16 +138,18 @@ public class SysRegisterService
             validateCaptcha(username, registerBody.getCode(), registerBody.getUuid());
         }
 
-        Long familyDeptId = parseFamilyCode(registerBody.getFamilyCode());
-        SysDept family = familyDeptId == null ? null : deptService.selectDeptById(familyDeptId);
+        // 邀请码 → 家庭。无效码不区分具体原因（不存在 / 已过期 / 家庭停用），
+        // 统一提示，避免通过错误文案枚举出哪些码是有效的。
+        SysDept family = familyCodeService.resolveFamily(registerBody.getFamilyCode());
+        Long familyDeptId = family == null ? null : family.getDeptId();
 
-        if (familyDeptId == null)
+        if (StringUtils.isEmpty(registerBody.getFamilyCode()))
         {
-            msg = "家庭代码不能为空";
+            msg = "家庭邀请码不能为空";
         }
-        else if (family == null || !"0".equals(family.getDelFlag()) || !"0".equals(family.getStatus()))
+        else if (family == null)
         {
-            msg = "家庭代码无效，请向家庭管理员确认";
+            msg = "邀请码无效或已过期，请让家庭管理员重新生成";
         }
         else if (StringUtils.isEmpty(username))
         {
@@ -210,28 +219,6 @@ public class SysRegisterService
             }
         }
         return msg;
-    }
-
-    /**
-     * 解析家庭代码：家庭代码即目标家庭的部门ID
-     *
-     * @param familyCode 用户输入的家庭代码
-     * @return 部门ID；为空或非数字时返回 null
-     */
-    private Long parseFamilyCode(String familyCode)
-    {
-        if (StringUtils.isEmpty(familyCode))
-        {
-            return null;
-        }
-        try
-        {
-            return Long.valueOf(familyCode.trim());
-        }
-        catch (NumberFormatException e)
-        {
-            return null;
-        }
     }
 
     /**

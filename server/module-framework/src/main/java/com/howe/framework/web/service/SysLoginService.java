@@ -8,7 +8,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 import com.howe.common.constant.Constants;
+import com.howe.common.constant.FamilyRoleConstants;
 import com.howe.common.constant.UserConstants;
+import com.howe.common.core.domain.entity.SysUser;
 import com.howe.common.core.domain.model.LoginBody;
 import com.howe.common.core.domain.model.LoginUser;
 import com.howe.common.exception.ServiceException;
@@ -126,6 +128,8 @@ public class SysLoginService
         }
         AsyncManager.me().execute(AsyncFactory.recordLogininfor(username, Constants.LOGIN_SUCCESS, MessageUtils.message("user.login.success")));
         LoginUser loginUser = (LoginUser) authentication.getPrincipal();
+        // 管理端只允许管理员与家庭管理员登录，点餐员/厨师等普通角色一律拒绝
+        assertAdminConsoleAllowed(loginUser, client);
         recordLoginInfo(loginUser.getUserId());
         // 按客户端决定本次会话的有效期：点餐端 30 天，管理端 30 分钟
         loginUser.setExpireMinutes(Constants.CLIENT_MEAL.equals(client)
@@ -228,5 +232,49 @@ public class SysLoginService
     public void recordLoginInfo(Long userId)
     {
         userService.updateLoginInfo(userId, IpUtils.getIpAddr(), DateUtils.getNowDate());
+    }
+
+    /**
+     * 校验当前账号是否允许登录管理端
+     *
+     * <p>
+     * 管理端只给两类人用：管理员（{@code userId == 1}）与家庭管理员（{@code meal_manager}）。
+     * 点餐员、厨师以及任何普通角色只能登录点餐端。
+     * </p>
+     *
+     * <p>
+     * <b>为什么在登录时拦而不是在接口上拦</b>：接口权限只能挡住「操作」，
+     * 挡不住「界面」——普通角色登录后照样能拉到菜单树、部门树、用户列表的骨架，
+     * 这些本身就是信息泄露面。在发 token 之前拒绝，连会话都不会建立。
+     * </p>
+     *
+     * <p>
+     * 点餐端（{@code client=meal}）不受此限制：点餐员和厨师本来就要用它。
+     * </p>
+     *
+     * @param loginUser 登录用户
+     * @param client 登录客户端
+     * @throws ServiceException 无管理端权限时抛出
+     */
+    private void assertAdminConsoleAllowed(LoginUser loginUser, String client)
+    {
+        if (Constants.CLIENT_MEAL.equals(client))
+        {
+            return;
+        }
+        SysUser user = loginUser.getUser();
+        if (user != null && user.isAdmin())
+        {
+            return;
+        }
+        boolean allowed = user != null && user.getRoles() != null && user.getRoles().stream()
+                .filter(role -> role != null && UserConstants.ROLE_NORMAL.equals(role.getStatus()))
+                .anyMatch(role -> FamilyRoleConstants.canAccessAdminConsole(role.getRoleKey()));
+        if (!allowed)
+        {
+            AsyncManager.me().execute(AsyncFactory.recordLogininfor(user == null ? "" : user.getUserName(),
+                    Constants.LOGIN_FAIL, "无管理端登录权限"));
+            throw new ServiceException("该账号无权登录管理端，请使用点餐端");
+        }
     }
 }

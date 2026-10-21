@@ -24,6 +24,7 @@ import com.howe.common.core.domain.AjaxResult;
 import com.howe.common.core.domain.entity.SysDept;
 import com.howe.common.enums.BusinessType;
 import com.howe.common.utils.StringUtils;
+import com.howe.system.service.IFamilyCodeService;
 import com.howe.system.service.ISysDeptService;
 
 /**
@@ -38,6 +39,9 @@ public class SysDeptController extends BaseController
 {
     @Autowired
     private ISysDeptService deptService;
+
+    @Autowired
+    private IFamilyCodeService familyCodeService;
 
     /**
      * 获取部门列表
@@ -154,5 +158,30 @@ public class SysDeptController extends BaseController
         }
         deptService.checkDeptDataScope(deptId);
         return toAjax(deptService.deleteDeptById(deptId));
+    }
+
+    /**
+     * 查询家庭邀请码
+     */
+    @PreAuthorize("@ss.hasPermi('system:dept:query')")
+    @Operation(summary = "查询家庭邀请码", description = "返回该家庭当前的邀请码与剩余有效期；没有或已过期时返回空")
+    @GetMapping("/familyCode/{deptId}")
+    public AjaxResult getFamilyCode(@Parameter(description = "家庭部门编号") @PathVariable Long deptId)
+    {
+        deptService.checkDeptDataScope(deptId);
+        return success(familyCodeService.describe(deptId));
+    }
+
+    /**
+     * 生成（或重新生成）家庭邀请码
+     */
+    @PreAuthorize("@ss.hasPermi('system:dept:edit')")
+    @Log(title = "部门管理", businessType = BusinessType.UPDATE)
+    @Operation(summary = "生成家庭邀请码", description = "有效期 1 天；重新生成会让旧码立即失效")
+    @PostMapping("/familyCode/{deptId}")
+    public AjaxResult generateFamilyCode(@Parameter(description = "家庭部门编号") @PathVariable Long deptId)
+    {
+        deptService.checkDeptDataScope(deptId);
+        return success(familyCodeService.describe(deptId, familyCodeService.generateCode(deptId)));
     }
 }

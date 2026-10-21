@@ -60,3 +60,29 @@ export function delDept(deptId: number): Promise<AjaxResult> {
     method: 'delete'
   })
 }
+
+/** 家庭邀请码信息 */
+export interface FamilyCodeInfo {
+  /** 邀请码；没有或已过期时为 null */
+  code: string | null
+  /** 剩余有效期（秒） */
+  expireSeconds: number
+  /** 有效期（天） */
+  ttlDays: number
+}
+
+// 查询家庭邀请码
+export function getFamilyCode(deptId: number): Promise<AjaxResult<FamilyCodeInfo>> {
+  return request({
+    url: '/system/dept/familyCode/' + deptId,
+    method: 'get'
+  })
+}
+
+// 生成（或重新生成）家庭邀请码
+export function generateFamilyCode(deptId: number): Promise<AjaxResult<FamilyCodeInfo>> {
+  return request({
+    url: '/system/dept/familyCode/' + deptId,
+    method: 'post'
+  })
+}
