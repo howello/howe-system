@@ -137,6 +137,10 @@
           <el-switch v-model="form.notifyAi" active-value="1" inactive-value="0" />
           <span class="wecom-hint-inline">菜品 AI 更新、提案 AI 审核结果</span>
         </el-form-item>
+        <el-form-item label="版本通知">
+          <el-tag type="info" size="small">随总开关</el-tag>
+          <span class="wecom-hint-inline">点餐 App 发布新版本时，向本群推送版本号与更新说明</span>
+        </el-form-item>
         <el-form-item label="备注" prop="remark">
           <el-input v-model="form.remark" type="textarea" placeholder="请输入备注" maxlength="500" show-word-limit />
         </el-form-item>

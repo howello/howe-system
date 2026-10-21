@@ -6,6 +6,7 @@ import com.howe.common.notify.wecom.WeComRobotResponse;
 import com.howe.common.notify.wecom.WeComTextMessage;
 import com.howe.common.utils.StringUtils;
 import com.howe.common.utils.spring.SpringUtils;
+import com.howe.meal.domain.MealAppVersion;
 import com.howe.meal.domain.MealOrder;
 import com.howe.meal.domain.MealOrderItem;
 import com.howe.meal.domain.MealWeComConfig;
@@ -43,6 +44,12 @@ public class MealWeComNotifyServiceImpl implements IMealWeComNotifyService {
 
     /** 评价内容展示上限（字符） */
     private static final int REVIEW_CONTENT_MAX_LENGTH = 100;
+
+    /** 新版本更新说明展示上限（字符），避免企微消息过长 */
+    private static final int RELEASE_LOG_MAX_LENGTH = 300;
+
+    /** 强制更新标记 */
+    private static final String FORCE_UPDATE_YES = "1";
 
     /** 订单号缺失时的占位 */
     private static final String UNKNOWN_ORDER_NO = "-";
@@ -169,6 +176,99 @@ public class MealWeComNotifyServiceImpl implements IMealWeComNotifyService {
             sendAiMessage(deptId, text.toString(), mobilesOf(userId), "提案 AI 审核");
         } catch (Exception e) {
             log.warn("组装提案 AI 审核企业微信通知失败，proposalId={}", proposalId, e);
+        }
+    }
+
+    /**
+     * 发送 App 新版本发布通知
+     *
+     * <p>平台级事件，没有单一家庭归属：遍历所有启用且配置了 Webhook Key 的家庭群，
+     * 每个群各发一条。只受家庭级总开关约束，不受订单 / AI 事件开关影响。
+     * 每个家庭独立提交到线程池，单个群发送失败不影响其他群。</p>
+     *
+     * @param version 本次发布的版本记录
+     */
+    @Override
+    public void notifyAppRelease(MealAppVersion version) {
+        if (version == null) {
+            return;
+        }
+        try {
+            MealWeComConfig query = new MealWeComConfig();
+            query.setEnabled(MealWeComConfig.ENABLED_YES);
+            List<MealWeComConfig> configs = mealWeComConfigMapper.selectMealWeComConfigList(query);
+            if (configs == null || configs.isEmpty()) {
+                return;
+            }
+            String content = buildReleaseContent(version);
+            for (MealWeComConfig config : configs) {
+                if (config == null || StringUtils.isEmpty(config.getWebhookKey())) {
+                    continue;
+                }
+                submitRelease(config.getWebhookKey(), content);
+            }
+        } catch (Exception e) {
+            log.warn("组装 App 新版本企业微信通知失败，versionId={}", version.getVersionId(), e);
+        }
+    }
+
+    /**
+     * 组装新版本通知文案
+     *
+     * @param version 版本记录
+     * @return 通知文案
+     */
+    private String buildReleaseContent(MealAppVersion version) {
+        StringBuilder text = new StringBuilder("🎉 点餐 App 有新版本啦！\n\n");
+        text.append("版本：v").append(defaultText(version.getVersionName()))
+                .append(" (").append(version.getVersionCode() == null ? "-" : version.getVersionCode()).append(")\n");
+        if (StringUtils.isNotEmpty(version.getUpdateLog())) {
+            text.append("更新说明：\n").append(truncate(version.getUpdateLog().trim(), RELEASE_LOG_MAX_LENGTH)).append("\n");
+        }
+        if (FORCE_UPDATE_YES.equals(version.getForceUpdate())) {
+            text.append("\n⚠️ 本次为强制更新，需要更新后才能继续使用。");
+        } else {
+            text.append("\n打开 App 即可收到更新提示。");
+        }
+        return text.toString();
+    }
+
+    /**
+     * 提交单个家庭群的新版本通知任务
+     *
+     * @param webhookKey webhook key
+     * @param content    通知文案
+     */
+    private void submitRelease(String webhookKey, String content) {
+        Runnable task = () -> doSendRelease(webhookKey, content);
+        Executor target = resolveExecutor();
+        if (target == null) {
+            task.run();
+            return;
+        }
+        try {
+            target.execute(task);
+        } catch (Exception e) {
+            log.warn("提交 App 新版本企业微信通知任务失败，改为同步发送", e);
+            task.run();
+        }
+    }
+
+    /**
+     * 真正发送新版本通知
+     *
+     * @param webhookKey webhook key
+     * @param content    通知文案
+     */
+    private void doSendRelease(String webhookKey, String content) {
+        try {
+            WeComRobotResponse response = weComRobotClient.sendText(webhookKey, content);
+            if (!response.isSuccess()) {
+                log.warn("App 新版本企业微信通知发送失败：errcode={}, errmsg={}",
+                        response.getErrcode(), response.getErrmsg());
+            }
+        } catch (Exception e) {
+            log.warn("App 新版本企业微信通知发送异常", e);
         }
     }
 
@@ -453,11 +553,21 @@ public class MealWeComNotifyServiceImpl implements IMealWeComNotifyService {
      * @return 截断后的内容
      */
     private String truncateForDisplay(String content) {
+        return truncate(content, REVIEW_CONTENT_MAX_LENGTH);
+    }
+
+    /**
+     * 按字符数截断文本，超出时追加省略号
+     *
+     * @param content 原始文本
+     * @param max     最大字符数
+     * @return 截断后的文本；空值返回 "-"
+     */
+    private String truncate(String content, int max) {
         if (StringUtils.isEmpty(content)) {
             return "-";
         }
         String trimmed = content.trim();
-        return trimmed.length() <= REVIEW_CONTENT_MAX_LENGTH
-                ? trimmed : trimmed.substring(0, REVIEW_CONTENT_MAX_LENGTH) + "…";
+        return trimmed.length() <= max ? trimmed : trimmed.substring(0, max) + "…";
     }
 }
