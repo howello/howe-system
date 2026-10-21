@@ -16,18 +16,11 @@ howe:
   addressEnabled: false
   # 验证码类型 math 数字计算 char 字符验证
   captchaType: math
-  # AI 调用网关
-  ai:
-    # 渠道密钥（ai_channel.api_key）的主密钥：Base64 编码的 16/24/32 字节，
-    # 用于 AES-GCM 加解密。只从环境变量读，不写死在这里、也不入库。
-    # 生成方式：openssl rand -base64 32
-    secret-key: ${AI_SECRET_KEY:}
-  # 文件分享短链
-  share:
-    # WebDAV 源密码（share_source.password_cipher）的主密钥：Base64 编码的 16/24/32 字节，
-    # 用于 AES-GCM 加解密。只从环境变量读，不写死在这里、也不入库。
-    # 生成方式：openssl rand -base64 32
-    secret-key: ${SHARE_SECRET_KEY:}
+  # 全局敏感值主密钥：Base64 编码的 16/24/32 字节，AES-GCM 加解密统一用它。
+  # 覆盖 AI 渠道密钥、WebDAV 源密码，以及后续参数表的敏感项。
+  # 只从环境变量读，不写死在这里、也不入库。生成方式：openssl rand -base64 32
+  # 变更后旧密文无法解密，需要重新保存各处密钥，详见 docs/防攻击/ 的升级文档。
+  secret-key: ${HOWE_SECRET_KEY:}
 
 # 开发环境配置
 server:
