@@ -261,6 +261,9 @@ public class SysUserServiceImpl implements ISysUserService
     @Transactional
     public int insertUser(SysUser user)
     {
+        // 新增路径一律由数据库分配主键：userId=1 是超级管理员的硬编码判定依据，
+        // 若允许请求体带 userId 就能直接覆盖/抢占超管记录（本项目当前未走此路径，属防御性封堵）
+        user.setUserId(null);
         // 新增用户信息
         int rows = userMapper.insertUser(user);
         // 新增用户岗位关联

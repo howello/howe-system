@@ -204,22 +204,40 @@ public class SysRoleServiceImpl implements ISysRoleService
     /**
      * 校验角色是否有数据权限
      *
+     * <p>
+     * 原实现借用 {@code selectRoleList} 的 {@code @DataScope} 过滤，而该过滤拼接的是
+     * {@code d.dept_id}（部门表），可 {@code sys_role} 本身没有 {@code dept_id}：
+     * 过滤条件经由 {@code sys_user_role → sys_user → sys_dept} 联表后落在「持有该角色的用户」上，
+     * 只要本家庭存在任意用户，join 就能命中，于是**任何角色都能通过校验**。
+     * 这正是本次渗透中攻击者能新建 {@code pentest_admin} 并挂满 166 个菜单的根因。
+     * </p>
+     *
+     * <p>
+     * 改为按「角色是否可用于当前登录者的数据范围」显式判定，不再依赖联表：
+     * 平台管理员放行；家庭侧只能操作三个家庭角色；其余一律拒绝。
+     * 用角色归属而非部门归属，是因为 {@code sys_role} 没有部门字段，而家庭场景的角色集合是固定的。
+     * </p>
+     *
      * @param roleIds 角色id
      */
     @Override
     public void checkRoleDataScope(Long... roleIds)
     {
-        if (!SecurityUtils.isAdmin())
+        if (SecurityUtils.isAdmin() || StringUtils.isEmpty(roleIds))
         {
-            for (Long roleId : roleIds)
+            return;
+        }
+        for (Long roleId : roleIds)
+        {
+            if (roleId == null)
             {
-                SysRole role = new SysRole();
-                role.setRoleId(roleId);
-                List<SysRole> roles = SpringUtils.getAopProxy(this).selectRoleList(role);
-                if (StringUtils.isEmpty(roles))
-                {
-                    throw new ServiceException("没有权限访问角色数据！");
-                }
+                continue;
+            }
+            SysRole role = roleMapper.selectRoleById(roleId);
+            // 角色不存在、已删除，或不属于家庭角色集合，一律视为越权
+            if (role == null || !"0".equals(role.getDelFlag()) || !FamilyRoleConstants.isFamilyRole(role.getRoleKey()))
+            {
+                throw new ServiceException("没有权限访问角色数据！");
             }
         }
     }
@@ -246,7 +264,7 @@ public class SysRoleServiceImpl implements ISysRoleService
                 continue;
             }
             SysRole role = roleMapper.selectRoleById(roleId);
-            if (role == null || !FamilyRoleConstants.isFamilyRole(role.getRoleKey()))
+            if (role == null || !"0".equals(role.getDelFlag()) || !FamilyRoleConstants.isFamilyRole(role.getRoleKey()))
             {
                 throw new ServiceException("只能分配家庭角色（点餐员 / 厨师 / 家庭管理员）");
             }
@@ -275,6 +293,7 @@ public class SysRoleServiceImpl implements ISysRoleService
     @Transactional
     public int insertRole(SysRole role)
     {
+        assertPlatformAdmin("新增角色");
         // 新增角色信息
         roleMapper.insertRole(role);
         return insertRoleMenu(role);
@@ -290,6 +309,7 @@ public class SysRoleServiceImpl implements ISysRoleService
     @Transactional
     public int updateRole(SysRole role)
     {
+        assertPlatformAdmin("修改角色");
         // 修改角色信息
         roleMapper.updateRole(role);
         // 删除角色与菜单关联
@@ -306,6 +326,7 @@ public class SysRoleServiceImpl implements ISysRoleService
     @Override
     public int updateRoleStatus(SysRole role)
     {
+        assertPlatformAdmin("修改角色状态");
         return roleMapper.updateRole(role);
     }
 
@@ -319,6 +340,7 @@ public class SysRoleServiceImpl implements ISysRoleService
     @Transactional
     public int authDataScope(SysRole role)
     {
+        assertPlatformAdmin("修改角色数据权限");
         // 修改角色信息
         roleMapper.updateRole(role);
         // 删除角色与部门关联
@@ -335,6 +357,11 @@ public class SysRoleServiceImpl implements ISysRoleService
     public int insertRoleMenu(SysRole role)
     {
         int rows = 1;
+        // 未勾选任何菜单时 menuIds 为 null，原实现会直接 NPE
+        if (StringUtils.isEmpty(role.getMenuIds()))
+        {
+            return rows;
+        }
         // 新增用户与角色管理
         List<SysRoleMenu> list = new ArrayList<SysRoleMenu>();
         for (Long menuId : role.getMenuIds())
@@ -402,6 +429,7 @@ public class SysRoleServiceImpl implements ISysRoleService
     @Transactional
     public int deleteRoleByIds(Long[] roleIds)
     {
+        assertPlatformAdmin("删除角色");
         for (Long roleId : roleIds)
         {
             checkRoleAllowed(new SysRole(roleId));
@@ -420,6 +448,25 @@ public class SysRoleServiceImpl implements ISysRoleService
     }
 
     /**
+     * 校验调用者是平台管理员
+     *
+     * <p>
+     * 角色本身是平台级资源：家庭管理员只该管理「家庭成员及其家庭角色」，
+     * 不该新建角色、改角色权限或改数据范围——否则可自建一个挂满菜单的角色再授予自己，
+     * 正是本次渗透的提权路径。这里在服务层兜底，避免将来新增入口时漏加注解。
+     * </p>
+     *
+     * @param action 动作名称，用于提示语
+     */
+    private void assertPlatformAdmin(String action)
+    {
+        if (!SecurityUtils.isAdmin())
+        {
+            throw new ServiceException("只有平台管理员可以" + action);
+        }
+    }
+
+    /**
      * 取消授权用户角色
      *
      * @param userRole 用户和角色关联信息
@@ -428,6 +475,7 @@ public class SysRoleServiceImpl implements ISysRoleService
     @Override
     public int deleteAuthUser(SysUserRole userRole)
     {
+        checkRoleDataScope(userRole.getRoleId());
         return userRoleMapper.deleteUserRoleInfo(userRole);
     }
 
@@ -441,6 +489,7 @@ public class SysRoleServiceImpl implements ISysRoleService
     @Override
     public int deleteAuthUsers(Long roleId, Long[] userIds)
     {
+        checkRoleDataScope(roleId);
         return userRoleMapper.deleteUserRoleInfos(roleId, userIds);
     }
 
@@ -454,6 +503,8 @@ public class SysRoleServiceImpl implements ISysRoleService
     @Override
     public int insertAuthUsers(Long roleId, Long[] userIds)
     {
+        checkRoleDataScope(roleId);
+        checkFamilyRoleAssignable(roleId);
         // 新增用户与角色管理
         List<SysUserRole> list = new ArrayList<SysUserRole>();
         for (Long userId : userIds)

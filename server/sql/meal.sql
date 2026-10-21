@@ -424,17 +424,14 @@ select @managerRoleId, menu_id from sys_menu
 where perms like 'meal:%'
   and perms not in ('meal:category:add', 'meal:category:edit', 'meal:category:remove');
 
--- 家庭管理员额外获得管理端「系统管理 > 用户管理」的菜单与按钮，用于增删改本家庭成员。
--- 数据范围仍是 data_scope='3'（本部门），用户列表只会返回本家庭成员，新增时归属部门
--- 固定为登录者自己的家庭；不授予 export / import / resetPwd（家庭场景用不到）。
-insert into sys_role_menu (role_id, menu_id)
-select @managerRoleId, menu_id from sys_menu
-where perms in ('system:user:list', 'system:user:query', 'system:user:add', 'system:user:edit', 'system:user:remove');
-
--- 只挂子菜单不挂父目录，侧边栏不会渲染出该菜单，因此按「用户管理」菜单的 parent_id 反查父目录
-insert into sys_role_menu (role_id, menu_id)
-select distinct @managerRoleId, parent_id from sys_menu
-where perms = 'system:user:list' and parent_id is not null and parent_id <> 0;
+-- 家庭管理员不授予管理端的「系统管理 > 用户管理」。
+-- 2026-10-21 渗透事件的提权链正是从这里进入的：家庭角色一旦持有 system:user:*，
+-- 就相当于拿到了平台级用户管理入口，配合当时 checkRoleDataScope 的联表缺陷即可
+-- 自建角色并挂满菜单。家庭成员管理改走 meal-ui 的「家庭与成员」页（/meal/member/*），
+-- 该页已覆盖新增、改角色、停用、移除，功能无缺口。
+--
+-- 如果将来确实需要在管理端管理家庭成员，请为家庭角色单独定义 meal:member:*
+-- 权限标识并新建对应菜单，不要复用 system:user:*。
 
 -- ----------------------------
 -- 11、公共菜谱分类（唯一主类，dept_id = 0，所有家庭可见）

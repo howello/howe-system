@@ -1,6 +1,7 @@
 package com.howe.web.controller.system;
 
 import java.util.List;
+import java.util.stream.Collectors;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,6 +18,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.howe.common.annotation.Log;
+import com.howe.common.constant.FamilyRoleConstants;
 import com.howe.common.core.controller.BaseController;
 import com.howe.common.core.domain.AjaxResult;
 import com.howe.common.core.domain.entity.SysDept;
@@ -24,6 +26,7 @@ import com.howe.common.core.domain.entity.SysRole;
 import com.howe.common.core.domain.entity.SysUser;
 import com.howe.common.core.page.TableDataInfo;
 import com.howe.common.enums.BusinessType;
+import com.howe.common.utils.SecurityUtils;
 import com.howe.common.utils.poi.ExcelUtil;
 import com.howe.framework.web.service.SysPermissionService;
 import com.howe.framework.web.service.TokenService;
@@ -95,7 +98,7 @@ public class SysRoleController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('system:role:add')")
     @Log(title = "角色管理", businessType = BusinessType.INSERT)
-    @Operation(summary = "新增角色", description = "角色名称与权限字符均不可重复")
+    @Operation(summary = "新增角色", description = "角色名称与权限字符均不可重复；仅平台管理员可新增")
     @PostMapping
     public AjaxResult add(@Validated @RequestBody SysRole role)
     {
@@ -187,11 +190,19 @@ public class SysRoleController extends BaseController
      * 获取角色选择框列表
      */
     @PreAuthorize("@ss.hasPermi('system:role:query')")
-    @Operation(summary = "获取角色选择框列表", description = "返回全部角色，供下拉选择使用")
+    @Operation(summary = "获取角色选择框列表", description = "平台管理员返回全部角色；家庭管理员只返回三个家庭角色")
     @GetMapping("/optionselect")
     public AjaxResult optionselect()
     {
-        return success(roleService.selectRoleAll());
+        List<SysRole> roles = roleService.selectRoleAll();
+        if (!SecurityUtils.isAdmin())
+        {
+            // 家庭管理员只该看到家庭角色，否则下拉里会暴露平台角色名与 role_key
+            roles = roles.stream()
+                    .filter(role -> FamilyRoleConstants.isFamilyRole(role.getRoleKey()))
+                    .collect(Collectors.toList());
+        }
+        return success(roles);
     }
 
     /**
