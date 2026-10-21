@@ -143,50 +143,50 @@ values ('重新缓存', @shareLinkMenuId, '5', '#', '', 1, 0, 'F', '0', '0', 'sh
 -- ----------------------------
 delete from sys_config where config_key like 'share.%';
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('文件分享-本地缓存上限（字节）', 'share.cache.localMaxSize', '10485760', 'Y', 'admin', sysdate(),
-        '小于该值且扩展名在文档白名单内的文件落本地磁盘，否则落 R2');
+        '小于该值且扩展名在文档白名单内的文件落本地磁盘，否则落 R2', '文件分享');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('文件分享-文档白名单扩展名', 'share.cache.docExts', 'md,pdf,txt,doc,docx,xls,xlsx,ppt,pptx', 'Y', 'admin', sysdate(),
-        '逗号分隔，不超上限的这类文件落本地磁盘；判定以扩展名优先');
+        '逗号分隔，不超上限的这类文件落本地磁盘；判定以扩展名优先', '文件分享');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('文件分享-缓存失败自动重试', 'share.cache.retryEnabled', 'true', 'Y', 'admin', sysdate(),
-        '开启后定时任务会把 cache_status=3 且未超重试上限的记录重新入队');
+        '开启后定时任务会把 cache_status=3 且未超重试上限的记录重新入队', '文件分享');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('文件分享-缓存最大重试次数', 'share.cache.maxRetry', '3', 'Y', 'admin', sysdate(),
-        '缓存失败重试上限，超过后不再自动重试');
+        '缓存失败重试上限，超过后不再自动重试', '文件分享');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('文件分享-路由缓存开关', 'share.route.cacheEnabled', 'true', 'Y', 'admin', sysdate(),
-        '是否启用 Redis 路由只读缓存（MySQL 始终是权威）');
+        '是否启用 Redis 路由只读缓存（MySQL 始终是权威）', '文件分享');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('文件分享-路由缓存 TTL（秒）', 'share.route.ttl', '604800', 'Y', 'admin', sysdate(),
-        '分享无过期时间时路由缓存的存活时间');
+        '分享无过期时间时路由缓存的存活时间', '文件分享');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('文件分享-密码尝试次数上限', 'share.password.maxAttempts', '5', 'Y', 'admin', sysdate(),
-        '同一 IP 在统计窗口内的密码尝试次数上限');
+        '同一 IP 在统计窗口内的密码尝试次数上限', '文件分享');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('文件分享-密码尝试统计窗口（秒）', 'share.password.windowSeconds', '60', 'Y', 'admin', sysdate(),
-        '密码尝试次数的统计窗口长度');
+        '密码尝试次数的统计窗口长度', '文件分享');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('文件分享-会话票据有效期（秒）', 'share.ticket.ttl', '300', 'Y', 'admin', sysdate(),
-        '进入就绪态后下发的 view ticket 有效期，期间可重复读取文件');
+        '进入就绪态后下发的 view ticket 有效期，期间可重复读取文件', '文件分享');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('文件分享-单文件下载上限（字节）', 'share.download.maxSize', '52428800', 'Y', 'admin', sysdate(),
-        '从 WebDAV 取文件的大小上限，超过则拒绝缓存');
+        '从 WebDAV 取文件的大小上限，超过则拒绝缓存', '文件分享');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('文件分享-访问日志保留天数', 'share.access.log.retainDays', '30', 'Y', 'admin', sysdate(),
-        '定时任务清理超过该天数的访问日志');
+        '定时任务清理超过该天数的访问日志', '文件分享');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('文件分享-短链基址', 'share.baseUrl', 'https://s.wyantao.com/s/', 'Y', 'admin', sysdate(),
-        '拼短链展示用，末尾带 /，与后端 /s/{code} 路由一致；本地联调可临时改成 http://localhost:9527/s/');
+        '拼短链展示用，末尾带 /，与后端 /s/{code} 路由一致；本地联调可临时改成 http://localhost:9527/s/', '文件分享');

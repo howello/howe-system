@@ -513,25 +513,27 @@ create table sys_config (
   config_id         int(5)          not null auto_increment    comment '参数主键',
   config_name       varchar(100)    default ''                 comment '参数名称',
   config_key        varchar(100)    default ''                 comment '参数键名',
-  config_value      varchar(500)    default ''                 comment '参数键值',
+  config_value      varchar(2048)   default ''                 comment '参数键值（敏感项为 enc:v1: 前缀的密文，密文比明文长约 40%）',
   config_type       char(1)         default 'N'                comment '系统内置（Y是 N否）',
+  param_type        varchar(32)     default ''                 comment '参数分类（自由文本，如：存储/博客/AI/点餐），仅用于管理端分组展示',
   create_by         varchar(64)     default ''                 comment '创建者',
   create_time       datetime                                   comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',
   update_time       datetime                                   comment '更新时间',
   remark            varchar(500)    default null               comment '备注',
+  `sensitive`       char(1)         default 'N'                comment '是否敏感（Y是 N否）；Y 时值加密入库，HTTP 接口只返回掩码',
   primary key (config_id)
 ) engine=innodb auto_increment=100 comment = '参数配置表';
 
-insert into sys_config values(1, '主框架页-默认皮肤样式名称',     'sys.index.skinName',               'skin-blue',     'Y', 'admin', sysdate(), '', null, '蓝色 skin-blue、绿色 skin-green、紫色 skin-purple、红色 skin-red、黄色 skin-yellow' );
-insert into sys_config values(2, '用户管理-账号初始密码',         'sys.user.initPassword',            '123456',        'Y', 'admin', sysdate(), '', null, '初始化密码 123456' );
-insert into sys_config values(3, '主框架页-侧边栏主题',           'sys.index.sideTheme',              'theme-dark',    'Y', 'admin', sysdate(), '', null, '深色主题theme-dark，浅色主题theme-light' );
-insert into sys_config values(4, '账号自助-验证码开关',           'sys.account.captchaEnabled',       'true',          'Y', 'admin', sysdate(), '', null, '是否开启验证码功能（true开启，false关闭）');
-insert into sys_config values(5, '账号自助-是否开启用户注册功能', 'sys.account.registerUser',         'false',         'Y', 'admin', sysdate(), '', null, '是否开启注册用户功能（true开启，false关闭）');
-insert into sys_config values(6, '用户登录-黑名单列表',           'sys.login.blackIPList',            '',              'Y', 'admin', sysdate(), '', null, '设置登录IP黑名单限制，多个匹配项以;分隔，支持匹配（*通配、网段）');
-insert into sys_config values(7, '用户管理-初始密码修改策略',     'sys.account.initPasswordModify',   '1',             'Y', 'admin', sysdate(), '', null, '0：初始密码修改策略关闭，没有任何提示，1：提醒用户，如果未修改初始密码，则在登录时就会提醒修改密码对话框');
-insert into sys_config values(8, '用户管理-账号密码更新周期',     'sys.account.passwordValidateDays', '0',             'Y', 'admin', sysdate(), '', null, '密码更新周期（填写数字，数据初始化值为0不限制，若修改必须为大于0小于365的正整数），如果超过这个周期登录系统时，则在登录时就会提醒修改密码对话框');
-insert into sys_config values(9, '用户管理-密码字符范围',         'sys.account.chrtype',              '0',             'Y', 'admin', sysdate(), '', null, '默认任意字符范围，0任意（密码可以输入任意字符），1数字（密码只能为0-9数字），2英文字母（密码只能为a-z和A-Z字母），3字母和数字（密码必须包含字母，数字）,4字母数字和特殊字符（目前支持的特殊字符包括：~!@#$%^&*()-=_+）');
+insert into sys_config (config_id, config_name, config_key, config_value, config_type, param_type, create_by, create_time, update_by, update_time, remark, `sensitive`) values(1, '主框架页-默认皮肤样式名称', 'sys.index.skinName', 'skin-blue', 'Y', '基础', 'admin', sysdate(), '', null, '蓝色 skin-blue、绿色 skin-green、紫色 skin-purple、红色 skin-red、黄色 skin-yellow', 'N');
+insert into sys_config (config_id, config_name, config_key, config_value, config_type, param_type, create_by, create_time, update_by, update_time, remark, `sensitive`) values(2, '用户管理-账号初始密码', 'sys.user.initPassword', '123456', 'Y', '账号', 'admin', sysdate(), '', null, '初始化密码 123456', 'N');
+insert into sys_config (config_id, config_name, config_key, config_value, config_type, param_type, create_by, create_time, update_by, update_time, remark, `sensitive`) values(3, '主框架页-侧边栏主题', 'sys.index.sideTheme', 'theme-dark', 'Y', '基础', 'admin', sysdate(), '', null, '深色主题theme-dark，浅色主题theme-light', 'N');
+insert into sys_config (config_id, config_name, config_key, config_value, config_type, param_type, create_by, create_time, update_by, update_time, remark, `sensitive`) values(4, '账号自助-验证码开关', 'sys.account.captchaEnabled', 'true', 'Y', '账号', 'admin', sysdate(), '', null, '是否开启验证码功能（true开启，false关闭）', 'N');
+insert into sys_config (config_id, config_name, config_key, config_value, config_type, param_type, create_by, create_time, update_by, update_time, remark, `sensitive`) values(5, '账号自助-是否开启用户注册功能', 'sys.account.registerUser', 'false', 'Y', '账号', 'admin', sysdate(), '', null, '是否开启注册用户功能（true开启，false关闭）', 'N');
+insert into sys_config (config_id, config_name, config_key, config_value, config_type, param_type, create_by, create_time, update_by, update_time, remark, `sensitive`) values(6, '用户登录-黑名单列表', 'sys.login.blackIPList', '', 'Y', '账号', 'admin', sysdate(), '', null, '设置登录IP黑名单限制，多个匹配项以;分隔，支持匹配（*通配、网段）', 'N');
+insert into sys_config (config_id, config_name, config_key, config_value, config_type, param_type, create_by, create_time, update_by, update_time, remark, `sensitive`) values(7, '用户管理-初始密码修改策略', 'sys.account.initPasswordModify', '1', 'Y', '账号', 'admin', sysdate(), '', null, '0：初始密码修改策略关闭，没有任何提示，1：提醒用户，如果未修改初始密码，则在登录时就会提醒修改密码对话框', 'N');
+insert into sys_config (config_id, config_name, config_key, config_value, config_type, param_type, create_by, create_time, update_by, update_time, remark, `sensitive`) values(8, '用户管理-账号密码更新周期', 'sys.account.passwordValidateDays', '0', 'Y', '账号', 'admin', sysdate(), '', null, '密码更新周期（填写数字，数据初始化值为0不限制，若修改必须为大于0小于365的正整数），如果超过这个周期登录系统时，则在登录时就会提醒修改密码对话框', 'N');
+insert into sys_config (config_id, config_name, config_key, config_value, config_type, param_type, create_by, create_time, update_by, update_time, remark, `sensitive`) values(9, '用户管理-密码字符范围', 'sys.account.chrtype', '0', 'Y', '账号', 'admin', sysdate(), '', null, '默认任意字符范围，0任意（密码可以输入任意字符），1数字（密码只能为0-9数字），2英文字母（密码只能为a-z和A-Z字母），3字母和数字（密码必须包含字母，数字）,4字母数字和特殊字符（目前支持的特殊字符包括：~!@#$%^&*()-=_+）', 'N');
 
 
 -- ----------------------------
@@ -600,30 +602,30 @@ create table sys_notice_read (
 -- sys.account.captchaEnabled 已在上面「参数配置表」初始化，此处不重复插入。
 -- 执行后若服务已在运行，去「系统管理 > 参数设置」点一次「刷新缓存」。
 -- ----------------------------
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('账号自助-验证码类型', 'sys.account.captchaType', 'math', 'Y', 'admin', sysdate(), '', null, 'char 扭曲字符 / math 算术运算 / line 线段干扰 / circle 圆圈干扰 / shear 扭曲干扰 / gif 动态图形 / random 每次随机');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('账号自助-验证码类型', 'sys.account.captchaType', 'math', 'Y', 'admin', sysdate(), '', null, 'char 扭曲字符 / math 算术运算 / line 线段干扰 / circle 圆圈干扰 / shear 扭曲干扰 / gif 动态图形 / random 每次随机', '账号');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('人机校验-开关', 'sys.turnstile.enabled', 'false', 'Y', 'admin', sysdate(), '', null, '是否启用 Cloudflare Turnstile 真人校验，登录与注册均生效');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('人机校验-开关', 'sys.turnstile.enabled', 'false', 'Y', 'admin', sysdate(), '', null, '是否启用 Cloudflare Turnstile 真人校验，登录与注册均生效', '人机校验');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('人机校验-站点密钥', 'sys.turnstile.siteKey', '', 'Y', 'admin', sysdate(), '', null, 'Site Key，会随 /captchaImage 下发给前端渲染组件，可公开');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('人机校验-站点密钥', 'sys.turnstile.siteKey', '', 'Y', 'admin', sysdate(), '', null, 'Site Key，会随 /captchaImage 下发给前端渲染组件，可公开', '人机校验');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('人机校验-服务端密钥', 'sys.turnstile.secretKey', '', 'Y', 'admin', sysdate(), '', null, 'Secret Key，只在后端校验时使用，切勿下发前端');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, `sensitive`, param_type)
+values('人机校验-服务端密钥', 'sys.turnstile.secretKey', '', 'Y', 'admin', sysdate(), '', null, 'Secret Key，只在后端校验时使用，切勿下发前端', 'Y', '人机校验');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('人机校验-校验地址', 'sys.turnstile.verifyUrl', 'https://challenges.cloudflare.com/turnstile/v0/siteverify', 'Y', 'admin', sysdate(), '', null, 'Cloudflare 官方校验端点，一般不用改');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('人机校验-校验地址', 'sys.turnstile.verifyUrl', 'https://challenges.cloudflare.com/turnstile/v0/siteverify', 'Y', 'admin', sysdate(), '', null, 'Cloudflare 官方校验端点，一般不用改', '人机校验');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('人机校验-超时时间', 'sys.turnstile.timeout', '5000', 'Y', 'admin', sysdate(), '', null, '调用 Cloudflare 校验接口的超时毫秒数，超时按校验失败处理');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('人机校验-超时时间', 'sys.turnstile.timeout', '5000', 'Y', 'admin', sysdate(), '', null, '调用 Cloudflare 校验接口的超时毫秒数，超时按校验失败处理', '人机校验');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('首页-统计缓存TTL', 'sys.home.statsCacheTtl', '600', 'Y', 'admin', sysdate(), '', null, '首页博客统计聚合结果 Redis 缓存秒数，默认 600（10 分钟）；参数页修改即时生效，无需重启');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('首页-统计缓存TTL', 'sys.home.statsCacheTtl', '600', 'Y', 'admin', sysdate(), '', null, '首页博客统计聚合结果 Redis 缓存秒数，默认 600（10 分钟）；参数页修改即时生效，无需重启', '首页');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('首页-模块探测缓存TTL', 'sys.home.moduleCacheTtl', '300', 'Y', 'admin', sysdate(), '', null, '首页模块数据表可用性探测结果 Redis 缓存秒数，默认 300（5 分钟）');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('首页-模块探测缓存TTL', 'sys.home.moduleCacheTtl', '300', 'Y', 'admin', sysdate(), '', null, '首页模块数据表可用性探测结果 Redis 缓存秒数，默认 300（5 分钟）', '首页');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('首页-卡片统计缓存TTL', 'sys.home.cardCacheTtl', '300', 'Y', 'admin', sysdate(), '', null, '首页点餐/分享/AI 等卡片统计结果 Redis 缓存秒数，默认 300（5 分钟）');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('首页-卡片统计缓存TTL', 'sys.home.cardCacheTtl', '300', 'Y', 'admin', sysdate(), '', null, '首页点餐/分享/AI 等卡片统计结果 Redis 缓存秒数，默认 300（5 分钟）', '首页');
 

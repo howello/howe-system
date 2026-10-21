@@ -16,8 +16,14 @@ public interface ConfigProvider
     /**
      * 按键名读取参数值
      *
+     * <p>
+     * <b>仅供服务内部使用</b>：敏感参数（如 R2 密钥、GitHub 令牌）会在这里解密成明文。
+     * HTTP 接口不要调用它，否则等于把掩码机制绕过去了——请改用
+     * {@code ISysConfigService#selectConfigByKey}，敏感键在那里会返回掩码。
+     * </p>
+     *
      * @param configKey 参数键名
      * @return 参数值；不存在时返回空串
      */
-    String getConfigValue(String configKey);
+    String getPlainValue(String configKey);
 }

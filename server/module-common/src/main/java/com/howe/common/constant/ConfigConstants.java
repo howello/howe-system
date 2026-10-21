@@ -1,5 +1,10 @@
 package com.howe.common.constant;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 /**
  * 参数配置键名
  *
@@ -248,4 +253,41 @@ public class ConfigConstants
 
     /** 文件分享：短链对外基址（末尾带 /），用于拼列表展示的短链 */
     public static final String SHARE_BASE_URL = "share.baseUrl";
+
+    /**
+     * 敏感参数键名清单
+     *
+     * <p>
+     * 这些键的值是可直接冒用身份的凭据：一旦落到前端或导出文件里，等同于泄露。
+     * 清单在这里集中维护，用途有三：
+     * </p>
+     * <ul>
+     *   <li>新增参数时按清单自动置 {@code sensitive='Y'}，避免漏标；</li>
+     *   <li>参数页判断是否用密码框、是否需要「留空不改」；</li>
+     *   <li>代码评审时一眼能看出哪些键属于凭据类。</li>
+     * </ul>
+     *
+     * <p>
+     * 注意：这里只做「兜底提示」，真正的权威标记是数据库的 {@code sys_config.sensitive} 列——
+     * 运维手工新增的参数不在清单里，仍然要按需在参数页勾上「是否敏感」。
+     * </p>
+     */
+    public static final Set<String> SENSITIVE_KEYS = Collections.unmodifiableSet(new LinkedHashSet<>(Arrays.asList(
+            STORAGE_R2_SECRET_KEY,
+            BLOG_GITHUB_TOKEN,
+            BLOG_WEBHOOK_SECRET,
+            BLOG_OPEN_TOKEN,
+            MEAL_APP_PUBLISH_TOKEN,
+            TURNSTILE_SECRET_KEY)));
+
+    /**
+     * 判断键名是否属于敏感参数
+     *
+     * @param configKey 参数键名
+     * @return true 表示该键的值应按凭据对待
+     */
+    public static boolean isSensitiveKey(String configKey)
+    {
+        return configKey != null && SENSITIVE_KEYS.contains(configKey);
+    }
 }

@@ -10,6 +10,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="configKey"     column="config_key"     />
         <result property="configValue"   column="config_value"   />
         <result property="configType"    column="config_type"    />
+        <result property="paramType"     column="param_type"     />
+        <result property="sensitive"     column="sensitive"      />
         <result property="createBy"      column="create_by"      />
         <result property="createTime"    column="create_time"    />
         <result property="updateBy"      column="update_by"      />
@@ -17,7 +19,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectConfigVo">
-        select config_id, config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark
+        select config_id, config_name, config_key, config_value, config_type, param_type, `sensitive`, create_by, create_time, update_by, update_time, remark
 		from sys_config
     </sql>
 
@@ -47,6 +49,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			<if test="configType != null and configType != ''">
 				AND config_type = #{configType}
 			</if>
+			<if test="paramType != null and paramType != ''">
+				AND param_type = #{paramType}
+			</if>
 			<if test="configKey != null and configKey != ''">
 				AND config_key like concat('%', #{configKey}, '%')
 			</if>
@@ -75,6 +80,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			<if test="configKey != null and configKey != '' ">config_key,</if>
 			<if test="configValue != null and configValue != '' ">config_value,</if>
 			<if test="configType != null and configType != '' ">config_type,</if>
+			<if test="paramType != null and paramType != '' ">param_type,</if>
+			<if test="sensitive != null and sensitive != '' ">`sensitive`,</if>
 			<if test="createBy != null and createBy != ''">create_by,</if>
 			<if test="remark != null and remark != ''">remark,</if>
  			create_time
@@ -83,6 +90,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			<if test="configKey != null and configKey != ''">#{configKey},</if>
 			<if test="configValue != null and configValue != ''">#{configValue},</if>
 			<if test="configType != null and configType != ''">#{configType},</if>
+			<if test="paramType != null and paramType != ''">#{paramType},</if>
+			<if test="sensitive != null and sensitive != ''">#{sensitive},</if>
 			<if test="createBy != null and createBy != ''">#{createBy},</if>
 			<if test="remark != null and remark != ''">#{remark},</if>
  			sysdate()
@@ -96,6 +105,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="configKey != null and configKey != ''">config_key = #{configKey},</if>
             <if test="configValue != null and configValue != ''">config_value = #{configValue},</if>
             <if test="configType != null and configType != ''">config_type = #{configType},</if>
+            <if test="paramType != null and paramType != ''">param_type = #{paramType},</if>
+            <if test="sensitive != null and sensitive != ''">`sensitive` = #{sensitive},</if>
             <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
             <if test="remark != null">remark = #{remark},</if>
  			update_time = sysdate()

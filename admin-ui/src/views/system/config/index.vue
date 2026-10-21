@@ -19,8 +19,18 @@
                @keyup.enter="handleQuery"
             />
          </el-form-item>
+         <el-form-item label="参数分类" prop="paramType">
+            <el-select v-model="queryParams.paramType" placeholder="参数分类" clearable filterable allow-create style="width: 200px">
+               <el-option
+                  v-for="item in paramTypeOptions"
+                  :key="item"
+                  :label="item"
+                  :value="item"
+               />
+            </el-select>
+         </el-form-item>
          <el-form-item label="系统内置" prop="configType">
-            <el-select v-model="queryParams.configType" placeholder="系统内置" clearable style="width: 240px">
+            <el-select v-model="queryParams.configType" placeholder="系统内置" clearable style="width: 200px">
                <el-option
                   v-for="dict in sys_yes_no"
                   :key="dict.value"
@@ -101,10 +111,29 @@
          <el-table-column label="参数主键" align="center" prop="configId" />
          <el-table-column label="参数名称" align="center" prop="configName" :show-overflow-tooltip="true" />
          <el-table-column label="参数键名" align="center" prop="configKey" :show-overflow-tooltip="true" />
-         <el-table-column label="参数键值" align="center" prop="configValue" :show-overflow-tooltip="true" />
+         <el-table-column label="参数分类" align="center" prop="paramType" width="110">
+            <template #default="scope">
+               <el-tag v-if="scope.row.paramType" size="small" effect="plain">{{ scope.row.paramType }}</el-tag>
+               <span v-else class="text-muted">未分类</span>
+            </template>
+         </el-table-column>
+         <el-table-column label="参数键值" align="center" prop="configValue" :show-overflow-tooltip="true">
+            <template #default="scope">
+               <span v-if="scope.row.sensitive === 'Y'" class="sensitive-value">
+                  {{ scope.row.configValue || "未设置" }}
+                  <el-tag size="small" type="warning" effect="plain">已加密</el-tag>
+               </span>
+               <span v-else>{{ scope.row.configValue }}</span>
+            </template>
+         </el-table-column>
          <el-table-column label="系统内置" align="center" prop="configType">
             <template #default="scope">
                <dict-tag :options="sys_yes_no" :value="scope.row.configType" />
+            </template>
+         </el-table-column>
+         <el-table-column label="是否敏感" align="center" prop="sensitive" width="90">
+            <template #default="scope">
+               <dict-tag :options="sys_yes_no" :value="scope.row.sensitive" />
             </template>
          </el-table-column>
          <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
@@ -138,8 +167,40 @@
             <el-form-item label="参数键名" prop="configKey">
                <el-input v-model="form.configKey" placeholder="请输入参数键名" />
             </el-form-item>
+            <el-form-item label="参数分类" prop="paramType">
+               <el-select v-model="form.paramType" placeholder="选择或输入分类" clearable filterable allow-create style="width: 100%">
+                  <el-option
+                     v-for="item in paramTypeOptions"
+                     :key="item"
+                     :label="item"
+                     :value="item"
+                  />
+               </el-select>
+               <div class="form-tip">
+                  自由文本，仅用于按业务域分组展示（如 存储 / 博客 / AI / 点餐）。
+               </div>
+            </el-form-item>
             <el-form-item label="参数键值" prop="configValue">
-               <el-input v-model="form.configValue" type="textarea" placeholder="请输入参数键值" />
+               <el-input
+                  v-model="form.configValue"
+                  type="textarea"
+                  :placeholder="form.sensitive === 'Y' ? '留空表示不修改；重新输入则覆盖原密钥' : '请输入参数键值'"
+               />
+               <div v-if="form.sensitive === 'Y'" class="form-tip">
+                  敏感参数加密存储，列表与接口只返回掩码。不改动就保持原样提交，不会覆盖。
+               </div>
+            </el-form-item>
+            <el-form-item label="是否敏感" prop="sensitive">
+               <el-radio-group v-model="form.sensitive">
+                  <el-radio
+                     v-for="dict in sys_yes_no"
+                     :key="dict.value"
+                     :value="dict.value"
+                  >{{ dict.label }}</el-radio>
+               </el-radio-group>
+               <div class="form-tip">
+                  标记为「是」后，值会加密入库，接口与导出只返回掩码。
+               </div>
             </el-form-item>
             <el-form-item label="系统内置" prop="configType">
                <el-radio-group v-model="form.configType">
@@ -181,6 +242,8 @@ const multiple = ref<boolean>(true)
 const total = ref<number>(0)
 const title = ref<string>("")
 const dateRange = ref<string[]>([])
+// 分类下拉候选：来自当前列表里出现过的分类，配合 allow-create 支持新分类
+const paramTypeOptions = ref<string[]>([])
 
 const data = reactive({
   form: {} as SysConfig,
@@ -189,7 +252,8 @@ const data = reactive({
     pageSize: 10,
     configName: undefined,
     configKey: undefined,
-    configType: undefined
+    configType: undefined,
+    paramType: undefined
   } as ConfigQueryParams,
   rules: {
     configName: [{ required: true, message: "参数名称不能为空", trigger: "blur" }],
@@ -200,6 +264,12 @@ const data = reactive({
 
 const { queryParams, form, rules } = toRefs(data)
 
+// 敏感参数在「修改」时允许留空表示不覆盖；新增仍然必填
+watch([() => form.value.sensitive, () => form.value.configId], ([sensitive, configId]: [string | undefined, number | undefined]) => {
+  const rule = rules.value.configValue[0]
+  rule.required = !(sensitive === "Y" && configId != undefined)
+}, { immediate: true })
+
 /** 查询参数列表 */
 function getList() {
   loading.value = true
@@ -207,6 +277,9 @@ function getList() {
     configList.value = response.rows
     total.value = response.total
     loading.value = false
+    // 分类候选取自当前页，去重后排序；跨页的新分类靠 allow-create 输入
+    const types = configList.value.map((item: SysConfig) => item.paramType).filter((t: string | undefined): t is string => !!t)
+    paramTypeOptions.value = Array.from(new Set<string>(types)).sort()
   })
 }
 
@@ -224,6 +297,8 @@ function reset() {
     configKey: undefined,
     configValue: undefined,
     configType: "Y",
+    paramType: undefined,
+    sensitive: "N",
     remark: undefined
   }
   proxy.resetForm("configRef")
@@ -262,6 +337,11 @@ function handleUpdate(row: SysConfig) {
   const configId = row.configId || ids.value[0]
   getConfig(configId).then(response => {
     form.value = response.data
+    // 敏感值后端只给掩码，直接回填会在提交时把 sk-****abcd 当成新密钥存进去。
+    // 清空后由后端按「留空不改」沿用原值；需要换密钥时重新输入即可。
+    if (form.value.sensitive === "Y") {
+      form.value.configValue = ""
+    }
     open.value = true
     title.value = "修改参数"
   })
@@ -315,3 +395,18 @@ function handleRefreshCache() {
 
 getList()
 </script>
+
+<style scoped>
+.sensitive-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-tip {
+  margin-top: 4px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+</style>

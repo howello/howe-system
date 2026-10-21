@@ -259,113 +259,113 @@ delete from sys_config where config_key in (
   'ai.prompt.meal.app.versionLog'
 );
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-总开关', 'ai.enabled', 'false', 'Y', 'admin', sysdate(),
-        '关闭时所有 AI 调用直接抛 AI_DISABLED，不发起外部请求');
+        '关闭时所有 AI 调用直接抛 AI_DISABLED，不发起外部请求', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-全局默认对话模型', 'ai.default.chat.model', '', 'Y', 'admin', sysdate(),
-        '填 ai_model 的主键ID；场景未配路由时用它兜底');
+        '填 ai_model 的主键ID；场景未配路由时用它兜底', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-全局默认视觉模型', 'ai.default.vision.model', '', 'Y', 'admin', sysdate(),
-        '填 ai_model 的主键ID');
+        '填 ai_model 的主键ID', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-全局默认文生图模型', 'ai.default.image.model', '', 'Y', 'admin', sysdate(),
-        '填 ai_model 的主键ID');
+        '填 ai_model 的主键ID', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-全局默认向量模型', 'ai.default.embedding.model', '', 'Y', 'admin', sysdate(),
-        '填 ai_model 的主键ID');
+        '填 ai_model 的主键ID', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-是否启用降级链', 'ai.fallback.enabled', 'true', 'Y', 'admin', sysdate(),
-        '关闭后场景路由只走主模型，不做故障切换');
+        '关闭后场景路由只走主模型，不做故障切换', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-同模型重试次数', 'ai.retry.max', '1', 'Y', 'admin', sysdate(),
-        '只对超时、厂商5xx、限流等瞬时错误生效；重试与降级分开计数');
+        '只对超时、厂商5xx、限流等瞬时错误生效；重试与降级分开计数', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-重试退避基数', 'ai.retry.backoffMs', '500', 'Y', 'admin', sysdate(),
-        '第 n 次重试等待 n 倍基数，单位毫秒');
+        '第 n 次重试等待 n 倍基数，单位毫秒', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-对话超时', 'ai.timeout.chat', '60000', 'Y', 'admin', sysdate(),
-        '单位毫秒');
+        '单位毫秒', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-文生图超时', 'ai.timeout.image', '120000', 'Y', 'admin', sysdate(),
-        '单位毫秒；异步厂商的轮询总时长也受它约束');
+        '单位毫秒；异步厂商的轮询总时长也受它约束', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-单次最多生成张数', 'ai.image.maxCount', '4', 'Y', 'admin', sysdate(),
-        '超过该值的请求直接抛 BAD_REQUEST');
+        '超过该值的请求直接抛 BAD_REQUEST', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-风格后缀-美食摄影', 'ai.image.styleSuffix.recipe.photo',
         '中式美食摄影，俯拍四十五度，白色或浅木色桌面，自然光，摆盘精致，热气腾腾，浅景深，高清细节，无文字，无水印，正方形构图。',
-        'Y', 'admin', sysdate(), '菜谱封面的写实风格后缀，拼在业务提示词之后');
+        'Y', 'admin', sysdate(), '菜谱封面的写实风格后缀，拼在业务提示词之后', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-风格后缀-插画', 'ai.image.styleSuffix.recipe.illustration',
         '扁平化矢量插画，暖色调，色块干净，构图居中，背景简洁，无文字，无水印，正方形构图。',
-        'Y', 'admin', sysdate(), '菜谱封面的插画风格后缀');
+        'Y', 'admin', sysdate(), '菜谱封面的插画风格后缀', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-风格后缀-水彩', 'ai.image.styleSuffix.recipe.watercolor',
         '清新水彩手绘，晕染自然，留白充足，纸张纹理，柔和光线，无文字，无水印，正方形构图。',
-        'Y', 'admin', sysdate(), '菜谱封面的水彩风格后缀');
+        'Y', 'admin', sysdate(), '菜谱封面的水彩风格后缀', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-风格后缀-极简', 'ai.image.styleSuffix.recipe.minimal',
         '极简静物，纯色背景，单一光源，大量留白，构图克制，无文字，无水印，正方形构图。',
-        'Y', 'admin', sysdate(), '菜谱封面的极简风格后缀');
+        'Y', 'admin', sysdate(), '菜谱封面的极简风格后缀', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-调用记录保留天数', 'ai.log.retentionDays', '30', 'Y', 'admin', sysdate(),
-        '超过天数的调用记录可清理，单位天');
+        '超过天数的调用记录可清理，单位天', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-转存重试次数', 'ai.image.transfer.retryMax', '3', 'Y', 'admin', sysdate(),
-        '生成图下载/上传的请求内重试次数，复用已拿到字节，不会重新生成');
+        '生成图下载/上传的请求内重试次数，复用已拿到字节，不会重新生成', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-转存重试退避', 'ai.image.transfer.retryBackoffMs', '1000', 'Y', 'admin', sysdate(),
-        '第 n 次重试等待 n 倍基数，单位毫秒');
+        '第 n 次重试等待 n 倍基数，单位毫秒', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-转存补偿开关', 'ai.image.transfer.compensateEnabled', 'true', 'Y', 'admin', sysdate(),
-        '关闭后转存失败直接报错，不入队重传、也不写占位地址');
+        '关闭后转存失败直接报错，不入队重传、也不写占位地址', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-转存补偿最大次数', 'ai.image.transfer.compensateMaxAttempt', '30', 'Y', 'admin', sysdate(),
-        '定时重传的最大次数，超过即放弃');
+        '定时重传的最大次数，超过即放弃', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-转存补偿保留时长', 'ai.image.transfer.expireMinutes', '120', 'Y', 'admin', sysdate(),
-        '待补偿任务的保留时长，单位分钟，超时丢弃');
+        '待补偿任务的保留时长，单位分钟，超时丢弃', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-菜品补全提示词', 'ai.prompt.meal.dish.system',
         '你是一位资深中餐菜谱编辑，请根据菜名补全菜品信息。所有内容使用简体中文：简介精炼（不超过 60 字）；标签、耗时、难度贴合家常做法；份量给出人份（如 2 人份）；热量给出每份千卡估值（如 520 千卡）；用料给出常见份量的名称与用量；做法步骤清晰可执行；小贴士简洁实用。',
-        'Y', 'admin', sysdate(), '菜品「一键 AI 补齐」与自动审核共用的 system 提示词；留空则用代码内缺省值');
+        'Y', 'admin', sysdate(), '菜品「一键 AI 补齐」与自动审核共用的 system 提示词；留空则用代码内缺省值', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-新菜审核提示词追加', 'ai.prompt.meal.dish.auditSuffix',
         '另外，请先判断该菜名是否为一道可制作的家常菜品：若是，approved 填 "true" 并按要求补齐字段；若不是可制作的菜品、或内容明显不当，approved 填 "false"，rejectReason 用一句中文说明原因，其余字段留空。',
-        'Y', 'admin', sysdate(), '仅「新菜提案 AI 自动审核」使用，追加在菜品补全提示词之后；留空则用代码内缺省值');
+        'Y', 'admin', sysdate(), '仅「新菜提案 AI 自动审核」使用，追加在菜品补全提示词之后；留空则用代码内缺省值', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-菜品更新提示词', 'ai.prompt.meal.dish.updateSystem',
         '你是一位资深中餐菜谱编辑。用户会给出一道菜的完整做法，请从中提取结构化菜品信息。所有内容使用简体中文：简介精炼（不超过 60 字）；标签给出 3 到 6 个短词；耗时、难度、份量、热量按文本合理推断；用料提取名称与用量；做法按步骤拆分并保留原文关键信息；小贴士提取注意事项。文本中确实未提到的字段返回空字符串或空数组，不要编造。',
-        'Y', 'admin', sysdate(), '菜品「AI 更新」使用的 system 提示词；留空则用代码内缺省值');
+        'Y', 'admin', sysdate(), '菜品「AI 更新」使用的 system 提示词；留空则用代码内缺省值', 'AI');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-App发版日志润色提示词', 'ai.prompt.meal.app.versionLog',
         '你是家庭点餐 App 的版本公告编辑。用户会把本次发版的代码提交标题交给你，请把它们改写成家庭成员能看懂的更新说明。要求：只使用给定提交里明确提到的内容，不编造、不夸大、不写技术术语（如 commit、分支、重构、依赖）；每条一行，最多 3 行，整段不超过 100 个汉字；不使用序号、Markdown、emoji；语气自然平实，例如「新增菜品编辑页，可以直接修改做法」「修复下架的菜仍显示在点餐区的问题」。',
-        'Y', 'admin', sysdate(), 'CI 发版前「日志润色」使用的 system 提示词；留空则用代码内缺省值');
+        'Y', 'admin', sysdate(), 'CI 发版前「日志润色」使用的 system 提示词；留空则用代码内缺省值', 'AI');
 
 -- ----------------------------------------------------------------------------
 -- 10. 菜单与按钮权限

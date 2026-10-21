@@ -598,6 +598,6 @@ where d.dept_id = 0
 -- 建议值：32 字节随机串，如 openssl rand -hex 32。
 -- ----------------------------
 delete from sys_config where config_key = 'meal.app.publishToken';
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, `sensitive`, param_type)
 values ('点餐-App 版本发布令牌', 'meal.app.publishToken', '', 'N', 'admin', sysdate(),
-        '打包脚本 publish:wgt 用：请求头 X-Publish-Token 与之匹配即可发布版本；留空=未配置（发布接口拒绝）');
+        '打包脚本 publish:wgt 用：请求头 X-Publish-Token 与之匹配即可发布版本；留空=未配置（发布接口拒绝）', 'Y', '点餐');

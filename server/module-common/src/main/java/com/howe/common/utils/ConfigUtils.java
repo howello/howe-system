@@ -13,6 +13,11 @@ import com.howe.common.utils.spring.SpringUtils;
  * 在参数设置页改完值即时生效，不需要重启服务。
  * </p>
  *
+ * <p>
+ * <b>本类返回的永远是明文</b>：敏感参数（R2 密钥、GitHub 令牌等）在这里自动解密。
+ * 因此它只服务内部调用，结果不得直接写回 HTTP 响应。
+ * </p>
+ *
  * @author howe
  */
 public class ConfigUtils
@@ -103,6 +108,12 @@ public class ConfigUtils
      * 取原始值
      *
      * <p>
+     * 走 {@link ConfigProvider#getPlainValue}，敏感参数会在这里解密，
+     * 所以本类拿到的**永远是明文**——这也意味着只能服务内部使用，
+     * 不能把结果直接回给 HTTP 层。
+     * </p>
+     *
+     * <p>
      * 容器尚未就绪时（例如启动早期）静默返回空串，交由调用方走缺省值，
      * 避免因为拿不到配置直接把启动过程打断。
      * </p>
@@ -111,7 +122,7 @@ public class ConfigUtils
     {
         try
         {
-            return SpringUtils.getBean(ConfigProvider.class).getConfigValue(configKey);
+            return SpringUtils.getBean(ConfigProvider.class).getPlainValue(configKey);
         }
         catch (Exception e)
         {

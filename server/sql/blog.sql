@@ -86,56 +86,56 @@ create table blog_draft (
 -- config_type='Y' 表示系统内置，在界面上不可删除，避免误删导致上传功能失效。
 -- ----------------------------
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('文件存储-存储类型', 'sys.storage.type', 'r2', 'Y', 'admin', sysdate(), '', null, 'r2 上传到 Cloudflare R2 图床；local 落本地磁盘（仅本机开发，容器重建会丢文件）');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('文件存储-存储类型', 'sys.storage.type', 'r2', 'Y', 'admin', sysdate(), '', null, 'r2 上传到 Cloudflare R2 图床；local 落本地磁盘（仅本机开发，容器重建会丢文件）', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('文件存储-R2端点地址', 'sys.storage.r2.endpoint', '', 'Y', 'admin', sysdate(), '', null, 'S3 兼容端点，形如 https://<accountId>.r2.cloudflarestorage.com');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('文件存储-R2端点地址', 'sys.storage.r2.endpoint', '', 'Y', 'admin', sysdate(), '', null, 'S3 兼容端点，形如 https://<accountId>.r2.cloudflarestorage.com', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('文件存储-R2访问密钥ID', 'sys.storage.r2.accessKeyId', '', 'Y', 'admin', sysdate(), '', null, 'R2 API 令牌的 Access Key ID');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('文件存储-R2访问密钥ID', 'sys.storage.r2.accessKeyId', '', 'Y', 'admin', sysdate(), '', null, 'R2 API 令牌的 Access Key ID', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('文件存储-R2访问密钥', 'sys.storage.r2.secretAccessKey', '', 'Y', 'admin', sysdate(), '', null, 'R2 API 令牌的 Secret Access Key');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, `sensitive`, param_type)
+values('文件存储-R2访问密钥', 'sys.storage.r2.secretAccessKey', '', 'Y', 'admin', sysdate(), '', null, 'R2 API 令牌的 Secret Access Key', 'Y', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('文件存储-R2存储桶', 'sys.storage.r2.bucket', '', 'Y', 'admin', sysdate(), '', null, 'R2 存储桶名称');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('文件存储-R2存储桶', 'sys.storage.r2.bucket', '', 'Y', 'admin', sysdate(), '', null, 'R2 存储桶名称', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('文件存储-R2公开域名', 'sys.storage.r2.publicUrl', 'https://img.wyantao.com', 'Y', 'admin', sysdate(), '', null, '绑定到桶的公开访问域名，末尾不带斜杠');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('文件存储-R2公开域名', 'sys.storage.r2.publicUrl', 'https://img.wyantao.com', 'Y', 'admin', sysdate(), '', null, '绑定到桶的公开访问域名，末尾不带斜杠', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('文件存储-R2对象键前缀', 'sys.storage.r2.keyPrefix', 'img', 'Y', 'admin', sysdate(), '', null, '对象键统一前缀，留空表示直接放在桶根目录。现有文章图片都在 img/ 下');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('文件存储-R2对象键前缀', 'sys.storage.r2.keyPrefix', 'img', 'Y', 'admin', sysdate(), '', null, '对象键统一前缀，留空表示直接放在桶根目录。现有文章图片都在 img/ 下', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('博客-GitHub接口地址', 'blog.github.apiBase', 'https://api.github.com', 'Y', 'admin', sysdate(), '', null, 'GitHub API 基址，自建 GitHub Enterprise 时才需要改');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('博客-GitHub接口地址', 'blog.github.apiBase', 'https://api.github.com', 'Y', 'admin', sysdate(), '', null, 'GitHub API 基址，自建 GitHub Enterprise 时才需要改', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('博客-仓库拥有者', 'blog.github.owner', 'howello', 'Y', 'admin', sysdate(), '', null, 'GitHub 用户名或组织名');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('博客-仓库拥有者', 'blog.github.owner', 'howello', 'Y', 'admin', sysdate(), '', null, 'GitHub 用户名或组织名', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('博客-仓库名', 'blog.github.repo', 'Astro-Blog', 'Y', 'admin', sysdate(), '', null, '存放文章的仓库名');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('博客-仓库名', 'blog.github.repo', 'Astro-Blog', 'Y', 'admin', sysdate(), '', null, '存放文章的仓库名', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('博客-目标分支', 'blog.github.branch', 'main', 'Y', 'admin', sysdate(), '', null, '文章提交到哪个分支');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('博客-目标分支', 'blog.github.branch', 'main', 'Y', 'admin', sysdate(), '', null, '文章提交到哪个分支', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('博客-访问令牌', 'blog.github.token', '', 'Y', 'admin', sysdate(), '', null, 'fine-grained PAT 需授予目标仓库 Contents 读写权限');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, `sensitive`, param_type)
+values('博客-访问令牌', 'blog.github.token', '', 'Y', 'admin', sysdate(), '', null, 'fine-grained PAT 需授予目标仓库 Contents 读写权限', 'Y', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('博客-文章目录', 'blog.github.contentDir', 'src/content/blog', 'Y', 'admin', sysdate(), '', null, '文章所在目录，相对仓库根');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('博客-文章目录', 'blog.github.contentDir', 'src/content/blog', 'Y', 'admin', sysdate(), '', null, '文章所在目录，相对仓库根', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('博客-提交作者名', 'blog.github.committerName', '', 'Y', 'admin', sysdate(), '', null, '与邮箱都填了才生效，留空则用令牌所属账号');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('博客-提交作者名', 'blog.github.committerName', '', 'Y', 'admin', sysdate(), '', null, '与邮箱都填了才生效，留空则用令牌所属账号', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('博客-提交作者邮箱', 'blog.github.committerEmail', '', 'Y', 'admin', sysdate(), '', null, '与作者名都填了才生效，留空则用令牌所属账号');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('博客-提交作者邮箱', 'blog.github.committerEmail', '', 'Y', 'admin', sysdate(), '', null, '与作者名都填了才生效，留空则用令牌所属账号', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('博客-Webhook密钥', 'blog.github.webhookSecret', '', 'Y', 'admin', sysdate(), '', null, '与 GitHub 仓库 webhook 的 Secret 一致；留空则 webhook 接口拒绝所有请求');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, `sensitive`, param_type)
+values('博客-Webhook密钥', 'blog.github.webhookSecret', '', 'Y', 'admin', sysdate(), '', null, '与 GitHub 仓库 webhook 的 Secret 一致；留空则 webhook 接口拒绝所有请求', 'Y', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('博客-GitHub请求超时', 'blog.github.timeout', '30000', 'Y', 'admin', sysdate(), '', null, '单位毫秒');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('博客-GitHub请求超时', 'blog.github.timeout', '30000', 'Y', 'admin', sysdate(), '', null, '单位毫秒', '博客');
 
 -- ----------------------------
 -- 4、博客菜单与权限（文章 / 草稿）
@@ -305,17 +305,17 @@ values (3, '推荐', 'recommend', 'blog_link_group', '', 'warning', 'N', '0', 'a
 -- ----------------------------
 delete from sys_config where config_key in ('blog.feed.timeout', 'blog.feed.maxSize', 'blog.feed.summaryLength', 'blog.feed.userAgent');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
-values ('博客-RSS抓取超时', 'blog.feed.timeout', '30000', 'Y', 'admin', sysdate(), '单个订阅源的连接与读取超时，单位毫秒');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
+values ('博客-RSS抓取超时', 'blog.feed.timeout', '30000', 'Y', 'admin', sysdate(), '单个订阅源的连接与读取超时，单位毫秒', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
-values ('博客-RSS响应体上限', 'blog.feed.maxSize', '5242880', 'Y', 'admin', sysdate(), '单位字节，超过即中断并按失败处理，防超大 RSS 撑爆内存');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
+values ('博客-RSS响应体上限', 'blog.feed.maxSize', '5242880', 'Y', 'admin', sysdate(), '单位字节，超过即中断并按失败处理，防超大 RSS 撑爆内存', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
-values ('博客-RSS摘要长度', 'blog.feed.summaryLength', '200', 'Y', 'admin', sysdate(), '摘要剥离 HTML 后截断的字数');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
+values ('博客-RSS摘要长度', 'blog.feed.summaryLength', '200', 'Y', 'admin', sysdate(), '摘要剥离 HTML 后截断的字数', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
-values ('博客-RSS请求UA', 'blog.feed.userAgent', 'Mozilla/5.0 (compatible; HoweBlogBot/1.0; +https://www.wyantao.com)', 'Y', 'admin', sysdate(), '部分站点拒绝默认 UA');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
+values ('博客-RSS请求UA', 'blog.feed.userAgent', 'Mozilla/5.0 (compatible; HoweBlogBot/1.0; +https://www.wyantao.com)', 'Y', 'admin', sysdate(), '部分站点拒绝默认 UA', '博客');
 
 -- ----------------------------
 -- 10、博客社交菜单与权限
@@ -392,14 +392,14 @@ values('说说删除', @talkMenuId, '4', '#', '', 1, 0, 'F', '0', '0', 'blog:tal
 -- ----------------------------
 delete from sys_config where config_key in ('blog.waline.url', 'blog.waline.pageSize', 'blog.waline.timeout');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
-values ('博客-waline评论端点', 'blog.waline.url', 'https://waline.wyantao.com/api/comment', 'Y', 'admin', sysdate(), 'waline 评论列表基础地址（不含查询参数）');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
+values ('博客-waline评论端点', 'blog.waline.url', 'https://waline.wyantao.com/api/comment', 'Y', 'admin', sysdate(), 'waline 评论列表基础地址（不含查询参数）', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
-values ('博客-waline每页条数', 'blog.waline.pageSize', '10', 'Y', 'admin', sysdate(), '单次请求拉取的评论条数');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
+values ('博客-waline每页条数', 'blog.waline.pageSize', '10', 'Y', 'admin', sysdate(), '单次请求拉取的评论条数', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
-values ('博客-waline请求超时', 'blog.waline.timeout', '30000', 'Y', 'admin', sysdate(), '单位毫秒');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
+values ('博客-waline请求超时', 'blog.waline.timeout', '30000', 'Y', 'admin', sysdate(), '单位毫秒', '博客');
 
 -- ----------------------------
 -- 12、博客开放接口参数
@@ -407,11 +407,11 @@ values ('博客-waline请求超时', 'blog.waline.timeout', '30000', 'Y', 'admin
 -- POST /blog/open/article，匿名接口，靠请求头 X-Blog-Token 与下面的令牌比对放行。
 -- 开关关闭或令牌为空时一律拒绝，不存在裸奔的写入口。
 -- ----------------------------
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('博客-开放接口开关', 'blog.open.enabled', 'false', 'Y', 'admin', sysdate(), '', null, '是否允许站外工具调用 POST /blog/open/article 投稿');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
+values('博客-开放接口开关', 'blog.open.enabled', 'false', 'Y', 'admin', sysdate(), '', null, '是否允许站外工具调用 POST /blog/open/article 投稿', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark)
-values('博客-开放接口令牌', 'blog.open.token', '', 'Y', 'admin', sysdate(), '', null, '调用方需在请求头 X-Blog-Token 中带上该值。建议 32 位以上随机串，留空等同于关闭');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, `sensitive`, param_type)
+values('博客-开放接口令牌', 'blog.open.token', '', 'Y', 'admin', sysdate(), '', null, '调用方需在请求头 X-Blog-Token 中带上该值。建议 32 位以上随机串，留空等同于关闭', 'Y', '博客');
 
 -- ----------------------------
 -- 13、博客定时任务开关（替代原 quartz sys_job 的启停控制）
@@ -425,8 +425,8 @@ values('博客-开放接口令牌', 'blog.open.token', '', 'Y', 'admin', sysdate
 -- ----------------------------
 delete from sys_config where config_key in ('blog.feed.syncEnabled', 'blog.link.syncEnabled');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
-values ('博客-朋友圈同步开关', 'blog.feed.syncEnabled', 'false', 'Y', 'admin', sysdate(), 'true 启用；每 2 小时抓取一次已启用的 RSS 订阅源');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
+values ('博客-朋友圈同步开关', 'blog.feed.syncEnabled', 'false', 'Y', 'admin', sysdate(), 'true 启用；每 2 小时抓取一次已启用的 RSS 订阅源', '博客');
 
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
-values ('博客-友链同步开关', 'blog.link.syncEnabled', 'false', 'Y', 'admin', sysdate(), 'true 启用；每 30 分钟同步 waline 友链申请留言');
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
+values ('博客-友链同步开关', 'blog.link.syncEnabled', 'false', 'Y', 'admin', sysdate(), 'true 启用；每 30 分钟同步 waline 友链申请留言', '博客');

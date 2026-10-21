@@ -455,8 +455,12 @@ function submitForm() {
 onMounted(() => {
   getDeptTree()
   getList()
+  // 初始密码不是敏感参数，但 getConfigKey 需要 system:config:query 权限；
+  // 取不到时留空即可，新增用户时用户自己填密码，不该因此让整页报错。
   proxy.getConfigKey("sys.user.initPassword").then((response: AjaxResult) => {
-    initPassword.value = response.msg
+    initPassword.value = response.data
+  }).catch(() => {
+    initPassword.value = undefined
   })
 })
 </script>

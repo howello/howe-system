@@ -21,6 +21,7 @@ import com.howe.common.core.controller.BaseController;
 import com.howe.common.core.domain.AjaxResult;
 import com.howe.common.core.page.TableDataInfo;
 import com.howe.common.enums.BusinessType;
+import com.howe.common.utils.StringUtils;
 import com.howe.common.utils.poi.ExcelUtil;
 import com.howe.system.domain.SysConfig;
 import com.howe.system.service.ISysConfigService;
@@ -75,8 +76,15 @@ public class SysConfigController extends BaseController
 
     /**
      * 根据参数键名查询参数值
+     *
+     * <p>
+     * 2026-10-21 渗透事件的实际泄露出口：此前没有任何权限注解，任意登录用户
+     * （攻击者用的是 ry 演示账号）都能读到 R2 密钥、GitHub PAT 等明文。
+     * 现在补上 {@code system:config:query}，且敏感键只返回掩码。
+     * </p>
      */
-    @Operation(summary = "根据参数键名查询参数值", description = "供前端按键名读取单个参数值")
+    @PreAuthorize("@ss.hasPermi('system:config:query')")
+    @Operation(summary = "根据参数键名查询参数值", description = "供前端按键名读取单个参数值；敏感参数只返回掩码")
     @GetMapping(value = "/configKey/{configKey}")
     public AjaxResult getConfigKey(@Parameter(description = "参数键名") @PathVariable String configKey)
     {
@@ -88,13 +96,18 @@ public class SysConfigController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('system:config:add')")
     @Log(title = "参数管理", businessType = BusinessType.INSERT)
-    @Operation(summary = "新增参数配置", description = "参数键名不可重复")
+    @Operation(summary = "新增参数配置", description = "参数键名不可重复；敏感参数的值加密入库")
     @PostMapping
     public AjaxResult add(@Validated @RequestBody SysConfig config)
     {
         if (!configService.checkConfigKeyUnique(config))
         {
             return error("新增参数'" + config.getConfigName() + "'失败，参数键名已存在");
+        }
+        // 值字段去掉了 @NotBlank（编辑时留空表示不修改），新增场景在这里兜底
+        if (StringUtils.isEmpty(config.getConfigValue()))
+        {
+            return error("参数键值不能为空");
         }
         config.setCreateBy(getUsername());
         return toAjax(configService.insertConfig(config));

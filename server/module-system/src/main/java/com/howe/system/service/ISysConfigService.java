@@ -21,10 +21,28 @@ public interface ISysConfigService
     /**
      * 根据键名查询参数配置信息
      *
+     * <p>
+     * <b>这是对外路径</b>：敏感参数只返回掩码（形如 {@code sk-****abcd}），
+     * 不会把明文交给调用方。服务内部需要真实值时请用 {@link #getPlainValue(String)}。
+     * </p>
+     *
      * @param configKey 参数键名
-     * @return 参数键值
+     * @return 参数键值；敏感键返回掩码
      */
     public String selectConfigByKey(String configKey);
+
+    /**
+     * 按键名读取参数明文
+     *
+     * <p>
+     * <b>仅供服务内部使用</b>：敏感参数会在这里解密成明文。
+     * 任何返回给前端的接口都不要直接用它，否则掩码机制形同虚设。
+     * </p>
+     *
+     * @param configKey 参数键名
+     * @return 参数明文；不存在时返回空串
+     */
+    public String getPlainValue(String configKey);
 
     /**
      * 获取验证码开关
