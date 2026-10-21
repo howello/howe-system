@@ -25,6 +25,10 @@ services: # 容器服务定义
       TZ: ${TZ} # 应用时区
       SERVER_PORT: ${APP_PORT} # 服务端口
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE} # 激活配置环境
+      # 生产环境强制关闭接口文档与 Druid 控制台，不受 .env 同名键影响
+      SPRINGDOC_API_DOCS_ENABLED: "false" # 关闭 /v3/api-docs
+      SPRINGDOC_SWAGGER_UI_ENABLED: "false" # 关闭 /swagger-ui.html
+      DRUID_STAT_VIEW_ENABLED: "false" # 关闭 /druid/* 控制台
       JAVA_OPTS: "-Xms256m -Xmx512m -XX:MetaspaceSize=128m -XX:MaxMetaspaceSize=384m -XX:+UseG1GC -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/app/logs"
       CACHE_PATH: /app/cache # AI 转存补偿的字节暂存目录
     ports: # 后端端口映射（默认仅本机访问）

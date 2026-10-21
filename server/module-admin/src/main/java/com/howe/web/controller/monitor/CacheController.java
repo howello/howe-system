@@ -95,13 +95,62 @@ public class CacheController
     }
 
     @PreAuthorize("@ss.hasPermi('monitor:cache:list')")
-    @Operation(summary = "获取缓存内容", description = "根据缓存名称与键名查询缓存值")
+    @Operation(summary = "获取缓存内容", description = "根据缓存名称与键名查询缓存值；登录令牌、验证码等敏感缓存只返回脱敏摘要")
     @GetMapping("/getValue/{cacheName}/{cacheKey}")
     public AjaxResult getCacheValue(@Parameter(description = "缓存名称") @PathVariable String cacheName, @Parameter(description = "缓存键名") @PathVariable String cacheKey)
     {
         String cacheValue = redisTemplate.opsForValue().get(cacheKey);
-        SysCache sysCache = new SysCache(cacheName, cacheKey, cacheValue);
+        SysCache sysCache = new SysCache(cacheName, cacheKey, maskSensitiveValue(cacheName, cacheValue));
         return AjaxResult.success(sysCache);
+    }
+
+    /**
+     * 对敏感缓存内容脱敏
+     *
+     * <p>
+     * {@code login_tokens:*} 存的是完整 {@code LoginUser}（含 token 与权限集合），
+     * {@code captcha_codes:*} 是未过期的验证码答案，这两类一旦被原样读出即可直接复用他人会话。
+     * 监控页只需要确认「键存在、有内容」，因此这里只返回长度与首尾片段，不给出可用凭据。
+     * </p>
+     *
+     * @param cacheName 缓存名称（键名前缀）
+     * @param cacheValue 缓存原始值
+     * @return 脱敏后的值；非敏感缓存原样返回
+     */
+    private String maskSensitiveValue(String cacheName, String cacheValue)
+    {
+        if (StringUtils.isEmpty(cacheValue) || !isSensitiveCache(cacheName))
+        {
+            return cacheValue;
+        }
+        int length = cacheValue.length();
+        if (length <= 8)
+        {
+            return "******（已脱敏，长度 " + length + "）";
+        }
+        return cacheValue.substring(0, 4) + "******" + cacheValue.substring(length - 4)
+                + "（已脱敏，长度 " + length + "）";
+    }
+
+    /**
+     * 判断缓存名称是否属于敏感类别
+     *
+     * @param cacheName 缓存名称（键名前缀）
+     * @return true 表示该类别的内容不得原样下发
+     */
+    private boolean isSensitiveCache(String cacheName)
+    {
+        if (StringUtils.isEmpty(cacheName))
+        {
+            return false;
+        }
+        // 传入的 cacheName 可能带或不带结尾冒号，统一补齐后再比较
+        String prefix = StringUtils.endsWith(cacheName, ":") ? cacheName : cacheName + ":";
+        return StringUtils.equals(prefix, CacheConstants.LOGIN_TOKEN_KEY)
+                || StringUtils.equals(prefix, CacheConstants.CAPTCHA_CODE_KEY)
+                || StringUtils.equals(prefix, CacheConstants.PWD_ERR_CNT_KEY)
+                // 参数缓存里同样有存储密钥、博客令牌等凭据，明文下发等于再开一个出口
+                || StringUtils.equals(prefix, CacheConstants.SYS_CONFIG_KEY);
     }
 
     @PreAuthorize("@ss.hasPermi('monitor:cache:list')")

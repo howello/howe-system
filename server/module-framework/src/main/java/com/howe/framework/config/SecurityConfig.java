@@ -104,7 +104,10 @@ public class SecurityConfig
                 requests.requestMatchers("/login", "/register", "/captchaImage").permitAll()
                     // 静态资源，可匿名访问
                     .requestMatchers(HttpMethod.GET, "/", "/*.html", "/**.html", "/**.css", "/**.js", "/profile/**").permitAll()
-                    .requestMatchers("/swagger-ui.html", "/v3/api-docs/**", "/swagger-ui/**", "/druid/**").permitAll()
+                    // 接口文档仅在本机/内网调试时放行，生产环境由 SPRINGDOC_* 开关整体关闭
+                    .requestMatchers("/swagger-ui.html", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                    // Druid 控制台不再放行：即便误开 statViewServlet，请求也会先被认证拦截
+                    .requestMatchers("/druid/**").denyAll()
                     // 异步派发放行：SSE / DeferredResult 这类异步接口完成时，容器会重新派发一次请求。
                     // JwtAuthenticationTokenFilter 与 SecurityContextHolderFilter 都是 OncePerRequestFilter，
                     // 默认跳过异步派发，此时链上没有认证上下文；而 AuthorizationFilter 不跳过，

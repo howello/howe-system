@@ -42,13 +42,15 @@ spring:
             webStatFilter: 
                 enabled: true
             statViewServlet:
-                enabled: true
+                # 默认关闭：控制台会暴露数据源连接串、SQL 统计与执行明细，是本次渗透的直接入口。
+                # 仅本机排查问题时临时用 DRUID_STAT_VIEW_ENABLED=true 打开，生产环境严禁开启。
+                enabled: ${DRUID_STAT_VIEW_ENABLED:false}
                 # 设置白名单，不填则允许所有访问
                 allow:
                 url-pattern: /druid/*
-                # 控制台管理用户名和密码
-                login-username: ${DRUID_LOGIN_USERNAME}
-                login-password: ${DRUID_LOGIN_PASSWORD}
+                # 控制台管理用户名和密码（仅在临时开启控制台时生效，须用强口令）
+                login-username: ${DRUID_LOGIN_USERNAME:}
+                login-password: ${DRUID_LOGIN_PASSWORD:}
             filter:
                 stat:
                     enabled: true
@@ -58,4 +60,5 @@ spring:
                     merge-sql: true
                 wall:
                     config:
-                        multi-statement-allow: true
+                        # 禁止分号拼接多语句：项目没有依赖多语句的 SQL，关掉可切断注入后的语句串联放大
+                        multi-statement-allow: false

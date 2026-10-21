@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import cn.hutool.core.io.IoUtil;
+import cn.hutool.core.util.URLUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,6 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.howe.common.annotation.Anonymous;
 import com.howe.common.annotation.RateLimiter;
 import com.howe.common.config.YmlConfig;
+import com.howe.common.constant.Constants;
 import com.howe.common.core.domain.AjaxResult;
 import com.howe.common.enums.LimitType;
 import com.howe.common.exception.ServiceException;
@@ -181,20 +183,67 @@ public class CommonController {
      * 入参是上传时返回的地址：R2 模式下是图床完整 URL，local 模式下是 {@code /profile/...} 相对路径，
      * 两种形态都由存储层自己还原成对象键，调用方不用关心当前用的哪种存储。
      * </p>
+     *
+     * <p>
+     * 入参来自请求，必须按「不可信输入」处理：先解码、再归一化，任何试图上跳目录或
+     * 指向绝对路径的取值一律拒绝，避免切换本地存储后变成任意文件读取。
+     * </p>
      */
     @Operation(summary = "资源下载", description = "按上传返回的地址下载，兼容图床 URL 与 /profile 相对路径")
     @GetMapping("/download/resource")
     public void resourceDownload(@Parameter(description = "上传时返回的文件地址") String resource,
             HttpServletResponse response) {
         try {
-            if (!FileUtils.checkAllowDownload(resource)) {
+            String safeResource = normalizeResource(resource);
+            if (!FileUtils.checkAllowDownload(safeResource)) {
                 throw new ServiceException(StringUtils.format("资源文件({})非法，不允许下载。 ", resource));
             }
-            String downloadName = StringUtils.substringAfterLast(resource.replace('\\', '/'), "/");
-            writeToResponse(response, resource, downloadName);
+            String downloadName = StringUtils.substringAfterLast(safeResource.replace('\\', '/'), "/");
+            writeToResponse(response, safeResource, downloadName);
         } catch (Exception e) {
             log.error("下载文件失败", e);
         }
+    }
+
+    /**
+     * 归一化资源地址并拒绝越权路径
+     *
+     * <p>
+     * 只放行两种形态：{@code http(s)://} 开头的完整地址（对象存储公网域名），
+     * 以及 {@code /profile/} 前缀的相对路径或裸对象键。处理顺序是先 URL 解码
+     * （防止 {@code %2e%2e} 绕过字面量校验），再折叠多余分隔符，最后统一拒绝
+     * 含 {@code ..}、控制字符、盘符或非 http(s) 协议的取值。
+     * </p>
+     *
+     * @param resource 请求传入的资源地址
+     * @return 归一化后的安全地址
+     */
+    private String normalizeResource(String resource) {
+        if (StringUtils.isEmpty(resource)) {
+            throw new ServiceException("资源文件不能为空");
+        }
+        // 先解码，避免 %2e%2e / %2f 之类的编码绕过后续字面量检查
+        String decoded = URLUtil.decode(resource.trim());
+        if (StringUtils.contains(decoded, "..") || StringUtils.containsAny(decoded, '\u0000', '\r', '\n')) {
+            throw new ServiceException("资源文件非法，不允许下载。");
+        }
+        // 统一分隔符后再判断，Windows 风格的反斜杠同样不能用于上跳
+        String normalized = decoded.replace('\\', '/');
+        if (StringUtils.startsWithIgnoreCase(normalized, "http://")
+                || StringUtils.startsWithIgnoreCase(normalized, "https://")) {
+            // 完整地址原样交给存储层匹配公网域名，协议已限定为 http(s)
+            return normalized;
+        }
+        // 相对路径不允许出现协议或盘符写法（如 file:、C:）
+        if (StringUtils.contains(normalized, ":")) {
+            throw new ServiceException("资源文件非法，不允许下载。");
+        }
+        // 折叠重复斜杠，保留 /profile 前缀的语义（存储层据此还原对象键）
+        normalized = normalized.replaceAll("/{2,}", "/");
+        if (StringUtils.startsWith(normalized, Constants.RESOURCE_PREFIX + "/")) {
+            return normalized;
+        }
+        return StringUtils.stripStart(normalized, "/");
     }
 
     /**
