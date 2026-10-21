@@ -6,22 +6,18 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.Resource;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.MediaTypeFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.HandlerMapping;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 
 /**
  * 短链页面 控制层
@@ -38,7 +34,7 @@ import java.time.Duration;
  *
  * @author howe
  */
-@Tag(name = "分享-短链页面", description = "短链入口渲染与公开页静态资源")
+@Tag(name = "分享-短链页面", description = "短链入口渲染")
 @Anonymous
 @RestController
 public class SharePageController {
@@ -46,8 +42,8 @@ public class SharePageController {
     /** 页面模板在 classpath 下的位置 */
     private static final String PAGE_LOCATION = "static/share-page/index.html";
 
-    /** 静态资源前缀 */
-    private static final String ASSET_PREFIX = "/share-page/";
+    /** 短码路径前缀 */
+    private static final String CODE_PATH_PREFIX = "/s/";
 
     /**
      * 页面模板里的短码占位符
@@ -64,12 +60,48 @@ public class SharePageController {
     /**
      * 短链入口：渲染分享页并注入短码
      *
-     * @param code 短码
+     * <p>
+     * <b>匹配所有 {@code /s/**}</b>，而不只是 {@code /s/{code}}。短链域名（如
+     * {@code s.wyantao.com}）只对外提供分享访问，不该出现「没有任何 handler」的 500
+     * 或「认证失败」的 401 —— 那两种响应既暴露了这是后端服务，也会让人以为地址打错了。
+     * 现在无论是 {@code /s}、{@code /s/mq4yTU9A} 还是 {@code /s/share/lib/x.ini}，
+     * 一律返回分享页；页面拿到的短码无效时由前端渲染「链接不存在」，与真实失效链接
+     * 的用户体验完全一致，也无法据此判断短码是否存在。
+     * </p>
+     *
+     * @param request 请求（用于取原始路径）
      * @return HTML 响应
      */
-    @Operation(summary = "短链入口")
-    @GetMapping(value = "/s/{code}", produces = "text/html;charset=UTF-8")
-    public ResponseEntity<byte[]> page(@PathVariable("code") String code) {
+    @Operation(summary = "短链入口", description = "匹配 /s/** 全部路径；路径中取不到有效短码时由页面显示「链接不存在」")
+    @GetMapping(value = "/s", produces = "text/html;charset=UTF-8")
+    public ResponseEntity<byte[]> pageRoot() {
+        return renderPage("");
+    }
+
+    /**
+     * 短链入口（带子路径）
+     *
+     * @param request 请求
+     * @return HTML 响应
+     */
+    @Operation(summary = "短链入口（含子路径）", description = "同 /s，路径中的第一段作为短码")
+    @GetMapping(value = "/s/**", produces = "text/html;charset=UTF-8")
+    public ResponseEntity<byte[]> page(HttpServletRequest request) {
+        return renderPage(extractCode(request));
+    }
+
+    /**
+     * 渲染分享页
+     *
+     * <p>
+     * 空短码也走这里：把空串注入模板，页面请求 {@code /share/public/detail?code=}
+     * 会得到「链接不存在」，不需要前端再做判空分支。
+     * </p>
+     *
+     * @param code 短码，可为空
+     * @return HTML 响应
+     */
+    private ResponseEntity<byte[]> renderPage(String code) {
         String html = template().replace(CODE_PLACEHOLDER, sanitizeCode(code));
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.valueOf("text/html;charset=UTF-8"));
@@ -79,27 +111,28 @@ public class SharePageController {
     }
 
     /**
-     * 分享页静态资源（vendor 下的 marked / DOMPurify 等）
+     * 从请求路径里取短码
+     *
+     * <p>
+     * 取 {@code /s/} 之后的第一段，忽略后面的追加路径。这样
+     * {@code /s/share/lib/x.ini} 会被当成短码 {@code share} 处理（→ 链接不存在），
+     * 而不是当成文件路径去读——短链域名下不存在「按路径取文件」这种用法。
+     * </p>
      *
      * @param request 请求
-     * @return 资源响应
+     * @return 短码；取不到时返回空串
      */
-    @Operation(summary = "分享页静态资源")
-    @GetMapping(ASSET_PREFIX + "**")
-    public ResponseEntity<Resource> asset(HttpServletRequest request) {
+    private String extractCode(HttpServletRequest request) {
         String fullPath = (String) request.getAttribute(HandlerMapping.PATH_WITHIN_HANDLER_MAPPING_ATTRIBUTE);
-        String relative = fullPath == null ? "" : fullPath.substring(ASSET_PREFIX.length());
-        if (relative.isEmpty() || relative.contains("..")) {
-            throw new ServiceException("分享页资源路径不合法");
+        if (fullPath == null) {
+            fullPath = request.getRequestURI();
         }
-        Resource resource = new ClassPathResource("static/share-page/" + relative);
-        if (!resource.exists()) {
-            return ResponseEntity.notFound().build();
+        if (fullPath == null || !fullPath.startsWith(CODE_PATH_PREFIX)) {
+            return "";
         }
-        MediaType mediaType = MediaTypeFactory.getMediaType(relative).orElse(MediaType.APPLICATION_OCTET_STREAM);
-        CacheControl cacheControl = relative.endsWith(".html")
-                ? CacheControl.noStore() : CacheControl.maxAge(Duration.ofHours(1));
-        return ResponseEntity.ok().contentType(mediaType).cacheControl(cacheControl).body(resource);
+        String rest = fullPath.substring(CODE_PATH_PREFIX.length());
+        int idx = rest.indexOf('/');
+        return idx >= 0 ? rest.substring(0, idx) : rest;
     }
 
     /**

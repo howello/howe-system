@@ -104,6 +104,9 @@ public class SecurityConfig
                 requests.requestMatchers("/login", "/register", "/captchaImage").permitAll()
                     // 静态资源，可匿名访问
                     .requestMatchers(HttpMethod.GET, "/", "/*.html", "/**.html", "/**.css", "/**.js", "/profile/**").permitAll()
+                    // 分享页的 vendor 资源（marked / DOMPurify）：由 Spring Boot 默认静态资源处理直接提供，
+                    // 不单独写 handler。上面的 /**/*.js 只匹配单段路径，覆盖不到 share-page/vendor/xxx.js
+                    .requestMatchers(HttpMethod.GET, "/share-page/**").permitAll()
                     // 接口文档仅在本机/内网调试时放行，生产环境由 SPRINGDOC_* 开关整体关闭
                     .requestMatchers("/swagger-ui.html", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
                     // Druid 控制台不再放行：即便误开 statViewServlet，请求也会先被认证拦截

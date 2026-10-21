@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex,nofollow" />
+<title>王艳涛 · 站点导航</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-1: #eef2fb;
+  --bg-2: #e3eaf7;
+  --card: #ffffff;
+  --ink: #16203a;
+  --ink-2: #5a6478;
+  --ink-3: #8d97ab;
+  --line: #e9edf5;
+  --accent: #3b6ef5;
+  --accent-soft: #ecf1ff;
+  --shadow: 0 24px 60px rgba(26, 45, 92, .13), 0 6px 16px rgba(26, 45, 92, .06);
+  --shadow-sm: 0 4px 14px rgba(26, 45, 92, .07);
+  --radius: 22px;
+}
+
+html.dark {
+  --bg-1: #161d2e;
+  --bg-2: #0c1019;
+  --card: #151b29;
+  --ink: #e9eef8;
+  --ink-2: #a5afc3;
+  --ink-3: #6d778d;
+  --line: #242c3e;
+  --accent: #6d8dff;
+  --accent-soft: #1c2740;
+  --shadow: 0 24px 60px rgba(0, 0, 0, .45);
+  --shadow-sm: 0 4px 14px rgba(0, 0, 0, .3);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --bg-1: #161d2e;
+    --bg-2: #0c1019;
+    --card: #151b29;
+    --ink: #e9eef8;
+    --ink-2: #a5afc3;
+    --ink-3: #6d778d;
+    --line: #242c3e;
+    --accent: #6d8dff;
+    --accent-soft: #1c2740;
+    --shadow: 0 24px 60px rgba(0, 0, 0, .45);
+    --shadow-sm: 0 4px 14px rgba(0, 0, 0, .3);
+  }
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+               "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  color: var(--ink);
+  background: radial-gradient(1200px 600px at 50% -10%, var(--bg-1), var(--bg-2));
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { width: 100%; max-width: 720px; }
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.brand__mark {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), #7aa0ff);
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+}
+
+.brand__name { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+.brand__desc { font-size: 13px; color: var(--ink-3); margin-top: 3px; }
+
+.section-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 4px 12px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  border-radius: var(--radius);
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+  color: inherit;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+  border-color: var(--accent);
+}
+
+.card__icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  background: var(--accent-soft);
+  flex-shrink: 0;
+}
+
+.card__body { min-width: 0; flex: 1; }
+.card__title { font-size: 15px; font-weight: 620; }
+.card__desc { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
+.card__arrow { color: var(--ink-3); font-size: 16px; flex-shrink: 0; }
+.card:hover .card__arrow { color: var(--accent); }
+
+.footer {
+  margin-top: 30px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink-3);
+  line-height: 1.9;
+}
+
+.footer code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--accent-soft);
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 11.5px;
+}
+
+@media (max-width: 520px) {
+  .grid { grid-template-columns: 1fr; }
+  .brand__name { font-size: 19px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="brand">
+    <div class="brand__mark">王</div>
+    <div>
+      <div class="brand__name">王艳涛</div>
+      <div class="brand__desc">个人站点与服务入口</div>
+    </div>
+  </div>
+
+  <div class="section-label">站点</div>
+  <div class="grid">
+    <a class="card" href="https://www.wyantao.com/" target="_blank" rel="noopener">
+      <div class="card__icon">📝</div>
+      <div class="card__body">
+        <div class="card__title">博客</div>
+        <div class="card__desc">技术笔记与随笔</div>
+      </div>
+      <div class="card__arrow">→</div>
+    </a>
+    <a class="card" href="https://img.wyantao.com/" target="_blank" rel="noopener">
+      <div class="card__icon">🖼️</div>
+      <div class="card__body">
+        <div class="card__title">图床</div>
+        <div class="card__desc">文章配图与静态资源</div>
+      </div>
+      <div class="card__arrow">→</div>
+    </a>
+  </div>
+
+  <div class="section-label" style="margin-top: 24px;">管理</div>
+  <div class="grid">
+    <a class="card" href="https://admin.wyantao.com/" target="_blank" rel="noopener">
+      <div class="card__icon">⚙️</div>
+      <div class="card__body">
+        <div class="card__title">后台管理</div>
+        <div class="card__desc">内容、AI、点餐与文件分享</div>
+      </div>
+      <div class="card__arrow">→</div>
+    </a>
+  </div>
+
+  <div class="footer">
+    <div>文件分享短链由本站提供，形如 <code>s.wyantao.com/s/xxxxxx</code></div>
+    <div>若你是通过分享链接错误跳转到这里，请向分享者确认地址是否完整</div>
+  </div>
+
+</div>
+</body>
+</html>
