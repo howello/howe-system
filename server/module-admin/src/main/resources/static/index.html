@@ -10,109 +10,216 @@
 
 :root {
   --bg-1: #eef2fb;
-  --bg-2: #e3eaf7;
+  --bg-2: #dfe7f6;
   --card: #ffffff;
+  --card-hover: #fbfcff;
   --ink: #16203a;
   --ink-2: #5a6478;
   --ink-3: #8d97ab;
   --line: #e9edf5;
   --accent: #3b6ef5;
   --accent-soft: #ecf1ff;
+  --ok: #16a34a;
+  --ok-soft: #e8f7ee;
+  --warn: #b26a00;
+  --warn-soft: #fff6e5;
+  --danger: #e5484d;
+  --danger-soft: #fdecec;
   --shadow: 0 24px 60px rgba(26, 45, 92, .13), 0 6px 16px rgba(26, 45, 92, .06);
-  --shadow-sm: 0 4px 14px rgba(26, 45, 92, .07);
-  --radius: 22px;
+  --shadow-sm: 0 2px 10px rgba(26, 45, 92, .06);
+  --radius: 18px;
 }
 
 html.dark {
   --bg-1: #161d2e;
-  --bg-2: #0c1019;
+  --bg-2: #0b0f18;
   --card: #151b29;
+  --card-hover: #1a2132;
   --ink: #e9eef8;
   --ink-2: #a5afc3;
   --ink-3: #6d778d;
   --line: #242c3e;
   --accent: #6d8dff;
   --accent-soft: #1c2740;
-  --shadow: 0 24px 60px rgba(0, 0, 0, .45);
-  --shadow-sm: 0 4px 14px rgba(0, 0, 0, .3);
+  --ok: #4ade80;
+  --ok-soft: #14291d;
+  --warn: #fbbf24;
+  --warn-soft: #2a2110;
+  --danger: #f87171;
+  --danger-soft: #2a1416;
+  --shadow: 0 24px 60px rgba(0, 0, 0, .5);
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, .3);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
     --bg-1: #161d2e;
-    --bg-2: #0c1019;
+    --bg-2: #0b0f18;
     --card: #151b29;
+    --card-hover: #1a2132;
     --ink: #e9eef8;
     --ink-2: #a5afc3;
     --ink-3: #6d778d;
     --line: #242c3e;
     --accent: #6d8dff;
     --accent-soft: #1c2740;
-    --shadow: 0 24px 60px rgba(0, 0, 0, .45);
-    --shadow-sm: 0 4px 14px rgba(0, 0, 0, .3);
+    --ok: #4ade80;
+    --ok-soft: #14291d;
+    --warn: #fbbf24;
+    --warn-soft: #2a2110;
+    --danger: #f87171;
+    --danger-soft: #2a1416;
+    --shadow: 0 24px 60px rgba(0, 0, 0, .5);
+    --shadow-sm: 0 2px 10px rgba(0, 0, 0, .3);
   }
 }
 
 body {
   min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px 20px;
+  padding: 40px 20px 56px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
                "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   color: var(--ink);
-  background: radial-gradient(1200px 600px at 50% -10%, var(--bg-1), var(--bg-2));
+  background: radial-gradient(1400px 700px at 50% -15%, var(--bg-1), var(--bg-2));
   -webkit-font-smoothing: antialiased;
+  font-size: 14px;
 }
 
-.wrap { width: 100%; max-width: 720px; }
+.wrap { width: 100%; max-width: 1080px; margin: 0 auto; }
 
-.brand {
+/* ---------- 头部 ---------- */
+
+.header {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-bottom: 28px;
+  gap: 16px;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
 }
 
+.brand { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 220px; }
+
 .brand__mark {
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
+  width: 54px;
+  height: 54px;
+  border-radius: 17px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  font-size: 23px;
   font-weight: 700;
   color: #fff;
   background: linear-gradient(135deg, var(--accent), #7aa0ff);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 8px 22px rgba(59, 110, 245, .3);
   flex-shrink: 0;
 }
 
-.brand__name { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+.brand__name { font-size: 23px; font-weight: 700; letter-spacing: -.02em; }
 .brand__desc { font-size: 13px; color: var(--ink-3); margin-top: 3px; }
 
-.section-label {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+.actions { display: flex; align-items: center; gap: 10px; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .15s ease;
+  font-family: inherit;
+}
+
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn:disabled { opacity: .55; cursor: default; }
+.btn:disabled:hover { border-color: var(--line); color: var(--ink-2); }
+
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn--primary:hover { color: #fff; opacity: .9; }
+.btn--primary:disabled { background: var(--accent); border-color: var(--accent); }
+.btn--primary:disabled:hover { color: #fff; opacity: .55; }
+
+.spin {
+  width: 14px; height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  display: none;
+}
+.btn.is-loading .spin { display: block; }
+.btn.is-loading .btn__icon { display: none; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- 状态汇总 ---------- */
+
+.summary {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 13px 20px;
+  margin-bottom: 26px;
+  border-radius: 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.summary__item { display: flex; align-items: center; gap: 7px; }
+.summary__num { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.summary__spacer { flex: 1; }
+.summary__time { color: var(--ink-3); font-size: 12px; }
+
+/* ---------- 分组 ---------- */
+
+.group { margin-bottom: 30px; }
+
+.group__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
   margin: 0 4px 12px;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 14px;
+.group__title {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
 
+.group__count { font-size: 11.5px; color: var(--ink-3); opacity: .7; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+/* ---------- 卡片 ---------- */
+
 .card {
+  position: relative;
   display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 18px 20px;
+  align-items: flex-start;
+  gap: 13px;
+  padding: 15px 16px;
   border-radius: var(--radius);
   background: var(--card);
   border: 1px solid var(--line);
@@ -126,28 +233,161 @@ body {
   transform: translateY(-2px);
   box-shadow: var(--shadow);
   border-color: var(--accent);
+  background: var(--card-hover);
 }
 
+.card.is-down { opacity: .62; }
+.card.is-down:hover { border-color: var(--danger); }
+
 .card__icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 13px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 19px;
+  font-size: 18px;
   background: var(--accent-soft);
   flex-shrink: 0;
 }
 
-.card__body { min-width: 0; flex: 1; }
-.card__title { font-size: 15px; font-weight: 620; }
-.card__desc { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
-.card__arrow { color: var(--ink-3); font-size: 16px; flex-shrink: 0; }
-.card:hover .card__arrow { color: var(--accent); }
+.card__body { min-width: 0; flex: 1; padding-top: 1px; }
+
+.card__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.card__title {
+  font-size: 14.5px;
+  font-weight: 620;
+  letter-spacing: -.01em;
+}
+
+.card__desc {
+  font-size: 12.5px;
+  color: var(--ink-3);
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card__host {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--ink-3);
+  opacity: .8;
+  margin-top: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 状态徽标 */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 19px;
+  padding: 0 7px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.badge--ok { background: var(--ok-soft); color: var(--ok); }
+.badge--degraded { background: var(--warn-soft); color: var(--warn); }
+.badge--down { background: var(--danger-soft); color: var(--danger); }
+.badge--unknown { background: var(--line); color: var(--ink-3); }
+.badge--note { background: var(--warn-soft); color: var(--warn); }
+
+.dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.badge--ok .dot { box-shadow: 0 0 0 3px rgba(22, 163, 74, .16); }
+.badge--down .dot { box-shadow: 0 0 0 3px rgba(229, 72, 77, .16); }
+
+.card__detail-btn {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  transition: all .15s ease;
+  font-family: inherit;
+}
+
+.card__detail-btn:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* 详情面板 */
+
+.detail {
+  display: none;
+  grid-column: 1 / -1;
+  padding: 13px 16px;
+  border-radius: 13px;
+  background: var(--card);
+  border: 1px dashed var(--line);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.85;
+}
+
+.detail.open { display: block; }
+
+.detail dl { display: grid; grid-template-columns: 92px 1fr; gap: 4px 12px; }
+.detail dt { color: var(--ink-3); }
+.detail dd { word-break: break-all; }
+
+.detail code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  background: var(--accent-soft);
+  padding: 1px 6px;
+  border-radius: 5px;
+}
+
+/* ---------- 骨架 ---------- */
+
+.skeleton {
+  height: 74px;
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, var(--line) 25%, var(--card) 50%, var(--line) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border: 1px solid var(--line);
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ---------- 页脚 ---------- */
 
 .footer {
-  margin-top: 30px;
+  margin-top: 36px;
   text-align: center;
   font-size: 12px;
   color: var(--ink-3);
@@ -162,60 +402,306 @@ body {
   font-size: 11.5px;
 }
 
-@media (max-width: 520px) {
+@media (max-width: 560px) {
+  body { padding: 24px 14px 40px; }
   .grid { grid-template-columns: 1fr; }
-  .brand__name { font-size: 19px; }
+  .brand__name { font-size: 20px; }
+  .brand__mark { width: 46px; height: 46px; font-size: 20px; border-radius: 14px; }
+  .detail dl { grid-template-columns: 76px 1fr; }
 }
 </style>
 </head>
 <body>
 <div class="wrap">
 
-  <div class="brand">
-    <div class="brand__mark">王</div>
-    <div>
-      <div class="brand__name">王艳涛</div>
-      <div class="brand__desc">个人站点与服务入口</div>
+  <div class="header">
+    <div class="brand">
+      <div class="brand__mark">王</div>
+      <div>
+        <div class="brand__name">王艳涛</div>
+        <div class="brand__desc">个人站点与服务入口</div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn btn--primary" id="refreshBtn" type="button">
+        <span class="spin"></span>
+        <span class="btn__icon">⟳</span>
+        <span id="refreshText">检测状态</span>
+      </button>
     </div>
   </div>
 
-  <div class="section-label">站点</div>
-  <div class="grid">
-    <a class="card" href="https://www.wyantao.com/" target="_blank" rel="noopener">
-      <div class="card__icon">📝</div>
-      <div class="card__body">
-        <div class="card__title">博客</div>
-        <div class="card__desc">技术笔记与随笔</div>
-      </div>
-      <div class="card__arrow">→</div>
-    </a>
-    <a class="card" href="https://img.wyantao.com/" target="_blank" rel="noopener">
-      <div class="card__icon">🖼️</div>
-      <div class="card__body">
-        <div class="card__title">图床</div>
-        <div class="card__desc">文章配图与静态资源</div>
-      </div>
-      <div class="card__arrow">→</div>
-    </a>
+  <div class="summary" id="summary">
+    <div class="summary__item">
+      <span class="dot" style="background:var(--ok)"></span>
+      <span>正常 <span class="summary__num" id="statOk">—</span></span>
+    </div>
+    <div class="summary__item">
+      <span class="dot" style="background:var(--warn)"></span>
+      <span>受限 <span class="summary__num" id="statDegraded">—</span></span>
+    </div>
+    <div class="summary__item">
+      <span class="dot" style="background:var(--danger)"></span>
+      <span>不可达 <span class="summary__num" id="statDown">—</span></span>
+    </div>
+    <span class="summary__spacer"></span>
+    <span class="summary__time" id="statTime">尚未检测</span>
   </div>
 
-  <div class="section-label" style="margin-top: 24px;">管理</div>
-  <div class="grid">
-    <a class="card" href="https://admin.wyantao.com/" target="_blank" rel="noopener">
-      <div class="card__icon">⚙️</div>
-      <div class="card__body">
-        <div class="card__title">后台管理</div>
-        <div class="card__desc">内容、AI、点餐与文件分享</div>
+  <div id="container">
+    <div class="group">
+      <div class="group__head"><span class="group__title">加载中</span></div>
+      <div class="grid">
+        <div class="skeleton"></div>
+        <div class="skeleton"></div>
+        <div class="skeleton"></div>
+        <div class="skeleton"></div>
       </div>
-      <div class="card__arrow">→</div>
-    </a>
+    </div>
   </div>
 
   <div class="footer">
-    <div>文件分享短链由本站提供，形如 <code>s.wyantao.com/s/xxxxxx</code></div>
+    <div>文件分享短链形如 <code>s.wyantao.com/s/xxxxxx</code></div>
     <div>若你是通过分享链接错误跳转到这里，请向分享者确认地址是否完整</div>
   </div>
 
 </div>
+
+<script>
+(function () {
+  'use strict';
+
+  var GROUP_ORDER = ['site', 'admin', 'tool', 'service'];
+  var GROUP_LABEL = {
+    site: '站点',
+    admin: '管理入口',
+    tool: '自建工具',
+    service: '中转与基础设施'
+  };
+  var GROUP_ICON = {
+    site: '📝',
+    admin: '⚙️',
+    tool: '🧰',
+    service: '🔌'
+  };
+
+  // 名称 → emoji，未命中时按分组兜底
+  var ICONS = {
+    blog: '📝', 'blog-apex': '🌐', admin: '⚙️', meal: '🍚',
+    gitea: '🐙', docker: '🐳', game: '🎮', mail: '✉️',
+    waline: '💬', hitokoto: '🎲', ai: '🤖', newapi: '🧠',
+    gpt: '✨', cbc: '🔁', cpa: '🔀', npm: '📦',
+    share: '📤', '3xui': '🛡️'
+  };
+
+  var sites = [];
+  var health = {};
+  var expanded = {};
+
+  var container = document.getElementById('container');
+  var refreshBtn = document.getElementById('refreshBtn');
+  var refreshText = document.getElementById('refreshText');
+  var statOk = document.getElementById('statOk');
+  var statDegraded = document.getElementById('statDegraded');
+  var statDown = document.getElementById('statDown');
+  var statTime = document.getElementById('statTime');
+
+  /** 取 host，用于卡片副标题 */
+  function hostOf(url) {
+    try { return new URL(url).host; } catch (e) { return url; }
+  }
+
+  /** 状态 → 徽标 HTML */
+  function badgeOf(key) {
+    var h = health[key];
+    if (!h) {
+      return '';
+    }
+    if (h.status === 'ok') {
+      return '<span class="badge badge--ok"><i class="dot"></i>' + h.costMs + 'ms</span>';
+    }
+    if (h.status === 'degraded') {
+      return '<span class="badge badge--degraded"><i class="dot"></i>HTTP ' + h.httpStatus + '</span>';
+    }
+    return '<span class="badge badge--down"><i class="dot"></i>不可达</span>';
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  /** 单张卡片 + 详情面板 */
+  function cardOf(site) {
+    var h = health[site.key];
+    var down = h && h.status === 'down';
+    var icon = ICONS[site.key] || GROUP_ICON[site.group] || '🔗';
+    var note = site.note
+      ? '<span class="badge badge--note">' + esc(site.note) + '</span>'
+      : '';
+
+    var html = '';
+    html += '<a class="card' + (down ? ' is-down' : '') + '" href="' + esc(site.url) + '"'
+         +  ' target="_blank" rel="noopener noreferrer">';
+    html += '  <div class="card__icon">' + icon + '</div>';
+    html += '  <div class="card__body">';
+    html += '    <div class="card__row">';
+    html += '      <span class="card__title">' + esc(site.name) + '</span>';
+    html += badgeOf(site.key);
+    html += note;
+    html += '    </div>';
+    html += '    <div class="card__desc">' + esc(site.desc) + '</div>';
+    html += '    <div class="card__host">' + esc(hostOf(site.url)) + '</div>';
+    html += '  </div>';
+    html += '  <button class="card__detail-btn" type="button" data-detail="' + esc(site.key) + '"'
+         +  ' title="查看详情">⋯</button>';
+    html += '</a>';
+
+    // 详情面板：默认隐藏，点击卡片的「⋯」展开
+    html += '<div class="detail' + (expanded[site.key] ? ' open' : '') + '" data-panel="' + esc(site.key) + '">';
+    html += '  <dl>';
+    html += '    <dt>名称</dt><dd>' + esc(site.name) + '</dd>';
+    html += '    <dt>地址</dt><dd><code>' + esc(site.url) + '</code></dd>';
+    html += '    <dt>说明</dt><dd>' + esc(site.desc) + '</dd>';
+    html += '    <dt>探测结果</dt><dd>' + detailStatus(h) + '</dd>';
+    html += '  </dl>';
+    html += '</div>';
+
+    return html;
+  }
+
+  /** 详情里的状态文案 */
+  function detailStatus(h) {
+    if (!h) {
+      return '尚未检测，点右上角「检测状态」';
+    }
+    if (h.status === 'ok') {
+      return '正常 · HTTP ' + h.httpStatus + ' · ' + h.costMs + 'ms';
+    }
+    if (h.status === 'degraded') {
+      return '服务在线但入口受限（多半有鉴权）· HTTP ' + h.httpStatus + ' · ' + h.costMs + 'ms';
+    }
+    return '不可达 · ' + esc(h.reason || '未知原因') + ' · 耗时 ' + h.costMs + 'ms';
+  }
+
+  /** 整体渲染 */
+  function render() {
+    if (!sites.length) {
+      container.innerHTML = '<div class="group"><div class="group__head">'
+        + '<span class="group__title">暂无站点</span></div></div>';
+      return;
+    }
+
+    var byGroup = {};
+    sites.forEach(function (s) {
+      (byGroup[s.group] = byGroup[s.group] || []).push(s);
+    });
+
+    var html = '';
+    GROUP_ORDER.forEach(function (g) {
+      var list = byGroup[g];
+      if (!list || !list.length) {
+        return;
+      }
+      html += '<section class="group">';
+      html += '  <div class="group__head">';
+      html += '    <span class="group__title">' + GROUP_LABEL[g] + '</span>';
+      html += '    <span class="group__count">' + list.length + '</span>';
+      html += '  </div>';
+      html += '  <div class="grid">';
+      list.forEach(function (s) { html += cardOf(s); });
+      html += '  </div>';
+      html += '</section>';
+    });
+
+    container.innerHTML = html;
+  }
+
+  /** 汇总统计 */
+  function renderSummary() {
+    var ok = 0, degraded = 0, down = 0, probed = 0;
+    Object.keys(health).forEach(function (k) {
+      var s = health[k].status;
+      probed++;
+      if (s === 'ok') { ok++; }
+      else if (s === 'degraded') { degraded++; }
+      else { down++; }
+    });
+    if (!probed) {
+      statOk.textContent = '—';
+      statDegraded.textContent = '—';
+      statDown.textContent = '—';
+      statTime.textContent = '尚未检测';
+      return;
+    }
+    statOk.textContent = ok;
+    statDegraded.textContent = degraded;
+    statDown.textContent = down;
+    statTime.textContent = '刚刚检测 · ' + new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  }
+
+  /** fetch JSON */
+  function api(url) {
+    return fetch(url, { headers: { 'Accept': 'application/json' } })
+      .then(function (res) { return res.json(); });
+  }
+
+  /** 拉站点清单 */
+  function loadList() {
+    return api('/site/list').then(function (body) {
+      sites = (body && body.data) || [];
+      render();
+    }).catch(function () {
+      sites = [];
+      render();
+    });
+  }
+
+  /** 探测健康状态 */
+  function loadHealth(auto) {
+    refreshBtn.disabled = true;
+    refreshBtn.classList.add('is-loading');
+    refreshText.textContent = '检测中…';
+
+    return api('/site/health').then(function (body) {
+      var rows = (body && body.data) || [];
+      health = {};
+      rows.forEach(function (r) { health[r.key] = r; });
+      render();
+      renderSummary();
+    }).catch(function () {
+      if (!auto) {
+        statTime.textContent = '检测失败，请稍后重试';
+      }
+    }).then(function () {
+      refreshBtn.disabled = false;
+      refreshBtn.classList.remove('is-loading');
+      refreshText.textContent = '重新检测';
+    });
+  }
+
+  // 点「⋯」展开/收起详情；阻止冒泡以免触发卡片跳转
+  container.addEventListener('click', function (ev) {
+    var btn = ev.target.closest('[data-detail]');
+    if (!btn) {
+      return;
+    }
+    ev.preventDefault();
+    ev.stopPropagation();
+    var key = btn.getAttribute('data-detail');
+    var panel = container.querySelector('[data-panel="' + key + '"]');
+    if (!panel) {
+      return;
+    }
+    var open = panel.classList.toggle('open');
+    expanded[key] = open;
+  });
+
+  refreshBtn.addEventListener('click', function () { loadHealth(false); });
+
+  loadList().then(function () { loadHealth(true); });
+})();
+</script>
 </body>
 </html>
