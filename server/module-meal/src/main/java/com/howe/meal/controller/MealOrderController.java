@@ -80,6 +80,13 @@ public class MealOrderController extends BaseController {
         return getDataTable(mealOrderService.selectKitchenOrderList(mealOrder));
     }
 
+    @Operation(summary = "厨师工作台待办汇总", description = "统计本家庭待接单与制作中订单数，供点餐区消息角标使用")
+    @PreAuthorize("@ss.hasPermi('meal:order:dispatch')")
+    @GetMapping("/kitchen/summary")
+    public AjaxResult kitchenSummary(MealOrder mealOrder) {
+        return success(mealOrderService.countKitchenOrderSummary(mealOrder));
+    }
+
     @Operation(summary = "接单", description = "待接单 → 制作中")
     @PreAuthorize("@ss.hasPermi('meal:order:dispatch')")
     @Log(title = "点餐订单", businessType = BusinessType.UPDATE)

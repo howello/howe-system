@@ -120,6 +120,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by d.create_time desc
     </select>
 
+    <!--
+      厨师工作台角标统计：数据范围同样由 @DataScope 注入，不附带明细，
+      也不受列表分页影响；只统计待接单（0）与制作中（1）两种流转中状态。
+    -->
+    <select id="selectKitchenOrderStatusCounts" parameterType="MealOrder" resultType="java.util.Map">
+        select d.status as status, count(*) as cnt
+        from meal_order d
+        where d.del_flag = '0'
+          and d.status in ('0', '1')
+        ${params.dataScope}
+        group by d.status
+    </select>
+
     <select id="selectMealOrderById" parameterType="Long" resultMap="MealOrderResult">
         <include refid="selectMealOrderVo"/>
         where d.order_id = #{orderId} and d.del_flag = '0'
