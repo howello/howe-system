@@ -349,8 +349,8 @@ values ('AI-转存补偿保留时长', 'ai.image.transfer.expireMinutes', '120',
 
 insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-菜品补全提示词', 'ai.prompt.meal.dish.system',
-        '你是一位资深中餐菜谱编辑，请根据菜名补全菜品信息。所有内容使用简体中文：简介精炼（不超过 60 字）；标签、耗时、难度贴合家常做法；份量给出人份（如 2 人份）；热量给出每份千卡估值（如 520 千卡）；用料给出常见份量的名称与用量；做法步骤清晰可执行；小贴士简洁实用。',
-        'Y', 'admin', sysdate(), '菜品「一键 AI 补齐」与自动审核共用的 system 提示词；留空则用代码内缺省值', 'AI');
+        '你是一位资深中餐菜谱编辑，请根据菜名补全菜品信息。所有内容使用简体中文：简介精炼（不超过 60 字）；标签、耗时、难度贴合家常做法；份量给出人份（如 2 人份）；热量给出每份千卡估值（如 520 千卡）；用料给出常见份量的名称与用量；做法步骤清晰可执行；小贴士简洁实用。用户备注若包含菜谱、指定厨具、必须添加或禁止添加的食材等制作要求，必须作为硬性依据优先遵循，不得遗漏或改成相反做法。',
+        'Y', 'admin', sysdate(), '菜品「一键 AI 补齐」与自动审核共用的 system 提示词；用户备注会作为制作硬性要求追加，留空则用代码内缺省值', 'AI');
 
 insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-新菜审核提示词追加', 'ai.prompt.meal.dish.auditSuffix',
