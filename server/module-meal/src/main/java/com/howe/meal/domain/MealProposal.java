@@ -78,7 +78,8 @@ public class MealProposal extends BaseEntity {
     @Schema(description = "做法步骤 JSON，形如 [\"切块\",\"焯水\"]")
     private String steps;
 
-    @Schema(description = "小贴士 JSON，形如 [\"小火慢炖\"]")
+    @Schema(description = "备注 JSON。提交新菜时可保存完整菜谱或制作要求，AI 会据此生成用料和步骤")
+    @Size(max = 8000, message = "备注长度不能超过8000个字符")
     private String tips;
 
     @Schema(description = "想吃的理由", example = "这周想吃点辣的")

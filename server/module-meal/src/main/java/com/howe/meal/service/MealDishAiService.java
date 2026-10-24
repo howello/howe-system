@@ -124,6 +124,17 @@ public class MealDishAiService {
             + "用料给出常见份量的名称与用量；做法步骤清晰可执行；小贴士简洁实用。";
 
     /**
+     * 用户备注的固定使用规则
+     *
+     * <p>备注里可能包含完整菜谱、指定厨具、必须添加或不能添加的食材。
+     * 该规则不随 sys_config 覆盖，避免自定义提示词把用户的硬性要求丢掉。</p>
+     */
+    private static final String USER_NOTES_RULE =
+            "用户备注是本次制作的硬性依据：若备注包含菜谱、用量、厨具、火候、时长或“必须加/不要加”等要求，"
+            + "生成简介、用料、做法和小贴士时必须优先遵循，不得遗漏、改写为相反要求或编造冲突内容；"
+            + "备注没有提到的部分再按家常做法合理补全。";
+
+    /**
      * AI 自动审核在 system 提示词之后追加的判定说明缺省值
      *
      * <p>实际取值优先读 sys_config（{@link ConfigConstants#AI_PROMPT_MEAL_DISH_AUDIT_SUFFIX}）。</p>
@@ -417,7 +428,7 @@ public class MealDishAiService {
             AiChatRequest chatRequest = AiChatRequest.builder()
                     .scene(SCENE_GENERATE)
                     .system(systemPrompt())
-                    .prompt(buildPrompt(name))
+                    .prompt(buildPrompt(name, userNotes(current)))
                     .outputSchema(JSON.toJSONString(objectSchema(properties, required)))
                     .build();
             AiChatResult chatResult = aiClient.chat(chatRequest);
@@ -464,7 +475,7 @@ public class MealDishAiService {
         AiChatRequest chatRequest = AiChatRequest.builder()
                 .scene(SCENE_AUDIT)
                 .system(auditPrompt())
-                .prompt(buildAuditPrompt(name, existingNames))
+                .prompt(buildAuditPrompt(name, existingNames, userNotes(current)))
                 .outputSchema(JSON.toJSONString(objectSchema(properties, required)))
                 .build();
         AiChatResult chatResult = aiClient.chat(chatRequest);
@@ -896,7 +907,7 @@ public class MealDishAiService {
      */
     private String systemPrompt() {
         return ConfigUtils.getString(ConfigConstants.AI_PROMPT_MEAL_DISH_SYSTEM, DEFAULT_SYSTEM_PROMPT)
-                + "\n" + MealCategoryTaxonomy.promptFragment();
+                + "\n" + USER_NOTES_RULE + "\n" + MealCategoryTaxonomy.promptFragment();
     }
 
     /**
@@ -918,13 +929,32 @@ public class MealDishAiService {
     }
 
     /**
+     * 提取用户填写的制作备注；没有备注时返回空字符串
+     *
+     * @param current 当前表单已填字段快照
+     * @return 去掉首尾空白的备注
+     */
+    private String userNotes(DishAiGenerateRequest.Current current) {
+        String notes = current == null ? null : current.getTips();
+        return notes == null ? "" : notes.trim();
+    }
+
+    /**
      * 组装生成场景的用户提示词
      *
-     * @param name 菜名
+     * @param name  菜名
+     * @param notes 用户备注（可能是菜谱或制作要求）
      * @return 提示词
      */
-    private String buildPrompt(String name) {
-        return "菜名：" + name + "\n请补全所需字段。";
+    private String buildPrompt(String name, String notes) {
+        StringBuilder builder = new StringBuilder("菜名：").append(name).append("\n");
+        if (!isBlank(notes)) {
+            builder.append("用户备注（制作硬性要求，必须体现在用料和步骤中）：\n")
+                    .append(notes)
+                    .append("\n");
+        }
+        builder.append("请补全所需字段。");
+        return builder.toString();
     }
 
     /**
@@ -932,13 +962,18 @@ public class MealDishAiService {
      *
      * @param name          待审核菜名
      * @param existingNames 已有菜品名称
+     * @param notes         用户备注（可能是菜谱或制作要求）
      * @return 提示词
      */
-    private String buildAuditPrompt(String name, List<String> existingNames) {
-        StringBuilder builder = new StringBuilder(buildPrompt(name));
+    private String buildAuditPrompt(String name, List<String> existingNames, String notes) {
+        StringBuilder builder = new StringBuilder(buildPrompt(name, notes));
         builder.append("\n已有菜品（用于判重）：")
                 .append(existingNames == null || existingNames.isEmpty() ? "暂无" : String.join("、", existingNames))
                 .append("\n请判断待审核菜名是否与已有菜品本质上是同一道菜；是则 approved 填 \"false\" 并说明与哪道重复。");
+        if (!isBlank(notes)) {
+            builder.append("\n用户备注中的做法、指定厨具、必须添加或禁止添加的食材均为硬性要求；")
+                    .append("在用料和步骤中必须严格体现，不得改成相反做法。");
+        }
         builder.append("\n同时给出 approved 判定；不通过时填写 rejectReason。");
         return builder.toString();
     }

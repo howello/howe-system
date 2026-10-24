@@ -88,6 +88,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where d.proposal_id = #{proposalId} and d.del_flag = '0'
     </select>
 
+    <!--
+      tips 保存提交人填写的备注：可能是完整菜谱、指定厨具或必须/不要添加的食材。
+      AI 自动审核会把它作为制作硬性要求参与生成，不能在这里丢弃。
+    -->
     <insert id="insertMealProposal" parameterType="MealProposal" useGeneratedKeys="true" keyProperty="proposalId">
         insert into meal_proposal (
             dept_id, user_id, user_name, name, description, image, tags, duration, level,

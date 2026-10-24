@@ -334,6 +334,8 @@ public class MealProposalAuditService {
         current.setLevel(proposal.getLevel());
         current.setIngredients(proposal.getIngredients());
         current.setSteps(proposal.getSteps());
+        // 备注是制作用户填写的菜谱/硬性要求，必须原样进入 AI 审核提示词；
+        // 即使已经从备注补出了 tips，也不能丢掉原文。
         current.setTips(proposal.getTips());
         return current;
     }
