@@ -10,6 +10,7 @@ import com.howe.meal.domain.MealDish;
 import com.howe.meal.domain.MealOrder;
 import com.howe.meal.domain.MealOrderItem;
 import com.howe.meal.domain.dto.MealOrderSubmitBody;
+import com.howe.meal.domain.vo.MealKitchenOrderSummary;
 import com.howe.meal.mapper.MealDishMapper;
 import com.howe.meal.mapper.MealOrderMapper;
 import com.howe.meal.mapper.MealReviewMapper;
@@ -65,6 +66,23 @@ public class MealOrderServiceImpl implements IMealOrderService {
         List<MealOrder> orders = mealOrderMapper.selectMealOrderList(mealOrder);
         fillItems(orders);
         return orders;
+    }
+
+    @Override
+    @DataScope(deptAlias = "d")
+    public MealKitchenOrderSummary countKitchenOrderSummary(MealOrder mealOrder) {
+        long pendingCount = 0;
+        long cookingCount = 0;
+        for (Map<String, Object> row : mealOrderMapper.selectKitchenOrderStatusCounts(mealOrder)) {
+            long count = row.get("cnt") instanceof Number value ? value.longValue() : 0L;
+            String status = row.get("status") == null ? "" : String.valueOf(row.get("status"));
+            if (MealOrder.STATUS_WAITING.equals(status)) {
+                pendingCount = count;
+            } else if (MealOrder.STATUS_COOKING.equals(status)) {
+                cookingCount = count;
+            }
+        }
+        return new MealKitchenOrderSummary(pendingCount, cookingCount);
     }
 
     @Override

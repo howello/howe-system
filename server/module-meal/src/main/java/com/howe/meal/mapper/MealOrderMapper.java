@@ -5,6 +5,7 @@ import com.howe.meal.domain.MealOrderItem;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 点餐-订单 数据层
@@ -39,6 +40,17 @@ public interface MealOrderMapper {
      * @return 订单集合
      */
     List<MealOrder> selectCookedOrderList(MealOrder mealOrder);
+
+    /**
+     * 按状态统计厨师工作台待办订单
+     *
+     * <p>配合 {@code @DataScope} 使用，只返回待接单与制作中两种状态的订单数，
+     * 不受工作台列表分页上限影响。</p>
+     *
+     * @param mealOrder 查询条件，数据范围由 {@code @DataScope} 注入
+     * @return 每行含 status 与 cnt
+     */
+    List<Map<String, Object>> selectKitchenOrderStatusCounts(MealOrder mealOrder);
 
     /**
      * 按主键查询订单

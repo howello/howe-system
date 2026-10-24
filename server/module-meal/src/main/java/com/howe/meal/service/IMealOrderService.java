@@ -2,6 +2,7 @@ package com.howe.meal.service;
 
 import com.howe.meal.domain.MealOrder;
 import com.howe.meal.domain.dto.MealOrderSubmitBody;
+import com.howe.meal.domain.vo.MealKitchenOrderSummary;
 
 import java.util.List;
 
@@ -26,6 +27,14 @@ public interface IMealOrderService {
      * @return 订单集合
      */
     List<MealOrder> selectKitchenOrderList(MealOrder mealOrder);
+
+    /**
+     * 统计厨师工作台待办订单（受数据权限约束）
+     *
+     * @param mealOrder 查询条件
+     * @return 待接单与制作中订单数
+     */
+    MealKitchenOrderSummary countKitchenOrderSummary(MealOrder mealOrder);
 
     /**
      * 查询「我的订单」
