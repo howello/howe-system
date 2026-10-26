@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -96,21 +97,28 @@ public class MealOrderServiceImpl implements IMealOrderService {
     @Override
     @DataScope(deptAlias = "d")
     public MealKitchenOrderSummary countKitchenOrderSummary(MealOrder mealOrder) {
-        long pendingCount = countKitchenStatus(MealOrder.STATUS_WAITING, false);
-        long cookingCount = countKitchenStatus(MealOrder.STATUS_COOKING, true);
+        long pendingCount = countKitchenStatus(MealOrder.STATUS_WAITING, false, mealOrder);
+        long cookingCount = countKitchenStatus(MealOrder.STATUS_COOKING, true, mealOrder);
         return new MealKitchenOrderSummary(pendingCount, cookingCount);
     }
 
     /**
      * 按状态统计厨师工作台数量；制作中订单只统计当前登录账号接的单。
      *
+     * <p>统计使用独立查询对象，必须显式继承入参上的 {@code params.dataScope}，
+     * 否则 {@code @DataScope} 写入的权限片段会丢失，导致跨家庭统计。</p>
+     *
      * @param status          订单状态
      * @param onlyCurrentChef 是否只统计当前接单人
+     * @param template        控制器入参，用于继承数据权限片段
      * @return 数量
      */
-    private long countKitchenStatus(String status, boolean onlyCurrentChef) {
+    private long countKitchenStatus(String status, boolean onlyCurrentChef, MealOrder template) {
         MealOrder query = new MealOrder();
         query.setStatus(status);
+        if (template != null) {
+            query.setParams(new HashMap<>(template.getParams()));
+        }
         if (onlyCurrentChef) {
             query.setAcceptUserId(SecurityUtils.getUserId());
         } else {
