@@ -87,6 +87,16 @@ public class MealOrderController extends BaseController {
         return success(mealOrderService.countKitchenOrderSummary(mealOrder));
     }
 
+    @Operation(summary = "跳过待接单订单", description = "当前厨师将订单从自己的待接单视图隐藏；仅记录个人偏好，不改变订单状态，也不影响其他厨师")
+    @PreAuthorize("@ss.hasPermi('meal:order:dispatch')")
+    @Log(title = "点餐订单", businessType = BusinessType.UPDATE)
+    @PutMapping("/kitchen/skip/{orderId}")
+    public AjaxResult skip(@Parameter(description = "订单ID", required = true)
+            @PathVariable("orderId") Long orderId) {
+        mealOrderService.skipOrder(orderId);
+        return success();
+    }
+
     @Operation(summary = "接单", description = "待接单 → 制作中")
     @PreAuthorize("@ss.hasPermi('meal:order:dispatch')")
     @Log(title = "点餐订单", businessType = BusinessType.UPDATE)

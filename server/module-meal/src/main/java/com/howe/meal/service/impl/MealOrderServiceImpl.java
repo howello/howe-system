@@ -2,6 +2,7 @@ package com.howe.meal.service.impl;
 
 import com.howe.common.annotation.DataScope;
 import com.howe.common.core.domain.model.LoginUser;
+import com.howe.common.core.redis.RedisCache;
 import com.howe.common.exception.ServiceException;
 import com.howe.common.utils.DateUtils;
 import com.howe.common.utils.SecurityUtils;
@@ -24,11 +25,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -48,41 +53,99 @@ public class MealOrderServiceImpl implements IMealOrderService {
 
     private static final long MILLIS_MINUTE = 60 * 1000L;
 
+    /** 厨师跳过待接单订单的 Redis 缓存前缀：家庭 + 用户隔离 */
+    private static final String SKIPPED_ORDER_KEY_PREFIX = "meal:order:skipped:";
+
+    /** 跳过记录保留 7 天，覆盖普通家庭订单的待接单周期 */
+    private static final long SKIPPED_ORDER_TTL_DAYS = 7;
+
     private final MealOrderMapper mealOrderMapper;
     private final MealDishMapper mealDishMapper;
     private final MealReviewMapper mealReviewMapper;
     private final IMealNotifyService mealNotifyService;
     private final IMealWeComNotifyService mealWeComNotifyService;
     private final ITransactionCommitExecutor transactionCommitExecutor;
+    private final RedisCache redisCache;
     @Override
     @DataScope(deptAlias = "d")
     public List<MealOrder> selectMealOrderList(MealOrder mealOrder) {
         return mealOrderMapper.selectMealOrderList(mealOrder);
     }
 
+    /**
+     * 厨师工作台列表：待接单是家庭共享待办，制作中只属于接单厨师本人。
+     *
+     * <p>只按当前登录用户过滤制作中订单；待接单必须让同家庭所有厨师看见，
+     * 因此不能把 {@code acceptUserId} 无条件塞进查询。</p>
+     */
     @Override
     @DataScope(deptAlias = "d")
     public List<MealOrder> selectKitchenOrderList(MealOrder mealOrder) {
+        applyKitchenVisibility(mealOrder);
+        // 待接单需要排除当前厨师已主动跳过的订单；制作中不读取跳过记录，避免影响接单人视角
+        if (mealOrder != null && MealOrder.STATUS_WAITING.equals(mealOrder.getStatus())) {
+            mealOrder.setExcludedOrderIds(skippedOrderIds(SecurityUtils.getDeptId()));
+        }
         List<MealOrder> orders = mealOrderMapper.selectMealOrderList(mealOrder);
         fillItems(orders);
         return orders;
     }
 
+    /**
+     * 厨师工作台角标：待接单统计家庭全部，制作中只统计本人接单。
+     */
     @Override
     @DataScope(deptAlias = "d")
     public MealKitchenOrderSummary countKitchenOrderSummary(MealOrder mealOrder) {
-        long pendingCount = 0;
-        long cookingCount = 0;
-        for (Map<String, Object> row : mealOrderMapper.selectKitchenOrderStatusCounts(mealOrder)) {
-            long count = row.get("cnt") instanceof Number value ? value.longValue() : 0L;
-            String status = row.get("status") == null ? "" : String.valueOf(row.get("status"));
-            if (MealOrder.STATUS_WAITING.equals(status)) {
-                pendingCount = count;
-            } else if (MealOrder.STATUS_COOKING.equals(status)) {
-                cookingCount = count;
-            }
-        }
+        long pendingCount = countKitchenStatus(MealOrder.STATUS_WAITING, false, mealOrder);
+        long cookingCount = countKitchenStatus(MealOrder.STATUS_COOKING, true, mealOrder);
         return new MealKitchenOrderSummary(pendingCount, cookingCount);
+    }
+
+    /**
+     * 按状态统计厨师工作台数量；制作中订单只统计当前登录账号接的单。
+     *
+     * <p>统计使用独立查询对象，必须显式继承入参上的 {@code params.dataScope}，
+     * 否则 {@code @DataScope} 写入的权限片段会丢失，导致跨家庭统计。</p>
+     *
+     * @param status          订单状态
+     * @param onlyCurrentChef 是否只统计当前接单人
+     * @param template        控制器入参，用于继承数据权限片段
+     * @return 数量
+     */
+    private long countKitchenStatus(String status, boolean onlyCurrentChef, MealOrder template) {
+        MealOrder query = new MealOrder();
+        query.setStatus(status);
+        if (template != null) {
+            query.setParams(new HashMap<>(template.getParams()));
+        }
+        if (onlyCurrentChef) {
+            query.setAcceptUserId(SecurityUtils.getUserId());
+        } else {
+            // 待接单角标同样排除当前厨师已主动跳过的订单
+            query.setExcludedOrderIds(skippedOrderIds(SecurityUtils.getDeptId()));
+        }
+        List<Map<String, Object>> rows = mealOrderMapper.selectKitchenOrderStatusCounts(query);
+        if (rows.isEmpty()) {
+            return 0L;
+        }
+        Object count = rows.get(0).get("cnt");
+        return count instanceof Number value ? value.longValue() : 0L;
+    }
+
+    /**
+     * 给厨师工作台查询设置可见范围：待接单不限接单人，制作中只限本人。
+     *
+     * @param mealOrder 查询条件
+     */
+    private void applyKitchenVisibility(MealOrder mealOrder) {
+        if (mealOrder == null) {
+            return;
+        }
+        String status = mealOrder.getStatus();
+        if (MealOrder.STATUS_COOKING.equals(status)) {
+            mealOrder.setAcceptUserId(SecurityUtils.getUserId());
+        }
     }
 
     @Override
@@ -199,6 +262,72 @@ public class MealOrderServiceImpl implements IMealOrderService {
                 notificationExtra(order.getOrderNo())));
         transactionCommitExecutor.afterCommit(() -> mealWeComNotifyService.notifyOrderAccepted(order.getOrderId()));
         return rows;
+    }
+
+    /**
+     * 当前厨师跳过一条待接单订单，只记录个人偏好，不改变订单状态。
+     *
+     * <p>记录按家庭与用户隔离，保留 7 天；订单被其他厨师接单、点餐人取消或超过保留期后，
+     * 会自动从所有厨师的待接单视图中消失。</p>
+     *
+     * @param orderId 待接单订单ID
+     */
+    @Override
+    public void skipOrder(Long orderId) {
+        if (orderId == null) {
+            throw new ServiceException("请选择要跳过的订单");
+        }
+        MealOrder order = requireOrder(orderId);
+        MealScopeGuard.assertSameDept(order.getDeptId(), "订单");
+        if (!MealOrder.STATUS_WAITING.equals(order.getStatus())) {
+            throw new ServiceException("该订单已不是待接单状态");
+        }
+        Long deptId = SecurityUtils.getDeptId();
+        String key = skippedOrderKey(deptId);
+        Set<Long> skipped = new LinkedHashSet<>(skippedOrderIds(deptId));
+        skipped.add(orderId);
+        redisCache.setCacheObject(key, new ArrayList<>(skipped));
+        // 集合写入与续期分开，确保每次新增跳过后 TTL 都覆盖到最新一条
+        redisCache.expire(key, SKIPPED_ORDER_TTL_DAYS, TimeUnit.DAYS);
+    }
+
+    /**
+     * 读取当前厨师跳过的订单ID；Redis 数据缺失或类型异常时按空集合处理，确保列表可用。
+     *
+     * @param deptId 当前家庭ID
+     * @return 跳过订单ID集合
+     */
+    private List<Long> skippedOrderIds(Long deptId) {
+        if (deptId == null) {
+            return new ArrayList<>();
+        }
+        Object cached = redisCache.getCacheObject(skippedOrderKey(deptId));
+        if (!(cached instanceof Collection<?> collection) || collection.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<Long> result = new ArrayList<>(collection.size());
+        for (Object value : collection) {
+            if (value instanceof Number number) {
+                result.add(number.longValue());
+            } else if (value != null) {
+                try {
+                    result.add(Long.valueOf(String.valueOf(value)));
+                } catch (NumberFormatException ignored) {
+                    // 忽略无法解析的脏成员，避免一条坏数据影响整个列表
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 生成跳过订单的 Redis key：家庭 + 当前厨师，保证 A 的跳过不影响 B。
+     *
+     * @param deptId 当前家庭ID
+     * @return Redis key
+     */
+    private String skippedOrderKey(Long deptId) {
+        return SKIPPED_ORDER_KEY_PREFIX + deptId + ":" + SecurityUtils.getUserId();
     }
 
     @Override
