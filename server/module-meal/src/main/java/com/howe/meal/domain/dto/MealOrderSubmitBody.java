@@ -27,6 +27,9 @@ public class MealOrderSubmitBody implements Serializable {
     @Size(max = 500, message = "整体备注长度不能超过500个字符")
     private String orderRemark;
 
+    @Schema(description = "指派厨师用户ID；为空表示不指派，进入公开抢单池", example = "2")
+    private Long assignUserId;
+
     @Schema(description = "点餐明细", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotEmpty(message = "请至少点一道菜")
     @Valid

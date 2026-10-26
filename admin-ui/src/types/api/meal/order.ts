@@ -4,7 +4,7 @@ import type { PageDomain, BaseEntity } from "../common";
 export interface MealOrderQueryParams extends PageDomain {
   /** 订单号（模糊匹配） */
   orderNo?: string;
-  /** 状态（0待接单 1制作中 2已完成 3已取消） */
+  /** 状态（0待接单 1制作中 2已完成 3已取消 4无人接单） */
   status?: string;
   /** 点餐人昵称（模糊匹配） */
   userName?: string;
@@ -41,7 +41,7 @@ export interface MealOrder extends BaseEntity {
   userId?: number;
   /** 点餐人昵称 */
   userName?: string;
-  /** 状态（0待接单 1制作中 2已完成 3已取消） */
+  /** 状态（0待接单 1制作中 2已完成 3已取消 4无人接单） */
   status?: string;
   /** 菜品总份数 */
   totalCount?: number;
@@ -57,6 +57,14 @@ export interface MealOrder extends BaseEntity {
   finishTime?: string;
   /** 取消时间 */
   cancelTime?: string;
+  /** 指派模式（0公开抢单 1指派中 2指派已转公开） */
+  assignMode?: string;
+  /** 被指派的厨师昵称（下单时快照） */
+  assignUserName?: string;
+  /** 接单截止时间 */
+  deadlineTime?: string;
+  /** 关闭原因（1用户取消 2超时 3全员拒绝） */
+  closeReason?: string;
   /** 点餐明细（详情接口附带） */
   items?: MealOrderItem[];
   /** 已等待分钟数（后端计算） */

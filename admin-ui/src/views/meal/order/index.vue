@@ -13,6 +13,7 @@
           <el-option label="制作中" value="1" />
           <el-option label="已完成" value="2" />
           <el-option label="已取消" value="3" />
+          <el-option label="无人接单" value="4" />
         </el-select>
       </el-form-item>
       <el-form-item label="下单时间">
@@ -55,31 +56,23 @@
         </template>
       </el-table-column>
       <el-table-column label="下单时间" align="center" prop="createTime" width="170" />
+      <el-table-column label="指派" align="center" width="120">
+        <template #default="scope">
+          <span v-if="scope.row.assignMode === '1'">{{ scope.row.assignUserName || "—" }}</span>
+          <span v-else-if="scope.row.assignMode === '2'" class="muted">已转公开</span>
+          <span v-else class="muted">公开抢单</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="接单截止" align="center" prop="deadlineTime" width="160" />
       <el-table-column label="接单人" align="center" prop="acceptBy" width="100" />
       <el-table-column label="完成人" align="center" prop="finishBy" width="100" />
-      <el-table-column label="操作" align="center" width="200" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="160" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="View" @click="handleDetail(scope.row)">详情</el-button>
-          <el-button
-            v-if="scope.row.status === '0'"
-            link
-            type="primary"
-            icon="Check"
-            @click="handleAccept(scope.row)"
-            v-hasPermi="['meal:order:dispatch']"
-          >
-            接单
-          </el-button>
-          <el-button
-            v-if="scope.row.status === '1'"
-            link
-            type="primary"
-            icon="Select"
-            @click="handleFinish(scope.row)"
-            v-hasPermi="['meal:order:finish']"
-          >
-            完成
-          </el-button>
+          <!--
+            接单与完成不在管理端提供：接单资格由订单候选人决定，候选人只包含厨师；
+            家庭管理员不再持有 meal:order:dispatch / meal:order:finish。
+          -->
           <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['meal:order:remove']">删除</el-button>
         </template>
       </el-table-column>
@@ -97,6 +90,10 @@
         <el-descriptions-item label="接单时间">{{ detail.acceptTime || "—" }}</el-descriptions-item>
         <el-descriptions-item label="完成人">{{ detail.finishBy || "—" }}</el-descriptions-item>
         <el-descriptions-item label="完成时间">{{ detail.finishTime || "—" }}</el-descriptions-item>
+        <el-descriptions-item label="指派模式">{{ assignModeText(detail.assignMode) }}</el-descriptions-item>
+        <el-descriptions-item label="指派厨师">{{ detail.assignUserName || "—" }}</el-descriptions-item>
+        <el-descriptions-item label="接单截止">{{ detail.deadlineTime || "—" }}</el-descriptions-item>
+        <el-descriptions-item label="关闭原因">{{ closeReasonText(detail.closeReason) }}</el-descriptions-item>
         <el-descriptions-item label="整体备注" :span="2">{{ detail.orderRemark || "—" }}</el-descriptions-item>
       </el-descriptions>
 
@@ -116,7 +113,7 @@
 </template>
 
 <script setup lang="ts" name="MealOrder">
-import { listOrder, getOrder, acceptOrder, finishOrder, delOrder } from "@/api/meal/order"
+import { listOrder, getOrder, delOrder } from "@/api/meal/order"
 import type { MealOrder, MealOrderQueryParams } from "@/types/api/meal/order"
 
 const { proxy } = getCurrentInstance() as any
@@ -125,7 +122,22 @@ const STATUS_TEXT: Record<string, string> = {
   "0": "待接单",
   "1": "制作中",
   "2": "已完成",
-  "3": "已取消"
+  "3": "已取消",
+  "4": "无人接单"
+}
+
+/** 指派模式文案 */
+const ASSIGN_MODE_TEXT: Record<string, string> = {
+  "0": "公开抢单",
+  "1": "指派中",
+  "2": "指派已转公开"
+}
+
+/** 关闭原因文案 */
+const CLOSE_REASON_TEXT: Record<string, string> = {
+  "1": "下单人取消",
+  "2": "超时无人接单",
+  "3": "全部候选人拒绝"
 }
 
 const orderList = ref<MealOrder[]>([])
@@ -158,7 +170,18 @@ function statusTag(status?: string): "success" | "info" | "warning" | "danger" |
   if (status === "0") return "warning"
   if (status === "1") return "primary"
   if (status === "2") return "success"
+  if (status === "4") return "danger"
   return "info"
+}
+
+/** 指派模式展示，未知值退回「公开抢单」 */
+function assignModeText(mode?: string): string {
+  return ASSIGN_MODE_TEXT[mode || "0"] || "公开抢单"
+}
+
+/** 关闭原因展示，未关闭时显示占位 */
+function closeReasonText(reason?: string): string {
+  return reason ? CLOSE_REASON_TEXT[reason] || "—" : "—"
 }
 
 function getList() {
@@ -199,28 +222,6 @@ function handleDetail(row: MealOrder) {
     detail.value = response.data
     open.value = true
   })
-}
-
-function handleAccept(row: MealOrder) {
-  proxy.$modal
-    .confirm(`确认接下订单 ${row.orderNo} 吗？`)
-    .then(() => acceptOrder(row.orderId as number))
-    .then(() => {
-      proxy.$modal.msgSuccess("已接单")
-      getList()
-    })
-    .catch(() => {})
-}
-
-function handleFinish(row: MealOrder) {
-  proxy.$modal
-    .confirm(`确认把订单 ${row.orderNo} 标记为已完成吗？`)
-    .then(() => finishOrder(row.orderId as number))
-    .then(() => {
-      proxy.$modal.msgSuccess("已完成")
-      getList()
-    })
-    .catch(() => {})
 }
 
 function handleDelete(row?: MealOrder) {

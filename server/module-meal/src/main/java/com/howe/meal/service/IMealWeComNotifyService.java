@@ -35,6 +35,13 @@ public interface IMealWeComNotifyService {
     void notifyOrderCompleted(Long orderId);
 
     /**
+     * 发送无人接单通知（超时或全部候选人拒绝）
+     *
+     * @param orderId 订单ID
+     */
+    void notifyOrderUnaccepted(Long orderId);
+
+    /**
      * 发送收到评价通知
      *
      * @param orderId  订单ID

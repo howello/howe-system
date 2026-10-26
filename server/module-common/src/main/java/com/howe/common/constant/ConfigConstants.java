@@ -218,6 +218,22 @@ public class ConfigConstants
      */
     public static final String MEAL_APP_PUBLISH_TOKEN = "meal.app.publishToken";
 
+    /**
+     * 点餐订单接单超时分钟数
+     *
+     * <p>订单进入待接单后，超过该时长仍无人接单则关闭为「无人接单」。
+     * 指派单超时时按 {@link #MEAL_ORDER_ASSIGN_REFUSE_STRATEGY} 处理。</p>
+     */
+    public static final String MEAL_ORDER_ACCEPT_TIMEOUT_MINUTES = "meal.order.acceptTimeoutMinutes";
+
+    /**
+     * 点餐指派单被拒或超时后的处理策略
+     *
+     * <p>{@code 1} 转公开池（补入本家庭其他厨师并重置截止时间）；{@code 2} 直接关闭为无人接单。
+     * 值缺失或非法时按转公开处理。</p>
+     */
+    public static final String MEAL_ORDER_ASSIGN_REFUSE_STRATEGY = "meal.order.assignRefuseStrategy";
+
     /** 文件分享：本地缓存大小上限（字节，超过落 R2） */
     public static final String SHARE_CACHE_LOCAL_MAX_SIZE = "share.cache.localMaxSize";
 

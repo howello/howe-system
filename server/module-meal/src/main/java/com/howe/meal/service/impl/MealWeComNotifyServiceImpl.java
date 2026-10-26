@@ -117,6 +117,23 @@ public class MealWeComNotifyServiceImpl implements IMealWeComNotifyService {
     }
 
     @Override
+    public void notifyOrderUnaccepted(Long orderId) {
+        MealOrder order = mealOrderMapper.selectMealOrderById(orderId);
+        if (order == null) {
+            return;
+        }
+        List<MealOrderItem> items = mealOrderMapper.selectItemsByOrderId(orderId);
+        String reason = MealOrder.CLOSE_REASON_TIMEOUT.equals(order.getCloseReason())
+                ? "等了很久都没人接单" : "大厨们都暂时腾不开手";
+        String content = "😅 这单没接上\n\n"
+                + defaultText(order.getUserName()) + "，" + reason + "，可以换个时间再点，或者直接喊一声～\n"
+                + formatDishSummary(items) + "\n"
+                + "🕒 " + friendlyTime(order.getCreateTime()) + "\n"
+                + "订单号：" + orderNo(order);
+        sendOrderMessage(order.getDeptId(), true, content, mobilesOf(order.getUserId()), "无人接单");
+    }
+
+    @Override
     public void notifyOrderRated(Long orderId, Integer score, String content) {
         MealOrder order = mealOrderMapper.selectMealOrderById(orderId);
         if (order == null) {

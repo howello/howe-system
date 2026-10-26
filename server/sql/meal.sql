@@ -97,7 +97,7 @@ create table meal_order (
   dept_id      bigint(20)                              comment '所属家庭ID',
   user_id      bigint(20)                              comment '点餐人ID',
   user_name    varchar(64)  default ''                 comment '点餐人昵称（冗余，列表直接展示）',
-  status       char(1)      default '0'                comment '状态（0待接单 1制作中 2已完成 3已取消）',
+  status       char(1)      default '0'                comment '状态（0待接单 1制作中 2已完成 3已取消 4无人接单）',
   total_count  int(11)      default 0                  comment '菜品总份数',
   order_remark varchar(500) default ''                 comment '整体备注（口味要求等）',
   accept_by      varchar(64)  default ''                 comment '接单人',
@@ -106,6 +106,11 @@ create table meal_order (
   finish_by    varchar(64)  default ''                 comment '完成人',
   finish_time  datetime                                comment '完成时间',
   cancel_time  datetime                                comment '取消时间',
+  assign_mode      char(1)     default '0'                comment '指派模式（0公开抢单 1指派中 2指派已转公开）',
+  assign_user_id   bigint(20)                             comment '指派的厨师用户ID（下单时确定，不提供改派）',
+  assign_user_name varchar(64) default ''                 comment '指派的厨师昵称（冗余快照）',
+  deadline_time    datetime                               comment '接单截止时间',
+  close_reason     char(1)                                comment '关闭原因（1用户取消 2超时 3全员拒绝）',
   del_flag     char(1)      default '0'                comment '删除标记（0存在 2删除）',
   create_by    varchar(64)  default ''                 comment '创建者',
   create_time  datetime                                comment '下单时间',
@@ -115,8 +120,41 @@ create table meal_order (
   primary key (order_id),
   unique key uk_meal_order_no (order_no),
   key idx_meal_order_dept (dept_id, status, create_time),
-  key idx_meal_order_user (user_id, status, create_time)
+  key idx_meal_order_user (user_id, status, create_time),
+  key idx_meal_order_deadline (status, deadline_time)
 ) engine=innodb auto_increment=1 comment = '点餐-订单';
+
+-- ----------------------------
+-- 3.1、订单候选厨师（派单 + 抢单）
+--
+-- 订单与「可以接这张单的厨师」之间的多对多关系。下单时按指派或公开模式生成：
+--   指派 → 只插被指派人一行（source=1）；
+--   公开 → 插本家庭全部启用中的 meal_chef（source=2）。
+-- 候选人只包含 meal_chef，家庭管理员不进入候选池。
+--
+-- 状态：0待响应 1已接单 2已拒绝 3已失效 4已超时未响应
+--   指派超时转公开后，原指派人置 4，但仍可接单（醒来后按公开候选人身份继续抢）。
+--
+-- 唯一键 (order_id, user_id) 保证同一订单同一厨师只有一行，是并发下的最后一道防线。
+-- ----------------------------
+drop table if exists meal_order_candidate;
+create table meal_order_candidate (
+  candidate_id bigint(20)  not null auto_increment comment '候选人ID',
+  order_id     bigint(20)  not null                comment '订单ID',
+  dept_id      bigint(20)                          comment '所属家庭ID',
+  user_id      bigint(20)  not null                comment '候选厨师用户ID',
+  user_name    varchar(64) default ''              comment '候选厨师昵称（冗余，免联表）',
+  source       char(1)     default '2'             comment '来源（1指派 2公开池 3转公开补入）',
+  status       char(1)     default '0'             comment '状态（0待响应 1已接单 2已拒绝 3已失效 4已超时未响应）',
+  expire_time  datetime                            comment '响应截止时间（与订单 deadline_time 一致）',
+  respond_time datetime                            comment '接单/拒绝/超时判定时间',
+  create_time  datetime                            comment '入池时间',
+  update_time  datetime                            comment '更新时间',
+  primary key (candidate_id),
+  unique key uk_meal_candidate_order_user (order_id, user_id),
+  key idx_meal_candidate_user (user_id, status),
+  key idx_meal_candidate_order (order_id, status)
+) engine=innodb auto_increment=1 comment = '点餐-订单候选厨师';
 
 -- ----------------------------
 -- 4、订单明细（菜品快照）
@@ -433,6 +471,14 @@ where perms like 'meal:%'
 -- 如果将来确实需要在管理端管理家庭成员，请为家庭角色单独定义 meal:member:*
 -- 权限标识并新建对应菜单，不要复用 system:user:*。
 
+-- 家庭管理员不接单：2026-10-26 起接单资格以「订单候选人」为准，候选人只包含 meal_chef。
+-- 因此从家庭管理员收回 meal:order:dispatch / meal:order:finish，管理端订单页也移除对应按钮。
+-- 家庭管理员若确实需要接单，请给他额外勾上「厨师」角色，而不是放宽候选人范围。
+delete from sys_role_menu
+where role_id in (select role_id from sys_role where role_key = 'meal_manager')
+  and menu_id in (select menu_id from sys_menu
+                  where perms in ('meal:order:dispatch', 'meal:order:finish'));
+
 -- ----------------------------
 -- 11、公共菜谱分类（唯一主类，dept_id = 0，所有家庭可见）
 --
@@ -601,3 +647,18 @@ delete from sys_config where config_key = 'meal.app.publishToken';
 insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, `sensitive`, param_type)
 values ('点餐-App 版本发布令牌', 'meal.app.publishToken', '', 'N', 'admin', sysdate(),
         '打包脚本 publish:wgt 用：请求头 X-Publish-Token 与之匹配即可发布版本；留空=未配置（发布接口拒绝）', 'Y', '点餐');
+
+-- ----------------------------
+-- 14、参数配置（派单与抢单）
+--
+-- 两个参数都在「系统管理 > 参数设置」里维护，读走 ConfigUtils，改完即时生效。
+-- ----------------------------
+delete from sys_config where config_key = 'meal.order.acceptTimeoutMinutes';
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, `sensitive`, param_type)
+values ('点餐-订单接单超时分钟数', 'meal.order.acceptTimeoutMinutes', '180', 'N', 'admin', sysdate(),
+        '订单进入待接单后超过该分钟数仍无人接单则关闭为「无人接单」；默认 180 分钟（3 小时）', 'N', '点餐');
+
+delete from sys_config where config_key = 'meal.order.assignRefuseStrategy';
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, `sensitive`, param_type)
+values ('点餐-指派单被拒后策略', 'meal.order.assignRefuseStrategy', '1', 'N', 'admin', sysdate(),
+        '指派厨师拒绝或指派超时后的处理：1=转公开池并重置截止时间（默认），2=直接关闭为无人接单', 'N', '点餐');

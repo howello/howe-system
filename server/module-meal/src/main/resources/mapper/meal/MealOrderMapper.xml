@@ -19,6 +19,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="finishBy"    column="finish_by"    />
         <result property="finishTime"  column="finish_time"  />
         <result property="cancelTime"  column="cancel_time"  />
+        <result property="assignMode"     column="assign_mode"      />
+        <result property="assignUserId"   column="assign_user_id"   />
+        <result property="assignUserName" column="assign_user_name" />
+        <result property="deadlineTime"   column="deadline_time"    />
+        <result property="closeReason"    column="close_reason"     />
         <result property="delFlag"     column="del_flag"     />
         <result property="createBy"    column="create_by"    />
         <result property="createTime"  column="create_time"  />
@@ -40,8 +45,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <sql id="selectMealOrderVo">
         select d.order_id, d.order_no, d.dept_id, d.user_id, d.user_name, d.status,
                d.total_count, d.order_remark, d.accept_by, d.accept_user_id, d.accept_time,
-               d.finish_by, d.finish_time, d.cancel_time, d.del_flag,
-               d.create_by, d.create_time, d.update_by, d.update_time, d.remark
+               d.finish_by, d.finish_time, d.cancel_time,
+               d.assign_mode, d.assign_user_id, d.assign_user_name, d.deadline_time, d.close_reason,
+               d.del_flag, d.create_by, d.create_time, d.update_by, d.update_time, d.remark
         from meal_order d
     </sql>
 
@@ -68,11 +74,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="acceptUserId != null">
                 AND d.accept_user_id = #{acceptUserId}
             </if>
-            <if test="excludedOrderIds != null and excludedOrderIds.size() > 0">
-                AND d.order_id not in
-                <foreach item="excludedOrderId" collection="excludedOrderIds" open="(" separator="," close=")">
-                    #{excludedOrderId}
-                </foreach>
+            <!-- 厨师工作台按候选人过滤：只有「我是待响应候选人」的待接单订单可见 -->
+            <if test="candidateUserId != null">
+                AND exists (
+                    select 1 from meal_order_candidate c
+                    where c.order_id = d.order_id
+                      and c.user_id = #{candidateUserId}
+                      and c.status in ('0', '4')
+                )
             </if>
             <if test="userName != null and userName != ''">
                 AND d.user_name like concat('%', #{userName}, '%')
@@ -146,11 +155,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           <if test="acceptUserId != null">
             and d.accept_user_id = #{acceptUserId}
           </if>
-          <if test="excludedOrderIds != null and excludedOrderIds.size() > 0">
-            and d.order_id not in
-            <foreach item="excludedOrderId" collection="excludedOrderIds" open="(" separator="," close=")">
-              #{excludedOrderId}
-            </foreach>
+          <if test="candidateUserId != null">
+            and exists (
+                select 1 from meal_order_candidate c
+                where c.order_id = d.order_id
+                  and c.user_id = #{candidateUserId}
+                  and c.status in ('0', '4')
+            )
           </if>
         ${params.dataScope}
         group by d.status
@@ -172,6 +183,41 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and r.role_key = 'meal_chef'
           and r.status = '0'
           and r.del_flag = '0'
+    </select>
+
+    <!--
+      可指派厨师：名额条件与 selectChefUserIdsByDeptId 保持一致，只多带昵称供选择器展示。
+      家庭管理员不在候选范围内，因此这里只查 meal_chef。
+    -->
+    <select id="selectChefAssigneesByDeptId" resultType="com.howe.meal.domain.vo.MealOrderAssignee">
+        select distinct u.user_id as userId,
+               case when u.nick_name is null or u.nick_name = '' then u.user_name else u.nick_name end as nickName
+        from sys_user u
+        inner join sys_user_role ur on ur.user_id = u.user_id
+        inner join sys_role r on r.role_id = ur.role_id
+        where u.dept_id = #{deptId}
+          and u.del_flag = '0'
+          and u.status = '0'
+          and r.role_key = 'meal_chef'
+          and r.status = '0'
+          and r.del_flag = '0'
+        order by nickName asc
+    </select>
+
+    <select id="selectChefUserInfoByDeptId" resultType="com.howe.meal.domain.vo.MealOrderAssignee">
+        select u.user_id as userId,
+               case when u.nick_name is null or u.nick_name = '' then u.user_name else u.nick_name end as nickName
+        from sys_user u
+        inner join sys_user_role ur on ur.user_id = u.user_id
+        inner join sys_role r on r.role_id = ur.role_id
+        where u.user_id = #{userId}
+          and u.dept_id = #{deptId}
+          and u.del_flag = '0'
+          and u.status = '0'
+          and r.role_key = 'meal_chef'
+          and r.status = '0'
+          and r.del_flag = '0'
+        limit 1
     </select>
 
     <select id="selectManagerUserIdsByDeptId" resultType="Long">
@@ -207,9 +253,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <insert id="insertMealOrder" parameterType="MealOrder" useGeneratedKeys="true" keyProperty="orderId">
         insert into meal_order (
             order_no, dept_id, user_id, user_name, status, total_count, order_remark,
+            assign_mode, assign_user_id, assign_user_name, deadline_time,
             del_flag, create_by, create_time, remark
         ) values (
             #{orderNo}, #{deptId}, #{userId}, #{userName}, #{status}, #{totalCount}, #{orderRemark},
+            #{assignMode}, #{assignUserId}, #{assignUserName}, #{deadlineTime},
             '0', #{createBy}, sysdate(), #{remark}
         )
     </insert>
@@ -234,12 +282,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="acceptUserId != null">accept_user_id = #{acceptUserId},</if>
             <if test="finishBy != null and finishBy != ''">finish_by = #{finishBy}, finish_time = sysdate(),</if>
             <if test="cancelTime != null">cancel_time = sysdate(),</if>
+            <if test="closeReason != null and closeReason != ''">close_reason = #{closeReason},</if>
+            <if test="assignMode != null and assignMode != ''">assign_mode = #{assignMode},</if>
+            <if test="deadlineTime != null">deadline_time = #{deadlineTime},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             update_time = sysdate()
         </set>
         where order_id = #{orderId} and del_flag = '0'
         <if test="expectedStatus != null and expectedStatus != ''">
             and status = #{expectedStatus}
+        </if>
+        <!-- 超时关闭额外要求确实已过截止时间，避免未到期的订单被误关 -->
+        <if test="requireExpired != null and requireExpired">
+            and deadline_time is not null and deadline_time &lt;= sysdate()
         </if>
     </update>
 
@@ -255,5 +310,52 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectMaxOrderNo" resultType="String">
         select max(order_no) from meal_order where order_no like concat(#{prefix}, '%')
     </select>
+
+    <!--
+      拒绝流程的行锁：同一订单的并发拒绝在这行上串行化。
+      不锁这一行时，两名候选人同时拒绝会各自读到「对方仍待响应」的快照，
+      结果谁都不关单，订单一直挂到超时。
+    -->
+    <select id="selectOrderForUpdate" parameterType="Long" resultMap="MealOrderResult">
+        <include refid="selectMealOrderVo"/>
+        where d.order_id = #{orderId} and d.del_flag = '0'
+        for update
+    </select>
+
+    <!-- 超时扫描：走 (status, deadline_time) 索引，单批有上限，避免长事务 -->
+    <select id="selectExpiredWaitingOrderIds" resultType="Long">
+        select d.order_id
+        from meal_order d
+        where d.status = '0'
+          and d.del_flag = '0'
+          and d.deadline_time is not null
+          and d.deadline_time &lt;= sysdate()
+        order by d.deadline_time asc
+        limit #{limit}
+    </select>
+
+    <!--
+      全员拒绝兜底扫描：仍待接单，但已经一个待响应候选人都没有了。
+      正常情况下最后一名候选人拒绝时订单已即时关闭，这里只捕获并发或异常留下的悬挂订单。
+    -->
+    <select id="selectWaitingWithoutPendingCandidate" resultType="Long">
+        select d.order_id
+        from meal_order d
+        where d.status = '0'
+          and d.del_flag = '0'
+          and not exists (
+              select 1 from meal_order_candidate c
+              where c.order_id = d.order_id and c.status in ('0', '4')
+          )
+        order by d.create_time asc
+        limit #{limit}
+    </select>
+
+    <!-- 指派转公开：改模式、重置截止时间，条件限定仍在指派中 -->
+    <update id="reopenToPublic">
+        update meal_order
+        set assign_mode = '2', deadline_time = #{deadlineTime}, update_time = sysdate()
+        where order_id = #{orderId} and status = '0' and assign_mode = '1' and del_flag = '0'
+    </update>
 
 </mapper>

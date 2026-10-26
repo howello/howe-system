@@ -1,6 +1,7 @@
 package com.howe.meal.service;
 
 import com.howe.meal.domain.MealOrder;
+import com.howe.meal.domain.vo.MealOrderAssignee;
 import com.howe.meal.domain.dto.MealOrderSubmitBody;
 import com.howe.meal.domain.vo.MealKitchenOrderSummary;
 
@@ -80,19 +81,26 @@ public interface IMealOrderService {
     int acceptOrder(Long orderId);
 
     /**
+     * 候选人拒绝订单（指派单或公开单均可用）
+     *
+     * @param orderId 订单ID
+     */
+    void refuseOrder(Long orderId);
+
+    /**
+     * 查询本家庭可指派的厨师，供确认下单页的「指派厨师」选择器使用
+     *
+     * @return 可指派厨师列表
+     */
+    List<MealOrderAssignee> selectAssignees();
+
+    /**
      * 标记完成（制作中 → 已完成）
      *
      * @param orderId 订单ID
      * @return 结果
      */
     int finishOrder(Long orderId);
-
-    /**
-     * 当前厨师跳过一条待接单订单（仅记录个人偏好，不改变订单状态）
-     *
-     * @param orderId 待接单订单ID
-     */
-    void skipOrder(Long orderId);
 
     /**
      * 批量删除订单

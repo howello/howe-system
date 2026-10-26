@@ -2,7 +2,9 @@ package com.howe.meal.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.howe.common.core.redis.RedisCache;
+import com.howe.common.utils.SecurityUtils;
 import com.howe.meal.domain.MealNotification;
+import com.howe.meal.mapper.MealOrderCandidateMapper;
 import com.howe.meal.mapper.MealOrderMapper;
 import com.howe.meal.service.IMealNotifyService;
 import com.howe.meal.service.ITransactionCommitExecutor;
@@ -13,8 +15,10 @@ import org.springframework.stereotype.Service;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -26,12 +30,17 @@ import java.util.concurrent.TimeUnit;
 public class MealNotifyServiceImpl implements IMealNotifyService, ITransactionCommitExecutor {
 
     private static final long NOTIFICATION_TTL_DAYS = 7;
+
+    /** 新订单通知类型：poll 时按候选人状态过滤陈旧提醒 */
+    private static final String TYPE_NEW_ORDER = "NEW_ORDER";
+
     private static final SecureRandom RANDOM = new SecureRandom();
     private long lastNotificationTimestamp = -1L;
     private int nextSuffix;
     private final java.util.Set<Integer> suffixesInCurrentMillisecond = new java.util.HashSet<>();
     private final RedisCache redisCache;
     private final MealOrderMapper mealOrderMapper;
+    private final MealOrderCandidateMapper candidateMapper;
     private final ObjectMapper objectMapper;
 
     /**
@@ -97,17 +106,60 @@ public class MealNotifyServiceImpl implements IMealNotifyService, ITransactionCo
         } catch (Exception e) {
             log.warn("读取点餐通知失败，receiverKey={}", receiverKey, e);
         }
+        return dropStaleNewOrderNotifications(notifications);
+    }
+
+    /**
+     * 剔除已经失效的「新订单」通知
+     *
+     * <p>队列里每条新单提醒都是按人复制的快照：订单被别人接走、被下单人取消或超时关闭后，
+     * 其他厨师队列里那条提醒仍然存在。读即清空的语义下，丢弃比更正更合适，
+     * 因此这里在返回前按数据库当前事实过滤，不修改 Redis 存储结构。</p>
+     *
+     * @param notifications 本轮读取到的通知
+     * @return 过滤后的通知列表
+     */
+    private List<MealNotification> dropStaleNewOrderNotifications(List<MealNotification> notifications) {
+        if (notifications.isEmpty()) {
+            return notifications;
+        }
+        Long userId = SecurityUtils.getUserId();
+        if (userId == null) {
+            return notifications;
+        }
+        List<Long> orderIds = notifications.stream()
+                .filter(item -> TYPE_NEW_ORDER.equals(item.getType()))
+                .map(MealNotification::getOrderId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        if (orderIds.isEmpty()) {
+            return notifications;
+        }
+        Set<Long> stale;
+        try {
+            stale = new HashSet<>(candidateMapper.selectNoLongerPendingOrderIds(userId, orderIds));
+        } catch (Exception e) {
+            // 过滤失败时保留原通知，宁可多提示一次也不要吞掉有效提醒
+            log.warn("过滤陈旧点餐通知失败，userId={}", userId, e);
+            return notifications;
+        }
+        if (stale.isEmpty()) {
+            return notifications;
+        }
+        notifications.removeIf(item -> TYPE_NEW_ORDER.equals(item.getType()) && stale.contains(item.getOrderId()));
         return notifications;
     }
 
     @Override
     public void pushNewOrderToChefs(Long deptId, Long orderId, String orderNo, String userName, Integer totalCount) {
+        // 保留以兼容既有调用方：推送对象由订单服务按候选人决定，这里只作为降级入口
         try {
             List<Long> chefIds = mealOrderMapper.selectChefUserIdsByDeptId(deptId);
             for (Long chefId : chefIds) {
                 Map<String, Object> extra = new HashMap<>();
                 extra.put("orderNo", orderNo);
-                push("notify:chef:" + chefId, "NEW_ORDER", orderId, "新订单", userName + "下单"
+                push("notify:chef:" + chefId, TYPE_NEW_ORDER, orderId, "新订单", userName + "下单"
                         + (totalCount == null ? 0 : totalCount) + " 份，等待接单", extra);
             }
         } catch (Exception e) {

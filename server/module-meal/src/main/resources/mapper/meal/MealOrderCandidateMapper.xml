@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.meal.mapper.MealOrderCandidateMapper">
+
+    <resultMap type="MealOrderCandidate" id="MealOrderCandidateResult">
+        <result property="candidateId" column="candidate_id" />
+        <result property="orderId"     column="order_id"     />
+        <result property="deptId"      column="dept_id"      />
+        <result property="userId"      column="user_id"      />
+        <result property="userName"    column="user_name"    />
+        <result property="source"      column="source"       />
+        <result property="status"      column="status"       />
+        <result property="expireTime"  column="expire_time"  />
+        <result property="respondTime" column="respond_time" />
+        <result property="createTime"  column="create_time"  />
+        <result property="updateTime"  column="update_time"  />
+    </resultMap>
+
+    <sql id="selectMealOrderCandidateVo">
+        select candidate_id, order_id, dept_id, user_id, user_name, source, status,
+               expire_time, respond_time, create_time, update_time
+        from meal_order_candidate
+    </sql>
+
+    <insert id="insertCandidates">
+        insert into meal_order_candidate (
+            order_id, dept_id, user_id, user_name, source, status, expire_time, create_time, update_time
+        ) values
+        <foreach item="c" collection="candidates" separator=",">
+            (#{c.orderId}, #{c.deptId}, #{c.userId}, #{c.userName}, #{c.source}, #{c.status},
+             #{c.expireTime}, sysdate(), sysdate())
+        </foreach>
+    </insert>
+
+    <!--
+      补入候选人：唯一键 (order_id, user_id) 冲突时跳过，避免指派转公开时
+      把已存在候选人记录的厨师重复插入。
+    -->
+    <insert id="insertCandidatesIgnoringExisting">
+        insert ignore into meal_order_candidate (
+            order_id, dept_id, user_id, user_name, source, status, expire_time, create_time, update_time
+        ) values
+        <foreach item="c" collection="candidates" separator=",">
+            (#{c.orderId}, #{c.deptId}, #{c.userId}, #{c.userName}, #{c.source}, #{c.status},
+             #{c.expireTime}, sysdate(), sysdate())
+        </foreach>
+    </insert>
+
+    <select id="selectByOrderId" resultMap="MealOrderCandidateResult">
+        <include refid="selectMealOrderCandidateVo"/>
+        where order_id = #{orderId}
+        order by candidate_id asc
+    </select>
+
+    <select id="selectByOrderAndUser" resultMap="MealOrderCandidateResult">
+        <include refid="selectMealOrderCandidateVo"/>
+        where order_id = #{orderId} and user_id = #{userId}
+    </select>
+
+    <select id="selectCandidateUserIds" resultType="Long">
+        select user_id from meal_order_candidate where order_id = #{orderId}
+    </select>
+
+    <!--
+      接单：从「待响应」迁移。状态 '4'（已超时未响应）只出现在指派超时转公开之后，
+      此时该厨师已重新获得接单资格，因此两种状态都视为可接单；竞争失败返回 0 行由 Service 抛业务异常。
+    -->
+    <update id="acceptCandidate">
+        update meal_order_candidate
+        set status = '1', respond_time = sysdate(), update_time = sysdate()
+        where order_id = #{orderId} and user_id = #{userId} and status in ('0', '4')
+    </update>
+
+    <!-- 拒绝：同样覆盖「待响应」与「超时未响应」两种仍可操作的状态 -->
+    <update id="refuseCandidate">
+        update meal_order_candidate
+        set status = '2', respond_time = sysdate(), update_time = sysdate()
+        where order_id = #{orderId} and user_id = #{userId} and status in ('0', '4')
+    </update>
+
+    <select id="countPending" resultType="int">
+        select count(*) from meal_order_candidate
+        where order_id = #{orderId} and status in ('0', '4')
+    </select>
+
+    <update id="invalidateOthers">
+        update meal_order_candidate
+        set status = '3', update_time = sysdate()
+        where order_id = #{orderId} and status in ('0', '4') and user_id != #{acceptedUserId}
+    </update>
+
+    <update id="invalidatePending">
+        update meal_order_candidate
+        set status = '3', update_time = sysdate()
+        where order_id = #{orderId} and status in ('0', '4')
+    </update>
+
+    <update id="invalidateAll">
+        update meal_order_candidate
+        set status = '3', update_time = sysdate()
+        where order_id = #{orderId} and status != '3'
+    </update>
+
+    <update id="expireCandidate">
+        update meal_order_candidate
+        set status = '4', respond_time = sysdate(), update_time = sysdate()
+        where order_id = #{orderId} and user_id = #{userId} and status = '0'
+    </update>
+
+    <update id="updateCandidateExpireTime">
+        update meal_order_candidate
+        set expire_time = #{expireTime}, update_time = sysdate()
+        where order_id = #{orderId} and user_id = #{userId}
+    </update>
+
+    <!--
+      陈旧新单通知筛选用：返回「当前用户在这些订单里已不是待响应候选人」的订单ID。
+      订单已被接单、取消或关闭时，即使候选人行仍是待响应（理论上不应出现），也一并剔除。
+    -->
+    <select id="selectNoLongerPendingOrderIds" resultType="Long">
+        select distinct c.order_id
+        from meal_order_candidate c
+        where c.user_id = #{userId}
+          and c.order_id in
+          <foreach item="orderId" collection="orderIds" open="(" separator="," close=")">
+              #{orderId}
+          </foreach>
+          and (c.status not in ('0', '4')
+               or not exists (
+                   select 1 from meal_order o
+                   where o.order_id = c.order_id and o.status = '0' and o.del_flag = '0'
+               ))
+    </select>
+
+</mapper>

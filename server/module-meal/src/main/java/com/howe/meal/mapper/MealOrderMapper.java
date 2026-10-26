@@ -2,8 +2,10 @@ package com.howe.meal.mapper;
 
 import com.howe.meal.domain.MealOrder;
 import com.howe.meal.domain.MealOrderItem;
+import com.howe.meal.domain.vo.MealOrderAssignee;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -67,6 +69,59 @@ public interface MealOrderMapper {
      * @return 厨师用户ID集合
      */
     List<Long> selectChefUserIdsByDeptId(@Param("deptId") Long deptId);
+
+    /**
+     * 查询本家庭可指派的厨师（含展示名），供确认下单页的选择器使用
+     *
+     * @param deptId 所属家庭ID
+     * @return 可指派厨师列表
+     */
+    List<MealOrderAssignee> selectChefAssigneesByDeptId(@Param("deptId") Long deptId);
+
+    /**
+     * 按用户查询本家庭厨师信息，用于下单时校验被指派人资格
+     *
+     * @param deptId 所属家庭ID
+     * @param userId 被指派的用户ID
+     * @return 厨师信息，不具备资格时返回 {@code null}
+     */
+    MealOrderAssignee selectChefUserInfoByDeptId(@Param("deptId") Long deptId, @Param("userId") Long userId);
+
+    /**
+     * 查询某订单并锁定该行，供拒绝流程串行化使用
+     *
+     * @param orderId 订单ID
+     * @return 订单
+     */
+    MealOrder selectOrderForUpdate(@Param("orderId") Long orderId);
+
+    /**
+     * 查询已过接单截止时间但仍待接单的订单ID
+     *
+     * @param limit 单批上限
+     * @return 订单ID列表
+     */
+    List<Long> selectExpiredWaitingOrderIds(@Param("limit") int limit);
+
+    /**
+     * 查询仍待接单、但已没有任何待响应候选人的订单ID
+     *
+     * <p>用于全员拒绝的定时兜底：正常情况下最后一名候选人拒绝时订单已即时关闭，
+     * 这里只捕获并发或异常留下的悬挂订单。</p>
+     *
+     * @param limit 单批上限
+     * @return 订单ID列表
+     */
+    List<Long> selectWaitingWithoutPendingCandidate(@Param("limit") int limit);
+
+    /**
+     * 指派转公开：修改指派模式并重置接单截止时间
+     *
+     * @param orderId      订单ID
+     * @param deadlineTime 新的截止时间
+     * @return 影响行数，0 表示订单已不在指派中
+     */
+    int reopenToPublic(@Param("orderId") Long orderId, @Param("deadlineTime") Date deadlineTime);
 
     /**
      * 查询具有家庭管理员角色的家庭成员用户ID。
