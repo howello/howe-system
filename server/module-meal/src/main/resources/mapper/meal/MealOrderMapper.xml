@@ -68,6 +68,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="acceptUserId != null">
                 AND d.accept_user_id = #{acceptUserId}
             </if>
+            <if test="excludedOrderIds != null and excludedOrderIds.size() > 0">
+                AND d.order_id not in
+                <foreach item="excludedOrderId" collection="excludedOrderIds" open="(" separator="," close=")">
+                    #{excludedOrderId}
+                </foreach>
+            </if>
             <if test="userName != null and userName != ''">
                 AND d.user_name like concat('%', #{userName}, '%')
             </if>
@@ -139,6 +145,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           </if>
           <if test="acceptUserId != null">
             and d.accept_user_id = #{acceptUserId}
+          </if>
+          <if test="excludedOrderIds != null and excludedOrderIds.size() > 0">
+            and d.order_id not in
+            <foreach item="excludedOrderId" collection="excludedOrderIds" open="(" separator="," close=")">
+              #{excludedOrderId}
+            </foreach>
           </if>
         ${params.dataScope}
         group by d.status

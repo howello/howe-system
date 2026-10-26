@@ -88,6 +88,13 @@ public interface IMealOrderService {
     int finishOrder(Long orderId);
 
     /**
+     * 当前厨师跳过一条待接单订单（仅记录个人偏好，不改变订单状态）
+     *
+     * @param orderId 待接单订单ID
+     */
+    void skipOrder(Long orderId);
+
+    /**
      * 批量删除订单
      *
      * @param orderIds 订单ID数组

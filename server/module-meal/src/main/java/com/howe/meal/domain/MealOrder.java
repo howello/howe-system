@@ -101,6 +101,11 @@ public class MealOrder extends BaseEntity {
     @Schema(description = "状态集合（多状态查询用，不落库）")
     private List<String> statusList;
 
+    /** 查询用：当前厨师跳过且需要从待接单结果中排除的订单ID（不落库） */
+    @JsonIgnore
+    @Schema(description = "需要排除的订单ID集合（厨师跳过记录，不落库）", accessMode = Schema.AccessMode.WRITE_ONLY)
+    private List<Long> excludedOrderIds;
+
     /** 查询用：是否已评价（不落库），前端据此决定显示「去评价」还是「已评价」 */
     @Schema(description = "是否已评价（查询结果附带，不落库）")
     private Boolean reviewed;
