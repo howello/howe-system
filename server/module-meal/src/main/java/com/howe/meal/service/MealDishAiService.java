@@ -617,20 +617,41 @@ public class MealDishAiService {
     }
 
     /**
-     * 按菜名生成封面（已填封面时不生成）
+     * 按菜名生成封面；普通补全模式下已有封面不重复生成，编辑页强制重建时始终生成。
      *
-     * @param request 生成请求（菜名 + 已填字段快照）
+     * @param request 生成请求（菜名、已填字段快照、可选图片描述与强制重建标记）
      * @return 封面永久地址或失败原因
      */
     public DishAiCoverResult generateCover(DishAiGenerateRequest request) {
         String name = resolveName(request);
         DishAiGenerateRequest.Current current = request.getCurrent();
+        boolean forceRegenerate = Boolean.TRUE.equals(request.getForceRegenerate());
+        String description = request.getImageDescription() == null ? "" : request.getImageDescription().trim();
 
         DishAiCoverResult result = new DishAiCoverResult();
-        if (isBlank(current == null ? null : current.getCover())) {
-            fillCover(result, name);
+        if (forceRegenerate || isBlank(current == null ? null : current.getCover())) {
+            // 重新生成必须带描述；普通补全保留原有「只补缺失」行为，不要求额外输入
+            if (forceRegenerate && description.isEmpty()) {
+                throw new ServiceException("请填写图片描述");
+            }
+            fillCover(result, name, description);
         }
         return result;
+    }
+
+    /**
+     * 组装封面提示词：菜名是主体，用户描述补充构图、光线、摆盘等画面要求。
+     *
+     * @param name        菜名
+     * @param description 画面描述
+     * @return 完整图片提示词
+     */
+    private String buildCoverPrompt(String name, String description) {
+        if (description == null || description.trim().isEmpty()) {
+            return name;
+        }
+        return "制作菜品「" + name + "」的诱人美食摄影封面。画面要求：" + description.trim()
+                + "。只呈现菜品与用餐场景，不要文字、水印或人物。";
     }
 
     /**
@@ -751,13 +772,17 @@ public class MealDishAiService {
     }
 
     /**
-     * 缺封面时调用文生图；失败只记录可读原因，不影响文本补齐
+     * 调用文生图生成封面；失败只记录可读原因，不影响文本补齐。
+     *
+     * @param result      封面结果
+     * @param name        菜名
+     * @param description 用户补充的画面描述；为空时只按菜名生成
      */
-    private void fillCover(DishAiCoverResult result, String name) {
+    private void fillCover(DishAiCoverResult result, String name, String description) {
         try {
             AiImageResult imageResult = aiClient.image(AiImageRequest.builder()
                     .scene(SCENE_COVER)
-                    .prompt(name)
+                    .prompt(buildCoverPrompt(name, description))
                     .style(STYLE_KEY)
                     .build());
             String url = firstImageUrl(imageResult);

@@ -69,7 +69,8 @@ public class MealDishController extends BaseController {
     }
 
     @Operation(summary = "一键 AI 生成菜品封面",
-            description = "根据菜名生成封面图并由 AI 模块转存为永久地址；已填封面时不生成。登录即可调用，点餐端与后台共用。")
+            description = "根据菜名生成封面图并由 AI 模块转存为永久地址；普通补全时已填封面不生成，"
+                    + "编辑页传 forceRegenerate=true 与 imageDescription 时按描述强制重建。登录即可调用，点餐端与后台共用。")
     @PostMapping("/ai-generate/cover")
     public AjaxResult aiGenerateCover(@RequestBody DishAiGenerateRequest request) {
         return success(mealDishAiService.generateCover(request));

@@ -26,6 +26,13 @@ public class DishAiGenerateRequest {
     @Schema(description = "当前表单已填字段快照，用于只补缺失")
     private Current current;
 
+    @Schema(description = "菜品编辑页重新生成封面时的画面描述；仅在强制重建时参与提示词",
+            example = "暖色灯光下的家常餐桌，俯拍，突出红烧肉油亮的酱汁")
+    private String imageDescription;
+
+    @Schema(description = "是否强制重新生成封面；仅编辑已有菜品时允许，新增时仍只补缺失")
+    private Boolean forceRegenerate;
+
     /**
      * 当前表单已填字段快照
      *

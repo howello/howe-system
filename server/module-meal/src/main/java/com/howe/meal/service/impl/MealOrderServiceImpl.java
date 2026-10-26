@@ -60,29 +60,66 @@ public class MealOrderServiceImpl implements IMealOrderService {
         return mealOrderMapper.selectMealOrderList(mealOrder);
     }
 
+    /**
+     * 厨师工作台列表：待接单是家庭共享待办，制作中只属于接单厨师本人。
+     *
+     * <p>只按当前登录用户过滤制作中订单；待接单必须让同家庭所有厨师看见，
+     * 因此不能把 {@code acceptUserId} 无条件塞进查询。</p>
+     */
     @Override
     @DataScope(deptAlias = "d")
     public List<MealOrder> selectKitchenOrderList(MealOrder mealOrder) {
+        applyKitchenVisibility(mealOrder);
         List<MealOrder> orders = mealOrderMapper.selectMealOrderList(mealOrder);
         fillItems(orders);
         return orders;
     }
 
+    /**
+     * 厨师工作台角标：待接单统计家庭全部，制作中只统计本人接单。
+     */
     @Override
     @DataScope(deptAlias = "d")
     public MealKitchenOrderSummary countKitchenOrderSummary(MealOrder mealOrder) {
-        long pendingCount = 0;
-        long cookingCount = 0;
-        for (Map<String, Object> row : mealOrderMapper.selectKitchenOrderStatusCounts(mealOrder)) {
-            long count = row.get("cnt") instanceof Number value ? value.longValue() : 0L;
-            String status = row.get("status") == null ? "" : String.valueOf(row.get("status"));
-            if (MealOrder.STATUS_WAITING.equals(status)) {
-                pendingCount = count;
-            } else if (MealOrder.STATUS_COOKING.equals(status)) {
-                cookingCount = count;
-            }
-        }
+        long pendingCount = countKitchenStatus(MealOrder.STATUS_WAITING, false);
+        long cookingCount = countKitchenStatus(MealOrder.STATUS_COOKING, true);
         return new MealKitchenOrderSummary(pendingCount, cookingCount);
+    }
+
+    /**
+     * 按状态统计厨师工作台数量；制作中订单只统计当前登录账号接的单。
+     *
+     * @param status          订单状态
+     * @param onlyCurrentChef 是否只统计当前接单人
+     * @return 数量
+     */
+    private long countKitchenStatus(String status, boolean onlyCurrentChef) {
+        MealOrder query = new MealOrder();
+        query.setStatus(status);
+        if (onlyCurrentChef) {
+            query.setAcceptUserId(SecurityUtils.getUserId());
+        }
+        List<Map<String, Object>> rows = mealOrderMapper.selectKitchenOrderStatusCounts(query);
+        if (rows.isEmpty()) {
+            return 0L;
+        }
+        Object count = rows.get(0).get("cnt");
+        return count instanceof Number value ? value.longValue() : 0L;
+    }
+
+    /**
+     * 给厨师工作台查询设置可见范围：待接单不限接单人，制作中只限本人。
+     *
+     * @param mealOrder 查询条件
+     */
+    private void applyKitchenVisibility(MealOrder mealOrder) {
+        if (mealOrder == null) {
+            return;
+        }
+        String status = mealOrder.getStatus();
+        if (MealOrder.STATUS_COOKING.equals(status)) {
+            mealOrder.setAcceptUserId(SecurityUtils.getUserId());
+        }
     }
 
     @Override
