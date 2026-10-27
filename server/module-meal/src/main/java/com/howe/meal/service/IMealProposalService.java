@@ -28,6 +28,17 @@ public interface IMealProposalService {
     List<MealProposal> selectMyProposalList(MealProposal mealProposal);
 
     /**
+     * 查询提案详情
+     *
+     * <p>「按 id 取详情」不受 {@code @DataScope} 保护，Service 层显式校验家庭归属。
+     * 返回提交时填写的全部字段、AI 补齐后的菜谱字段与审核结论。</p>
+     *
+     * @param proposalId 提案ID
+     * @return 提案详情
+     */
+    MealProposal selectMealProposalDetail(Long proposalId);
+
+    /**
      * 提交提案
      *
      * @param mealProposal 提案

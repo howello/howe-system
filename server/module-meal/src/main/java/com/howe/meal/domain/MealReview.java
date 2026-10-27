@@ -1,5 +1,6 @@
 package com.howe.meal.domain;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.howe.common.core.domain.BaseEntity;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -9,6 +10,9 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+
+import java.util.Date;
+import java.util.List;
 
 /**
  * 点餐-评价对象 meal_review
@@ -66,6 +70,41 @@ public class MealReview extends BaseEntity {
     /** 查询用：该订单的菜名，顿号分隔（不落库） */
     @Schema(description = "订单菜名，顿号分隔（查询结果附带，不落库）", example = "红烧肉、扬州炒饭")
     private String dishNames;
+
+    /** 查询用：下单时间（不落库） */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Schema(description = "订单下单时间（查询结果附带，不落库）")
+    private Date orderCreateTime;
+
+    /** 查询用：订单整体备注（不落库） */
+    @Schema(description = "订单整体备注（查询结果附带，不落库）")
+    private String orderRemark;
+
+    /** 查询用：订单总份数（不落库） */
+    @Schema(description = "订单总份数（查询结果附带，不落库）", example = "3")
+    private Integer orderTotalCount;
+
+    /** 查询用：订单状态（不落库），取值同 MealOrder.STATUS_* */
+    @Schema(description = "订单状态（查询结果附带，不落库）", example = "2")
+    private String orderStatus;
+
+    /** 查询用：接单厨师昵称（不落库），即「谁做的这顿饭」 */
+    @Schema(description = "接单厨师昵称（查询结果附带，不落库）", example = "爸爸")
+    private String acceptBy;
+
+    /** 查询用：接单时间（不落库） */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Schema(description = "接单时间（查询结果附带，不落库）")
+    private Date acceptTime;
+
+    /** 查询用：完成时间（不落库） */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Schema(description = "完成时间（查询结果附带，不落库）")
+    private Date finishTime;
+
+    /** 查询用：订单明细快照（不落库），用于展示菜品封面、份数与单项备注 */
+    @Schema(description = "订单明细（查询结果附带，不落库）")
+    private List<MealOrderItem> items;
 
     /**
      * 查询用：接单厨师用户ID（不落库）。

@@ -22,7 +22,7 @@ public interface IMealReviewService {
      * 查询「我的评价」
      *
      * <p>默认返回当前点餐人自己写的评价；{@code scope="chef"} 时返回当前厨师
-     * 接单制作过的订单所收到的评价。</p>
+     * 接单制作过的订单所收到的评价。结果附带订单信息与菜品快照。</p>
      *
      * @param mealReview 查询条件
      * @param scope      视角：空为点餐人，{@code "chef"} 为厨师

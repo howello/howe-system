@@ -6,6 +6,7 @@ import com.howe.common.exception.ServiceException;
 import com.howe.common.utils.SecurityUtils;
 import com.howe.common.utils.StringUtils;
 import com.howe.meal.domain.MealOrder;
+import com.howe.meal.domain.MealOrderItem;
 import com.howe.meal.domain.MealReview;
 import com.howe.meal.mapper.MealOrderMapper;
 import com.howe.meal.mapper.MealReviewMapper;
@@ -18,7 +19,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * 点餐-评价 服务层实现
@@ -46,13 +51,44 @@ public class MealReviewServiceImpl implements IMealReviewService {
 
     @Override
     public List<MealReview> selectMyReviewList(MealReview mealReview, String scope) {
+        List<MealReview> reviews;
         if (SCOPE_CHEF.equals(scope)) {
             // 厨师视角：自己接单制作过的订单收到的评价
             mealReview.setAcceptUserId(SecurityUtils.getUserId());
-            return mealReviewMapper.selectChefReviewList(mealReview);
+            reviews = mealReviewMapper.selectChefReviewList(mealReview);
+        } else {
+            mealReview.setUserId(SecurityUtils.getUserId());
+            reviews = mealReviewMapper.selectMyReviewList(mealReview);
         }
-        mealReview.setUserId(SecurityUtils.getUserId());
-        return mealReviewMapper.selectMyReviewList(mealReview);
+        fillItems(reviews);
+        return reviews;
+    }
+
+    /**
+     * 批量填充评价对应订单的菜品快照
+     *
+     * <p>评价卡片要展示「点了什么菜、长什么样、每道菜备注」，这些信息在订单明细里，
+     * 用一次 {@code in} 查询补齐，避免逐条评价回查订单。</p>
+     *
+     * @param reviews 当前页评价
+     */
+    private void fillItems(List<MealReview> reviews) {
+        if (reviews == null || reviews.isEmpty()) {
+            return;
+        }
+        Long[] orderIds = reviews.stream()
+                .map(MealReview::getOrderId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toArray(Long[]::new);
+        if (orderIds.length == 0) {
+            return;
+        }
+        Map<Long, List<MealOrderItem>> grouped = mealOrderMapper.selectItemsByOrderIds(orderIds).stream()
+                .collect(Collectors.groupingBy(MealOrderItem::getOrderId));
+        for (MealReview review : reviews) {
+            review.setItems(grouped.getOrDefault(review.getOrderId(), new ArrayList<>()));
+        }
     }
 
     /**

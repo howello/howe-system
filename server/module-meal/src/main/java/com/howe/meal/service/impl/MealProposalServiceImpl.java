@@ -53,6 +53,22 @@ public class MealProposalServiceImpl implements IMealProposalService {
         return mealProposalMapper.selectMyProposalList(mealProposal);
     }
 
+    /**
+     * 提案详情：家庭内成员都能查看，归属校验在 Service 层完成
+     *
+     * <p>同一家庭的成员（点餐人 / 厨师 / 管理员）都能打开彼此提交的提案，
+     * 但不能跨家庭读取。返回字段包含提交内容、AI 补齐结果与审核信息。</p>
+     */
+    @Override
+    public MealProposal selectMealProposalDetail(Long proposalId) {
+        MealProposal proposal = mealProposalMapper.selectMealProposalById(proposalId);
+        if (proposal == null) {
+            throw new ServiceException("提案不存在或已删除");
+        }
+        MealScopeGuard.assertSameDept(proposal.getDeptId(), "提案");
+        return proposal;
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int submitProposal(MealProposal mealProposal) {

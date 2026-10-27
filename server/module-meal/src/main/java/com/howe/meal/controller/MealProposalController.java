@@ -50,6 +50,13 @@ public class MealProposalController extends BaseController {
         return getDataTable(mealProposalService.selectMyProposalList(mealProposal));
     }
 
+    @Operation(summary = "提案详情", description = "含提交内容、AI 补齐的菜谱字段与审核信息；跨家庭读取被拒绝")
+    @GetMapping(value = "/{proposalId}")
+    public AjaxResult getInfo(@Parameter(description = "提案ID", required = true)
+            @PathVariable("proposalId") Long proposalId) {
+        return success(mealProposalService.selectMealProposalDetail(proposalId));
+    }
+
     @Operation(summary = "查询提案列表（管理端）", description = "受数据权限约束")
     @PreAuthorize("@ss.hasPermi('meal:proposal:list')")
     @GetMapping("/list")

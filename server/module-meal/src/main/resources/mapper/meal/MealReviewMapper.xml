@@ -22,13 +22,27 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="remark"     column="remark"      />
         <result property="orderNo"    column="order_no"    />
         <result property="dishNames"  column="dish_names"  />
+        <result property="orderCreateTime" column="order_create_time" />
+        <result property="orderRemark"     column="order_remark"      />
+        <result property="orderTotalCount" column="order_total_count"  />
+        <result property="orderStatus"     column="order_status"      />
+        <result property="acceptBy"        column="accept_by"         />
+        <result property="acceptTime"      column="accept_time"       />
+        <result property="finishTime"      column="finish_time"       />
     </resultMap>
 
+    <!--
+      评价详情要能还原「这是一顿什么饭」：订单号、下单时间、整体备注、份数、状态、
+      接单厨师（谁做的），以及菜品快照（Service 层按 order_id 批量补 items）。
+    -->
     <sql id="selectMealReviewVo">
         select d.review_id, d.order_id, d.dept_id, d.user_id, d.user_name, d.score,
                d.content, d.images, d.anonymous, d.del_flag,
                d.create_by, d.create_time, d.update_by, d.update_time, d.remark,
-               o.order_no as order_no,
+               o.order_no as order_no, o.create_time as order_create_time,
+               o.order_remark as order_remark, o.total_count as order_total_count,
+               o.status as order_status, o.accept_by as accept_by, o.accept_time as accept_time,
+               o.finish_time as finish_time,
                (select group_concat(i.dish_name order by i.item_id separator '、')
                   from meal_order_item i where i.order_id = d.order_id) as dish_names
         from meal_review d
