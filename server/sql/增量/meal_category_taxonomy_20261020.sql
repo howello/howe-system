@@ -344,7 +344,7 @@ insert into tmp_meal_category_legacy (old_name, new_name, priority) values
 ('素菜','素菜',9), ('蔬菜','素菜',9);
 
 -- 按 priority 从 1 到 9 逐轮插入，每轮跳过已有结果，等价于「取优先级最高的一条」。
--- 不用 row_number()：本项目 MySQL 是 5.7，不支持窗口函数。
+-- 本项目 MySQL 为 8.x；此处保留按 priority 逐轮插入的实现，不依赖窗口函数。
 insert into tmp_meal_category_pick (biz_type, biz_id, new_name)
 select r.biz_type, r.biz_id, l.new_name
 from meal_category_ref r
