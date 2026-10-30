@@ -255,9 +255,16 @@ public class CommonController {
         final String downloadFileName = "王艳涛";
         final String downloadAsciiFileName = "wyantao";
         final int timeoutMs = 15000;
-        // 逐跳/客户端自管请求头，透传会导致签名或分块传输异常
+        // 透传哪些头：其余请求头（含 Authorization、Cookie、User-Agent）原样带给下游。
+        // 必须丢弃的两类：
+        //   1) 逐跳头，由 HTTP 客户端自己生成，照抄会导致分块传输或签名异常；
+        //   2) Accept —— 订阅源按它决定返回格式：带 text/html 会回一份 HTML 页面（网页端订阅页），
+        //      而我们要的是配置内容。Clash 系客户端普遍发 `Accept: text/html,...`，
+        //      原样透传就会拿到 HTML，客户端解析时报 "cannot unmarshal !!str `<!docty...`"。
+        //      Accept-Encoding 同样不透传，避免下游回压缩体后无法当文本判断 YAML。
         final Set<String> skipForwardHeaders = Set.of(
-                "host", "content-length", "connection", "transfer-encoding", "accept-encoding", "upgrade");
+                "host", "content-length", "connection", "transfer-encoding",
+                "accept", "accept-encoding", "upgrade");
         // 回传时跳过的下游响应头：会因改写而变必须重算的、已被解压的、容器自管的
         final Set<String> skipResponseHeaders = Set.of(
                 "content-length", "content-type", "content-disposition", "content-encoding",
@@ -275,6 +282,9 @@ public class CommonController {
 
         // 逐跳头由 HTTP 客户端自己生成；Accept-Encoding 不透传，避免下游回压缩体后无法当文本判断 YAML
         HttpRequest httpRequest = HttpUtil.createGet(targetUrl).timeout(timeoutMs);
+        // hutool 默认带 Accept: text/html,...，订阅源见到 text/html 会回 HTML 页面而不是配置，
+        // 必须显式改成「什么格式都能接受」，让下游走默认的配置输出
+        httpRequest.header("Accept", "*/*");
         // hutool 预置了 Accept / User-Agent 默认值，而它的 header 表是大小写敏感的 HashMap：
         // 客户端按 HTTP/2 规范发小写 user-agent 时会变成另一个键，最终被默认值覆盖，UA 等于没透传。
         // 这里按已有键的原始大小写写回，保证 UA 等头真正生效。
