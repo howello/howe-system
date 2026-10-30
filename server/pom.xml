@@ -66,13 +66,12 @@
                 <scope>import</scope>
             </dependency>
 
-            <!-- Hutool 工具集：HTTP 请求、文件与 IO 工具 -->
+            <!-- Hutool 工具集：HTTP 请求、文件与 IO、加解密、验证码、YAML 解析。
+                 统一引 hutool-all 一个包，代码里直接 import cn.hutool.*，不再按子模块拆分 -->
             <dependency>
                 <groupId>cn.hutool</groupId>
-                <artifactId>hutool-bom</artifactId>
+                <artifactId>hutool-all</artifactId>
                 <version>${hutool.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
             </dependency>
 
             <!-- Spring AI：模型调用能力底座（ChatModel / ImageModel / EmbeddingModel） -->

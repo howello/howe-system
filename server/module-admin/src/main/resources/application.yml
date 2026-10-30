@@ -21,6 +21,10 @@ howe:
   # 只从环境变量读，不写死在这里、也不入库。生成方式：openssl rand -base64 32
   # 变更后旧密文无法解密，需要重新保存各处密钥，详见 docs/防攻击/ 的升级文档。
   secret-key: ${HOWE_SECRET_KEY:}
+  # Hutool HTTP 全局日志：记录所有出站请求的方法、URL、状态码与耗时（不含请求体/响应体）。
+  # 只想临时关掉可改日志级别：logging.level.com.howe.common.utils.http.HutoolHttpLogger
+  http-log:
+    enabled: ${HTTP_LOG_ENABLED:true}
 
 # 开发环境配置
 server:

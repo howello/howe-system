@@ -126,28 +126,12 @@
             <artifactId>jakarta.servlet-api</artifactId>
         </dependency>
 
-        <!-- Hutool 核心工具：文件、IO、字符串、日期 -->
+        <!-- Hutool 全家桶：文件与 IO、字符串、日期、HTTP 客户端、加解密（webhook HMAC-SHA256）、
+             验证码（线段/圆圈/扭曲/GIF/算术多种类型，替代原先的 kaptcha）、YAML 解析。
+             只引 hutool-all 一个包，各模块经 common 传递即可使用 cn.hutool.* -->
         <dependency>
             <groupId>cn.hutool</groupId>
-            <artifactId>hutool-core</artifactId>
-        </dependency>
-
-        <!-- Hutool HTTP 客户端 -->
-        <dependency>
-            <groupId>cn.hutool</groupId>
-            <artifactId>hutool-http</artifactId>
-        </dependency>
-
-        <!-- Hutool 加解密：webhook 签名校验用 HMAC-SHA256 -->
-        <dependency>
-            <groupId>cn.hutool</groupId>
-            <artifactId>hutool-crypto</artifactId>
-        </dependency>
-
-        <!-- Hutool 验证码：线段/圆圈/扭曲/GIF/算术多种类型，替代原先的 kaptcha -->
-        <dependency>
-            <groupId>cn.hutool</groupId>
-            <artifactId>hutool-captcha</artifactId>
+            <artifactId>hutool-all</artifactId>
         </dependency>
 
         <!-- swagger 注解：让所有模块（blog/quartz/generator/system/common）都能写
