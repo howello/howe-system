@@ -71,6 +71,8 @@ public class MealWeComNotifyServiceImpl implements IMealWeComNotifyService {
         if (order == null) {
             return;
         }
+        // 指派单如果在发送前已转公开，按公开单通知全部候选人，避免漏掉新入池厨师
+        order = latestRouting(order);
         List<MealOrderItem> items = mealOrderMapper.selectItemsByOrderId(orderId);
         StringBuilder content = new StringBuilder("🍽️ 有新订单啦！\n\n");
         content.append("👤 ").append(defaultText(order.getUserName())).append(" 想吃：\n");
@@ -81,8 +83,43 @@ public class MealWeComNotifyServiceImpl implements IMealWeComNotifyService {
             content.append("\n📝 整单备注：").append(order.getOrderRemark());
         }
         content.append("\n\n订单号：").append(orderNo(order));
-        List<String> mobiles = mobilesOf(mealOrderMapper.selectChefUserIdsByDeptId(order.getDeptId()));
+        List<String> mobiles = newOrderMentionMobiles(order);
         sendOrderMessage(order.getDeptId(), true, content.toString(), mobiles, "新订单");
+    }
+
+    /**
+     * 新订单只 @ 实际应接收的人
+     *
+     * <p>指派单只 @ 被指派厨师；公开单才 @ 本家庭全部厨师。
+     * 指派阶段被拒或超时转公开后，按公开单处理。</p>
+     *
+     * @param order 订单
+     * @return 需要 @ 的手机号
+     */
+    private List<String> newOrderMentionMobiles(MealOrder order) {
+        if (MealOrder.ASSIGN_MODE_ASSIGNED.equals(order.getAssignMode()) && order.getAssignUserId() != null) {
+            return mobilesOf(order.getAssignUserId());
+        }
+        return mobilesOf(mealOrderMapper.selectChefUserIdsByDeptId(order.getDeptId()));
+    }
+
+    /**
+     * 重新读取订单的最新指派状态
+     *
+     * <p>通知在事务提交后异步发送，排队期间订单可能已由指派转公开。
+     * 此时若继续使用旧快照，会只 @ 原指派人，漏掉真正可抢单的其他厨师。</p>
+     *
+     * @param order 提交时读取的订单快照
+     * @return 最新订单；读取失败时回退原快照
+     */
+    private MealOrder latestRouting(MealOrder order) {
+        try {
+            MealOrder latest = mealOrderMapper.selectMealOrderById(order.getOrderId());
+            return latest != null ? latest : order;
+        } catch (Exception e) {
+            log.debug("读取订单最新指派状态失败，沿用下单时快照，orderId={}", order.getOrderId(), e);
+            return order;
+        }
     }
 
     @Override

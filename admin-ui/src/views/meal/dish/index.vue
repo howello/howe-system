@@ -118,20 +118,6 @@
 
     <el-dialog :title="title" v-model="open" width="760px" append-to-body>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
-        <el-form-item label="一键 AI">
-          <div class="ai-field">
-            <el-button type="primary" plain icon="MagicStick" :loading="aiLoading" @click="handleAiGenerate">一键 AI 补齐</el-button>
-            <span class="ai-tip">填写菜名后点击，仅补齐空字段，不覆盖已填内容</span>
-          </div>
-          <div v-if="aiLoading" class="ai-steps">
-            <span class="ai-step" :class="stepClass(aiTextState)">
-              <span class="ai-step__icon">{{ stepIcon(aiTextState) }}</span>菜品信息 · {{ stepText(aiTextState) }}
-            </span>
-            <span class="ai-step" :class="stepClass(aiCoverState)">
-              <span class="ai-step__icon">{{ stepIcon(aiCoverState) }}</span>封面图 · {{ stepText(aiCoverState) }}
-            </span>
-          </div>
-        </el-form-item>
         <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item label="菜名" prop="name">
@@ -246,7 +232,27 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item label="备注" prop="remark">
-          <el-input v-model="form.remark" type="textarea" placeholder="请输入备注" />
+          <el-input
+            v-model="form.remark"
+            type="textarea"
+            :rows="4"
+            placeholder="可粘贴完整菜谱，或写明必须/不要添加的食材、指定厨具等；一键 AI 会解析并补全上方字段"
+          />
+          <div class="form-tip">备注只作为 AI 解析依据，不会原样写入小贴士</div>
+          <div class="ai-field ai-field--remark">
+            <el-button type="primary" plain icon="MagicStick" :loading="aiLoading" @click="handleAiGenerate">
+              使用备注解析并补齐
+            </el-button>
+            <span class="ai-tip">先填写菜名和备注；只补齐空字段，不覆盖已填内容</span>
+          </div>
+          <div v-if="aiLoading" class="ai-steps">
+            <span class="ai-step" :class="stepClass(aiTextState)">
+              <span class="ai-step__icon">{{ stepIcon(aiTextState) }}</span>菜品信息 · {{ stepText(aiTextState) }}
+            </span>
+            <span class="ai-step" :class="stepClass(aiCoverState)">
+              <span class="ai-step__icon">{{ stepIcon(aiCoverState) }}</span>封面图 · {{ stepText(aiCoverState) }}
+            </span>
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -563,7 +569,7 @@ async function handleAiGenerate() {
   }
   // 先把可视化列表写回表单，保证 current 快照包含用户已填的用料 / 做法 / 小贴士
   saveListsToForm()
-  const current = {
+  const current: MealDishAiCurrent = {
     categoryIds: selectedCategoryId.value ? [selectedCategoryId.value] : undefined,
     description: form.value.description || undefined,
     cover: form.value.cover || undefined,
@@ -574,7 +580,8 @@ async function handleAiGenerate() {
     kcal: form.value.kcal || undefined,
     ingredients: form.value.ingredients || undefined,
     steps: form.value.steps || undefined,
-    tips: form.value.tips || undefined
+    tips: form.value.tips || undefined,
+    remark: form.value.remark || undefined
   }
   const deptId = isAdmin.value && !form.value.dishId && asPublic.value ? 0 : undefined
   const payload = { name, deptId, current }
@@ -618,7 +625,7 @@ async function handleAiGenerate() {
 /** 两步都结束后汇总提示（放在函数里读取状态，避免 TS 把赋值后的类型收窄） */
 function finishAiSummary() {
   if (aiTextState.value === "done" && aiCoverState.value !== "error") {
-    proxy.$modal.msgSuccess("已补齐空字段")
+    proxy.$modal.msgSuccess("已按备注解析并补齐空字段")
   }
 }
 
@@ -875,6 +882,10 @@ loadCategories()
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.ai-field--remark {
+  margin-top: 10px;
 }
 
 .ai-steps {
