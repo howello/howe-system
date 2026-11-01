@@ -175,9 +175,10 @@ public class MealProposalAuditService {
      * @return 新菜品 ID
      */
     public Long createDishFromProposal(MealProposal proposal, Long categoryId, String operator) {
+        // 人工审核不会重新调用 AI：原始备注只保留在提案里，不能原样写成菜品小贴士。
         return insertDish(proposal.getDeptId(), proposal.getName(), proposal.getImage(), proposal.getDescription(),
                 proposal.getTags(), proposal.getDuration(), proposal.getLevel(), null, null,
-                proposal.getIngredients(), proposal.getSteps(), proposal.getTips(), categoryId, operator);
+                proposal.getIngredients(), proposal.getSteps(), null, categoryId, operator);
     }
 
     /**
@@ -223,7 +224,8 @@ public class MealProposalAuditService {
         String level = firstNonBlank(proposal.getLevel(), fieldText(fields, "level"));
         String ingredients = firstNonBlank(proposal.getIngredients(), fieldText(fields, "ingredients"));
         String steps = firstNonBlank(proposal.getSteps(), fieldText(fields, "steps"));
-        String tips = firstNonBlank(proposal.getTips(), fieldText(fields, "tips"));
+        // 提案 tips 是原始备注，不能直接作为菜品小贴士；只用 AI 解析出的结构化结果。
+        String tips = fieldText(fields, "tips");
         String serve = fieldText(fields, "serve");
         String kcal = fieldText(fields, "kcal");
 
@@ -252,7 +254,8 @@ public class MealProposalAuditService {
             update.setLevel(level);
             update.setIngredients(ingredients);
             update.setSteps(steps);
-            update.setTips(tips);
+            // 保留提案里的原始备注，避免审核通过后丢失用户填写内容。
+            update.setTips(proposal.getTips());
 
             int rows = mealProposalMapper.updateMealProposal(update);
             if (rows == 0) {
@@ -332,11 +335,11 @@ public class MealProposalAuditService {
         current.setTags(proposal.getTags());
         current.setDuration(proposal.getDuration());
         current.setLevel(proposal.getLevel());
+        // 新增提案的 tips 是用户填写的原始备注，不是生成结果：
+        // 必须作为解析依据传给 AI，同时让 tips 保持缺失，才能真正生成结构化小贴士。
         current.setIngredients(proposal.getIngredients());
         current.setSteps(proposal.getSteps());
-        // 备注是制作用户填写的菜谱/硬性要求，必须原样进入 AI 审核提示词；
-        // 即使已经从备注补出了 tips，也不能丢掉原文。
-        current.setTips(proposal.getTips());
+        current.setRemark(proposal.getTips());
         return current;
     }
 

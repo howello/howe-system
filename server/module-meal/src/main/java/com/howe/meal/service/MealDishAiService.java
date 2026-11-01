@@ -132,7 +132,8 @@ public class MealDishAiService {
     private static final String USER_NOTES_RULE =
             "用户备注是本次制作的硬性依据：若备注包含菜谱、用量、厨具、火候、时长或“必须加/不要加”等要求，"
             + "生成简介、用料、做法和小贴士时必须优先遵循，不得遗漏、改写为相反要求或编造冲突内容；"
-            + "备注没有提到的部分再按家常做法合理补全。";
+            + "备注原文只作为解析依据，不能把整段原文直接复制到任一字段；应提炼成结构化内容，"
+            + "其中小贴士只保留简短、可执行的注意事项。备注没有提到的部分再按家常做法合理补全。";
 
     /**
      * AI 自动审核在 system 提示词之后追加的判定说明缺省值
@@ -954,14 +955,55 @@ public class MealDishAiService {
     }
 
     /**
-     * 提取用户填写的制作备注；没有备注时返回空字符串
+     * 提取用户填写的原始备注；没有备注时返回空字符串
+     *
+     * <p>新增菜品时备注只作为 AI 解析依据，不能把原文当作已填小贴士；
+     * 编辑旧数据时兼容前端只有 tips 快照的历史调用。</p>
      *
      * @param current 当前表单已填字段快照
      * @return 去掉首尾空白的备注
      */
     private String userNotes(DishAiGenerateRequest.Current current) {
-        String notes = current == null ? null : current.getTips();
-        return notes == null ? "" : notes.trim();
+        if (current == null) {
+            return "";
+        }
+        String notes = isBlank(current.getRemark()) ? current.getTips() : current.getRemark();
+        return plainNotes(notes);
+    }
+
+    /**
+     * 把备注字段还原成可直接阅读的文本
+     *
+     * <p>新菜提案的备注以 JSON 数组保存，AI 提示词中不能直接塞入
+     * {@code ["..."]} 这类存储格式，应先还原为逐行文本。</p>
+     *
+     * @param raw 原始备注
+     * @return 去掉首尾空白的纯文本
+     */
+    public String plainNotes(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        String notes = raw.trim();
+        if (!notes.startsWith("[") || !notes.endsWith("]")) {
+            return notes;
+        }
+        try {
+            List<String> lines = JSON.parseArray(notes, String.class);
+            if (lines == null || lines.isEmpty()) {
+                return notes;
+            }
+            List<String> nonBlank = new ArrayList<>();
+            for (String line : lines) {
+                if (!isBlank(line)) {
+                    nonBlank.add(line.trim());
+                }
+            }
+            return nonBlank.isEmpty() ? notes : String.join("\n", nonBlank);
+        } catch (Exception e) {
+            // 兼容历史脏数据：无法解析时保留原文，不让备注解析因格式异常中断
+            return notes;
+        }
     }
 
     /**

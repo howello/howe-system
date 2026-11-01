@@ -74,6 +74,8 @@ export interface MealDishAiCurrent {
   ingredients?: string;
   steps?: string;
   tips?: string;
+  /** 用户填写的原始备注，仅作为 AI 解析依据，不直接写入小贴士 */
+  remark?: string;
 }
 
 /** 一键 AI 文本补齐结果：只含被补齐的文本字段与唯一主类匹配结果 */

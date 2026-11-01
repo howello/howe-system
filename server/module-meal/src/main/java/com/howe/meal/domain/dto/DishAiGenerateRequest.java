@@ -72,7 +72,10 @@ public class DishAiGenerateRequest {
         @Schema(description = "已填做法 JSON")
         private String steps;
 
-        @Schema(description = "已填备注原文；提交新菜时可能是完整菜谱或制作硬性要求，AI 必须遵循")
+        @Schema(description = "已填小贴士 JSON；这是生成结果，不应把备注原文直接写入")
         private String tips;
+
+        @Schema(description = "新增菜品时填写的原始备注；作为 AI 解析依据，不直接作为最终小贴士")
+        private String remark;
     }
 }
