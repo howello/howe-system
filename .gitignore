@@ -24,6 +24,8 @@ selenium-debug.log
 # 依赖它存在，忽略掉会导致 fresh clone 后镜像构建失败
 yarn.lock
 auto-imports.d.ts
+# 管理端在首次构建前执行类型检查，需要随仓库保留自动导入声明。
+!admin-ui/auto-imports.d.ts
 
 ######################################################################
 # Build Tools
