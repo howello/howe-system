@@ -30,6 +30,10 @@ public class ShareLink extends BaseEntity {
     @Schema(description = "短码", example = "a1B2c3D4")
     private String code;
 
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    @Schema(description = "访问策略版本，修改策略时递增，旧票据随即失效")
+    private Long accessVersion;
+
     @Schema(description = "源ID", example = "1")
     private Long sourceId;
 

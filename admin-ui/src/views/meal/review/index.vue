@@ -77,10 +77,11 @@
 </template>
 
 <script setup lang="ts" name="MealReview">
+import { useAppProxy } from '@/utils/appProxy'
 import { listReview, delReview } from "@/api/meal/review"
 import type { MealReview, MealReviewQueryParams } from "@/types/api/meal/review"
 
-const { proxy } = getCurrentInstance() as any
+const proxy = useAppProxy()
 
 const reviewList = ref<MealReview[]>([])
 const loading = ref<boolean>(true)

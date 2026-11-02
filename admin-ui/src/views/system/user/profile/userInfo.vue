@@ -23,6 +23,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAppProxy, formRef } from '@/utils/appProxy'
 import { updateUserProfile } from "@/api/system/user"
 import type { SysUser } from '@/types/api/system/user'
 
@@ -32,7 +33,7 @@ interface Props {
 
 const props = defineProps<Props>()
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 
 const form = ref<SysUser>({})
 const rules = {
@@ -43,7 +44,7 @@ const rules = {
 
 /** 提交按钮 */
 function submit() {
-  proxy.$refs.userRef.validate((valid: boolean) => {
+  formRef(proxy.$refs.userRef).validate((valid: boolean) => {
     if (valid) {
       updateUserProfile(form.value).then(() => {
         proxy.$modal.msgSuccess("修改成功")
@@ -62,7 +63,7 @@ function close() {
 }
 
 // 回显当前登录用户信息
-watch(() => props.user, (user: SysUser) => {
+watch(() => props.user, (user) => {
   if (user) {
     form.value = { nickName: user.nickName, phonenumber: user.phonenumber, email: user.email, sex: user.sex }
   }

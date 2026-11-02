@@ -173,11 +173,12 @@
 </template>
 
 <script setup lang="ts" name="BlogDraft">
+import { useAppProxy, formRef } from '@/utils/appProxy'
 import MarkdownEditor from "@/components/MarkdownEditor/index.vue"
 import { listDraft, getDraft, delDraft, addDraft, updateDraft, publishDraft } from "@/api/blog/draft"
 import type { BlogDraft, BlogDraftQueryParams } from "@/types/api/blog/draft"
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 
 const draftList = ref<BlogDraft[]>([])
 const open = ref<boolean>(false)
@@ -301,7 +302,7 @@ function handleUpdate(row?: BlogDraft) {
 
 /** 提交按钮 */
 function submitForm() {
-  proxy.$refs["draftRef"].validate((valid: boolean) => {
+  formRef(proxy.$refs["draftRef"]).validate((valid: boolean) => {
     if (!valid) {
       return
     }

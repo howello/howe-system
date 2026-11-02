@@ -214,7 +214,7 @@
                   ></el-option>
                </el-select>
             </el-form-item>
-            <el-form-item label="数据权限" v-show="form.dataScope == 2">
+            <el-form-item label="数据权限" v-show="form.dataScope == '2'">
                <el-checkbox v-model="deptExpand" @change="handleCheckedTreeExpand($event, 'dept')">展开/折叠</el-checkbox>
                <el-checkbox v-model="deptNodeAll" @change="handleCheckedTreeNodeAll($event, 'dept')">全选/全不选</el-checkbox>
                <el-checkbox v-model="form.deptCheckStrictly" @change="handleCheckedTreeConnect($event, 'dept')">父子联动</el-checkbox>
@@ -242,6 +242,7 @@
 </template>
 
 <script setup lang="ts" name="Role">
+import { useAppProxy, formRef } from '@/utils/appProxy'
 import { addRole, changeRoleStatus, dataScope, delRole, getRole, listRole, updateRole, deptTreeSelect } from "@/api/system/role"
 import { roleMenuTreeselect, treeselect as menuTreeselect } from "@/api/system/menu"
 import type { SysRole, RoleQueryParams } from '@/types/api/system/role'
@@ -250,7 +251,7 @@ import type { RoleDeptTreeResult } from '@/types/api/system/role'
 import type { RoleMenuTreeselectResult } from '@/types/api/system/menu'
 
 const router = useRouter()
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 const { sys_normal_disable } = useDict("sys_normal_disable")
 
 const roleList = ref<SysRole[]>([])
@@ -382,7 +383,7 @@ function handleAuthUser(row: SysRole) {
 /** 查询菜单树结构 */
 function getMenuTreeselect() {
   menuTreeselect().then(response => {
-    menuOptions.value = response.data
+    menuOptions.value = response.data ?? []
   })
 }
 
@@ -472,12 +473,14 @@ function handleCheckedTreeExpand(value: boolean, type: string) {
   if (type == "menu") {
     let treeList = menuOptions.value
     for (let i = 0; i < treeList.length; i++) {
-      menuRef.value.store.nodesMap[treeList[i].id].expanded = value
+      const nodeId = treeList[i].id
+      if (nodeId != null && menuRef.value.store.nodesMap[nodeId]) menuRef.value.store.nodesMap[nodeId].expanded = value
     }
   } else if (type == "dept") {
     let treeList = deptOptions.value
     for (let i = 0; i < treeList.length; i++) {
-      deptRef.value.store.nodesMap[treeList[i].id].expanded = value
+      const nodeId = treeList[i].id
+      if (nodeId != null && deptRef.value.store.nodesMap[nodeId]) deptRef.value.store.nodesMap[nodeId].expanded = value
     }
   }
 }
@@ -512,7 +515,7 @@ function getMenuAllCheckedKeys(): number[] {
 
 /** 提交按钮 */
 function submitForm() {
-  proxy.$refs["roleRef"].validate((valid: boolean) => {
+  formRef(proxy.$refs["roleRef"]).validate((valid: boolean) => {
     if (valid) {
       if (form.value.roleId != undefined) {
         form.value.menuIds = getMenuAllCheckedKeys()

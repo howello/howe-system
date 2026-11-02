@@ -156,13 +156,14 @@
 </template>
 
 <script setup lang="ts" name="MealWeCom">
+import { useAppProxy, formRef } from '@/utils/appProxy'
 import { addWeComConfig, delWeComConfig, getWeComConfig, listWeComConfig, testWeComConfig, updateWeComConfig } from "@/api/meal/wecom"
 import { listDept } from "@/api/system/dept"
 import useUserStore from "@/store/modules/user"
 import type { MealWeComConfig, MealWeComConfigQueryParams } from "@/types/api/meal/wecom"
 import type { SysDept } from "@/types/api/system/dept"
 
-const { proxy } = getCurrentInstance() as any
+const proxy = useAppProxy()
 const userStore = useUserStore()
 
 const configList = ref<MealWeComConfig[]>([])
@@ -313,7 +314,7 @@ function handleSwitchChange(row: MealWeComConfig, field: "enabled" | "notifyOrde
 
 /** 提交表单 */
 function submitForm() {
-  proxy.$refs["formRef"].validate((valid: boolean) => {
+  formRef(proxy.$refs["formRef"]).validate((valid: boolean) => {
     if (!valid) {
       return
     }

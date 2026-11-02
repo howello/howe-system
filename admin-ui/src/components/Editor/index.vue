@@ -27,6 +27,7 @@
 </template>
 
 <script setup lang="ts">
+import { templateRef, useAppProxy } from '@/utils/appProxy'
 import axios from 'axios'
 import { QuillEditor } from "@vueup/vue-quill"
 import "@vueup/vue-quill/dist/vue-quill.snow.css"
@@ -34,7 +35,7 @@ import { getToken } from "@/utils/auth"
 import { resolveFileUrl } from "@/utils/commonUtils"
 import type { UploadFileResult } from '@/types/api/common'
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 
 const quillEditorRef = ref()
 const uploadUrl = ref(import.meta.env.VITE_APP_BASE_API + "/common/upload") // 上传的图片服务器地址
@@ -109,7 +110,7 @@ const styles = computed(() => {
 })
 
 const content = ref("")
-watch(() => props.modelValue, (v: string) => {
+watch(() => props.modelValue, (v) => {
   if (v !== content.value) {
     content.value = v == undefined ? "<p></p>" : v
   }
@@ -122,7 +123,7 @@ onMounted(() => {
     let toolbar = quill.getModule("toolbar")
     toolbar.addHandler("image", (value: boolean) => {
       if (value) {
-        proxy.$refs.uploadRef.click()
+        templateRef<HTMLElement>(proxy.$refs.uploadRef).click()
       } else {
         quill.format("image", false)
       }

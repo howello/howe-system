@@ -180,10 +180,11 @@ public interface MealOrderMapper {
     int deleteMealOrderByIds(Long[] orderIds);
 
     /**
-     * 查询当天已生成的最大订单号，用于生成下一个流水号
+     * 在下单事务内写入基于数据库主键生成的业务订单号
      *
-     * @param prefix 订单号前缀（形如 M20260922）
-     * @return 最大订单号，当天没有订单时返回 null
+     * @param orderId 数据库生成的订单主键
+     * @param orderNo 业务订单号，格式 M日期-主键
+     * @return 影响行数
      */
-    String selectMaxOrderNo(@Param("prefix") String prefix);
+    int updateOrderNo(@Param("orderId") Long orderId, @Param("orderNo") String orderNo);
 }

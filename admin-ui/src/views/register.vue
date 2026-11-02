@@ -84,6 +84,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAppProxy, formRef } from '@/utils/appProxy'
 import { ElMessageBox } from "element-plus"
 import { getCodeImg, register } from "@/api/login"
 import defaultSettings from '@/settings'
@@ -94,7 +95,7 @@ import type { RegisterForm } from '@/types/api/login'
 const title = import.meta.env.VITE_APP_TITLE
 const footerContent = defaultSettings.footerContent
 const router = useRouter()
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 const { registerPwdValidator } = usePasswordRule()
 
 const registerForm = ref<RegisterForm>({
@@ -139,7 +140,7 @@ function handleTurnstileError(message: string): void {
 }
 
 function handleRegister(): void {
-  proxy.$refs.registerRef.validate((valid: boolean) => {
+  formRef(proxy.$refs.registerRef).validate((valid: boolean) => {
     if (valid) {
       if (turnstileEnabled.value && !registerForm.value.turnstileToken) {
         proxy.$modal.msgWarning("请先完成人机校验")

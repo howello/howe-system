@@ -176,6 +176,7 @@
 </template>
 
 <script setup lang="ts" name="Data">
+import { useAppProxy, formRef } from '@/utils/appProxy'
 import useDictStore from '@/store/modules/dict'
 import { optionselect as getDictOptionselect, getType } from "@/api/system/dict/type"
 import { listData, getData, delData, addData, updateData } from "@/api/system/dict/data"
@@ -186,7 +187,7 @@ interface ListClassOption {
   label: string
 }
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 const { sys_normal_disable } = useDict("sys_normal_disable")
 
 const dataList = ref<SysDictData[]>([])
@@ -241,7 +242,7 @@ function getTypes(dictId: number) {
 /** 查询字典类型列表 */
 function getTypeList() {
   getDictOptionselect().then(response => {
-    typeOptions.value = response.data
+    typeOptions.value = response.data ?? []
   })
 }
 
@@ -323,7 +324,7 @@ function handleUpdate(row?: SysDictData) {
 
 /** 提交按钮 */
 function submitForm() {
-  proxy.$refs["dataRef"].validate((valid: boolean) => {
+  formRef(proxy.$refs["dataRef"]).validate((valid: boolean) => {
     if (valid) {
       if (form.value.dictCode != undefined) {
         updateData(form.value).then(() => {

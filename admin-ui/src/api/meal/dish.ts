@@ -73,6 +73,11 @@ export function aiGenerateDishCover(data: {
 }
 
 // 删除菜品
+/** 查询本人生成图片的补偿转存结果。 */
+export function getImageTransferTask(taskId: string): Promise<AjaxResult<{ state: 'READY' | 'PENDING_TRANSFER' | 'FAILED'; message: string }>> {
+  return request({ url: '/ai/image-transfer/' + encodeURIComponent(taskId), method: 'get' })
+}
+
 export function delDish(dishId: number | number[]): Promise<AjaxResult> {
   return request({
     url: '/meal/dish/' + dishId,

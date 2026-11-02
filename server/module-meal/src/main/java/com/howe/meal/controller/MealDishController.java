@@ -10,6 +10,7 @@ import com.howe.meal.domain.dto.DishAiGenerateRequest;
 import com.howe.meal.domain.dto.DishAiUpdateRequest;
 import com.howe.meal.service.IMealDishService;
 import com.howe.meal.service.MealDishAiService;
+import com.howe.meal.service.MealDishAiTaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -45,6 +46,8 @@ public class MealDishController extends BaseController {
     private final IMealDishService mealDishService;
 
     private final MealDishAiService mealDishAiService;
+
+    private final MealDishAiTaskService aiTaskService;
 
     @Operation(summary = "查询菜品列表", description = "支持按分类、状态、菜名、关键词（菜名或用料）过滤")
     @GetMapping("/list")
@@ -84,8 +87,15 @@ public class MealDishController extends BaseController {
     @Log(title = "点餐菜品", businessType = BusinessType.UPDATE)
     @PostMapping("/ai-update")
     public AjaxResult aiUpdate(@RequestBody DishAiUpdateRequest request) {
-        mealDishAiService.submitUpdateFromText(request);
-        return success("AI 正在更新菜品，请稍后刷新查看");
+        return success(java.util.Map.of("taskId", mealDishAiService.submitUpdateFromText(request)));
+    }
+
+    /** 查询当前用户提交的菜品 AI 更新任务结果。 */
+    @Operation(summary = "查询菜品 AI 更新状态")
+    @PreAuthorize("@ss.hasPermi('meal:dish:edit')")
+    @GetMapping("/ai-update/task/{taskId}")
+    public AjaxResult aiUpdateTask(@PathVariable("taskId") String taskId) {
+        return success(aiTaskService.get(taskId));
     }
 
     @Operation(summary = "招牌推荐位", description = "本家庭近 90 天已完成订单中按份数取前 3 道仍上架的菜；"

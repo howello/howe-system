@@ -189,12 +189,13 @@
 </template>
 
 <script setup lang="ts" name="BlogArticle">
+import { useAppProxy, formRef } from '@/utils/appProxy'
 import MarkdownEditor from "@/components/MarkdownEditor/index.vue"
 import { listArticle, getArticle, delArticle, addArticle, updateArticle, syncArticle } from "@/api/blog/article"
 import type { BlogArticle, BlogArticleQueryParams, BlogSyncResult } from "@/types/api/blog/article"
 import type { AjaxResult } from "@/types/api/common"
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 
 const articleList = ref<BlogArticle[]>([])
 const open = ref<boolean>(false)
@@ -510,7 +511,7 @@ function handleUpdate(row?: BlogArticle) {
 
 /** 提交按钮 */
 function submitForm() {
-  proxy.$refs["articleRef"].validate((valid: boolean) => {
+  formRef(proxy.$refs["articleRef"]).validate((valid: boolean) => {
     if (!valid) {
       return
     }

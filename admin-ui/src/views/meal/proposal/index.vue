@@ -155,10 +155,11 @@
 </template>
 
 <script setup lang="ts" name="MealProposal">
+import { useAppProxy } from '@/utils/appProxy'
 import { listProposal, auditProposal, delProposal } from "@/api/meal/proposal"
 import type { MealProposal, MealProposalQueryParams } from "@/types/api/meal/proposal"
 
-const { proxy } = getCurrentInstance() as any
+const proxy = useAppProxy()
 
 const STATUS_TEXT: Record<string, string> = {
   "0": "待审核",

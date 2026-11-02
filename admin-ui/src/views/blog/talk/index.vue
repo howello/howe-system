@@ -137,12 +137,13 @@
 </template>
 
 <script setup lang="ts" name="BlogTalk">
+import { useAppProxy, formRef } from '@/utils/appProxy'
 // MarkdownEditor 未全局注册，必须按需 import
 import MarkdownEditor from "@/components/MarkdownEditor/index.vue"
 import { listTalk, getTalk, delTalk, addTalk, updateTalk } from "@/api/blog/talk"
 import type { BlogTalk, BlogTalkQueryParams } from "@/types/api/blog/talk"
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 
 const talkList = ref<BlogTalk[]>([])
 const open = ref<boolean>(false)
@@ -258,7 +259,7 @@ function handleUpdate(row?: BlogTalk) {
 
 /** 提交按钮 */
 function submitForm() {
-  proxy.$refs["talkRef"].validate((valid: boolean) => {
+  formRef(proxy.$refs["talkRef"]).validate((valid: boolean) => {
     if (!valid) {
       return
     }

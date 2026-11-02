@@ -1,6 +1,5 @@
 package com.howe.ai.storage;
 
-import cn.hutool.core.img.ImgUtil;
 import cn.hutool.core.io.IoUtil;
 import cn.hutool.core.thread.ThreadUtil;
 import cn.hutool.core.util.IdUtil;
@@ -18,8 +17,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
 import java.util.Base64;
 import java.util.Locale;
 
@@ -40,8 +37,7 @@ import java.util.Locale;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class AiImageTransfer
-{
+public class AiImageTransfer {
     /** 生成图在对象存储中的业务目录 */
     public static final String BIZ_DIR = "ai";
 
@@ -64,9 +60,9 @@ public class AiImageTransfer
      * @return 生成图（永久 url + 对象键 + 尺寸）
      * @throws AiException 下载失败（无从补偿）时抛出
      */
-    public AiImage transfer(String tempUrl, String base64, String mimeType)
-    {
+    public AiImage transfer(String tempUrl, String base64, String mimeType) {
         byte[] data = downloadWithRetry(tempUrl, base64);
+        int[] originalSize = AiImageContentGuard.validate(data);
         String extension = resolveExtension(mimeType, tempUrl);
         // 厂商原图动辄 2~3MB，转存前统一压到 500KB 上下
         AiImageCompressor.Compressed compressed = AiImageCompressor.compress(data, extension);
@@ -74,10 +70,10 @@ public class AiImageTransfer
         String uploadExtension = compressed.extension();
         String objectKey = BIZ_DIR + "/" + DateUtils.datePath() + "/" + IdUtil.fastSimpleUUID() + "." + uploadExtension;
         String contentType = resolveContentType(uploadExtension);
-        int[] size = resolveSize(compressed, uploadBytes);
+        int[] size = compressed.width() == null ? originalSize
+                : new int[] { compressed.width(), compressed.height() };
 
-        try
-        {
+        try {
             String url = uploadWithRetry(objectKey, uploadBytes, contentType);
             return AiImage.builder()
                     .url(url)
@@ -85,9 +81,7 @@ public class AiImageTransfer
                     .width(size == null ? null : size[0])
                     .height(size == null ? null : size[1])
                     .build();
-        }
-        catch (Exception e)
-        {
+        } catch (Exception e) {
             return fallbackToCompensation(objectKey, uploadBytes, contentType, size, e);
         }
     }
@@ -105,21 +99,26 @@ public class AiImageTransfer
      * @return 预写地址的生成图
      */
     private AiImage fallbackToCompensation(String objectKey, byte[] uploadBytes, String contentType, int[] size,
-            Exception cause)
-    {
-        if (!ConfigUtils.getBoolean(ConfigConstants.AI_IMAGE_TRANSFER_COMPENSATE_ENABLED, true))
-        {
+            Exception cause) {
+        if (!ConfigUtils.getBoolean(ConfigConstants.AI_IMAGE_TRANSFER_COMPENSATE_ENABLED, true)) {
             throw new AiException(AiErrorCode.TRANSFER_FAILED, "图片已生成但保存失败，请重试", cause);
         }
         String reason = StrUtil.blankToDefault(cause.getMessage(), cause.getClass().getSimpleName());
         int expireMinutes = Math.max(1, ConfigUtils.getInt(ConfigConstants.AI_IMAGE_TRANSFER_EXPIRE_MINUTES, 120));
         log.error("生成图转存失败，转入补偿重传：key={}", objectKey, cause);
-        compensationStore.enqueue(objectKey, uploadBytes, contentType, expireMinutes, reason);
+        String taskId;
+        try {
+            taskId = compensationStore.enqueue(objectKey, uploadBytes, contentType, expireMinutes, reason);
+        } catch (Exception e) {
+            throw new AiException(AiErrorCode.TRANSFER_FAILED, "图片保存失败且无法持久化补偿任务，请重试", e);
+        }
         return AiImage.builder()
                 .url(storageService.urlOf(objectKey))
                 .key(objectKey)
                 .width(size == null ? null : size[0])
                 .height(size == null ? null : size[1])
+                .transferStatus("PENDING_TRANSFER")
+                .transferTaskId(taskId)
                 .build();
     }
 
@@ -131,13 +130,10 @@ public class AiImageTransfer
      * @return 图片字节
      * @throws AiException 重试后仍失败
      */
-    private byte[] downloadWithRetry(String tempUrl, String base64)
-    {
-        if (StrUtil.isNotBlank(base64))
-        {
+    private byte[] downloadWithRetry(String tempUrl, String base64) {
+        if (StrUtil.isNotBlank(base64)) {
             byte[] data = decodeBase64(base64);
-            if (data.length == 0)
-            {
+            if (data.length == 0) {
                 throw new AiException(AiErrorCode.TRANSFER_FAILED, "图片已生成但内容为空，请重试");
             }
             return data;
@@ -145,17 +141,12 @@ public class AiImageTransfer
         int retryMax = retryMax();
         long backoffMs = retryBackoffMs();
         AiException last = null;
-        for (int attempt = 0; attempt <= retryMax; attempt++)
-        {
-            try
-            {
+        for (int attempt = 0; attempt <= retryMax; attempt++) {
+            try {
                 return download(tempUrl);
-            }
-            catch (AiException e)
-            {
+            } catch (AiException e) {
                 last = e;
-                if (attempt < retryMax)
-                {
+                if (attempt < retryMax) {
                     ThreadUtil.sleep(backoffMs * (attempt + 1));
                 }
             }
@@ -172,23 +163,17 @@ public class AiImageTransfer
      * @return 永久地址
      * @throws AiException 重试后仍失败
      */
-    private String uploadWithRetry(String objectKey, byte[] data, String contentType)
-    {
+    private String uploadWithRetry(String objectKey, byte[] data, String contentType) {
         int retryMax = retryMax();
         long backoffMs = retryBackoffMs();
         Exception last = null;
-        for (int attempt = 0; attempt <= retryMax; attempt++)
-        {
-            try
-            {
+        for (int attempt = 0; attempt <= retryMax; attempt++) {
+            try {
                 return storageService.store(objectKey, () -> IoUtil.toStream(data), data.length, contentType);
-            }
-            catch (Exception e)
-            {
+            } catch (Exception e) {
                 last = e;
                 log.warn("上传生成图失败（第 {} 次）：key={}，原因：{}", attempt + 1, objectKey, e.getMessage());
-                if (attempt < retryMax)
-                {
+                if (attempt < retryMax) {
                     ThreadUtil.sleep(backoffMs * (attempt + 1));
                 }
             }
@@ -200,16 +185,14 @@ public class AiImageTransfer
     /**
      * 转存重试次数
      */
-    private int retryMax()
-    {
+    private int retryMax() {
         return Math.max(0, ConfigUtils.getInt(ConfigConstants.AI_IMAGE_TRANSFER_RETRY_MAX, 3));
     }
 
     /**
      * 转存重试退避基数（毫秒）
      */
-    private long retryBackoffMs()
-    {
+    private long retryBackoffMs() {
         return Math.max(0L, ConfigUtils.getInt(ConfigConstants.AI_IMAGE_TRANSFER_RETRY_BACKOFF_MS, 1000));
     }
 
@@ -220,37 +203,27 @@ public class AiImageTransfer
      * @return 图片字节
      * @throws AiException 地址为空、下载失败或超出大小上限
      */
-    private byte[] download(String tempUrl)
-    {
-        if (StrUtil.isBlank(tempUrl))
-        {
+    private byte[] download(String tempUrl) {
+        if (StrUtil.isBlank(tempUrl)) {
             throw new AiException(AiErrorCode.TRANSFER_FAILED, "厂商没有返回可用的图片地址");
         }
-        try (HttpResponse response = HttpRequest.get(tempUrl).timeout(DOWNLOAD_TIMEOUT_MS).execute())
-        {
-            if (!response.isOk())
-            {
+        try (HttpResponse response = HttpRequest.get(tempUrl).timeout(DOWNLOAD_TIMEOUT_MS).executeAsync()) {
+            if (!response.isOk()) {
                 throw new AiException(AiErrorCode.TRANSFER_FAILED,
                         "下载生成图失败，厂商返回状态码 " + response.getStatus());
             }
-            byte[] data = response.bodyBytes();
-            if (data == null || data.length == 0)
-            {
+            byte[] data = AiImageContentGuard.readLimited(response.bodyStream());
+            if (data == null || data.length == 0) {
                 throw new AiException(AiErrorCode.TRANSFER_FAILED, "下载生成图失败，返回内容为空");
             }
-            if (data.length > MAX_DOWNLOAD_BYTES)
-            {
+            if (data.length > MAX_DOWNLOAD_BYTES) {
                 throw new AiException(AiErrorCode.TRANSFER_FAILED,
                         "生成图超过 " + (MAX_DOWNLOAD_BYTES / 1024 / 1024) + "MB，已放弃转存");
             }
             return data;
-        }
-        catch (AiException e)
-        {
+        } catch (AiException e) {
             throw e;
-        }
-        catch (Exception e)
-        {
+        } catch (Exception e) {
             throw new AiException(AiErrorCode.TRANSFER_FAILED, "下载生成图失败：" + e.getMessage(), e);
         }
     }
@@ -261,20 +234,22 @@ public class AiImageTransfer
      * @param base64 base64 字符串，可能带 data:image/...;base64, 前缀
      * @return 图片字节
      */
-    private byte[] decodeBase64(String base64)
-    {
+    private byte[] decodeBase64(String base64) {
         String content = base64;
         int comma = content.indexOf(',');
-        if (content.startsWith("data:") && comma > 0)
-        {
+        if (content.startsWith("data:") && comma > 0) {
             content = content.substring(comma + 1);
         }
-        try
-        {
-            return Base64.getDecoder().decode(content);
-        }
-        catch (IllegalArgumentException e)
-        {
+        try {
+            if ((long) content.length() > 4L * ((MAX_DOWNLOAD_BYTES + 2L) / 3L)) {
+                throw new AiException(AiErrorCode.TRANSFER_FAILED, "图片 base64 内容超过 20MB 上限");
+            }
+            byte[] decoded = Base64.getDecoder().decode(content);
+            if (decoded.length > MAX_DOWNLOAD_BYTES) {
+                throw new AiException(AiErrorCode.TRANSFER_FAILED, "图片 base64 内容超过 20MB 上限");
+            }
+            return decoded;
+        } catch (IllegalArgumentException e) {
             throw new AiException(AiErrorCode.TRANSFER_FAILED, "厂商返回的图片内容不是合法的 base64", e);
         }
     }
@@ -286,28 +261,21 @@ public class AiImageTransfer
      * @param tempUrl  临时地址，用于兜底推断
      * @return 后缀名
      */
-    private String resolveExtension(String mimeType, String tempUrl)
-    {
+    private String resolveExtension(String mimeType, String tempUrl) {
         String mime = mimeType == null ? "" : mimeType.toLowerCase(Locale.ROOT);
-        if (mime.contains("jpeg") || mime.contains("jpg"))
-        {
+        if (mime.contains("jpeg") || mime.contains("jpg")) {
             return "jpg";
         }
-        if (mime.contains("webp"))
-        {
+        if (mime.contains("webp")) {
             return "webp";
         }
-        if (mime.contains("png"))
-        {
+        if (mime.contains("png")) {
             return "png";
         }
-        if (StrUtil.isNotBlank(tempUrl))
-        {
+        if (StrUtil.isNotBlank(tempUrl)) {
             String path = tempUrl.split("\\?")[0].toLowerCase(Locale.ROOT);
-            for (String candidate : new String[] { "png", "jpg", "jpeg", "webp" })
-            {
-                if (path.endsWith("." + candidate))
-                {
+            for (String candidate : new String[] { "png", "jpg", "jpeg", "webp" }) {
+                if (path.endsWith("." + candidate)) {
                     return "jpeg".equals(candidate) ? "jpg" : candidate;
                 }
             }
@@ -322,44 +290,8 @@ public class AiImageTransfer
      * @param extension 后缀名
      * @return Content-Type
      */
-    private String resolveContentType(String extension)
-    {
+    private String resolveContentType(String extension) {
         return "jpg".equals(extension) ? "image/jpeg" : "image/" + extension;
     }
 
-    /**
-     * 取图片宽高：压缩结果已带尺寸则直接复用，否则重新读取
-     *
-     * @param compressed 压缩结果
-     * @param data       最终上传的字节
-     * @return 宽高数组
-     */
-    private int[] resolveSize(AiImageCompressor.Compressed compressed, byte[] data)
-    {
-        if (compressed.width() != null && compressed.height() != null)
-        {
-            return new int[] { compressed.width(), compressed.height() };
-        }
-        return readSize(data);
-    }
-
-    /**
-     * 读取图片尺寸，失败时返回 null
-     *
-     * @param data 图片字节
-     * @return 宽高数组
-     */
-    private int[] readSize(byte[] data)
-    {
-        try (ByteArrayInputStream input = new ByteArrayInputStream(data))
-        {
-            BufferedImage image = ImgUtil.read(input);
-            return image == null ? null : new int[] { image.getWidth(), image.getHeight() };
-        }
-        catch (Exception e)
-        {
-            log.warn("读取生成图尺寸失败，调用记录中将不记录宽高：{}", e.getMessage());
-            return null;
-        }
-    }
 }

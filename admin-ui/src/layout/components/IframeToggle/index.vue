@@ -15,7 +15,7 @@ import useTagsViewStore from "@/store/modules/tagsView"
 const route = useRoute()
 const tagsViewStore = useTagsViewStore()
 
-function iframeUrl(url: string, query: Record<string, any>): string {
+function iframeUrl(url = '', query: Record<string, unknown> = {}): string {
   if (Object.keys(query).length > 0) {
     const params = Object.keys(query).map((key) => key + "=" + query[key]).join("&")
     return url + "?" + params

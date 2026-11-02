@@ -6,6 +6,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <resultMap type="ShareLink" id="ShareLinkResult">
         <result property="linkId"          column="link_id"          />
+        <result property="accessVersion" column="access_version" />
         <result property="code"            column="code"             />
         <result property="sourceId"        column="source_id"        />
         <result property="filePath"        column="file_path"        />
@@ -34,7 +35,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectShareLinkVo">
-        select l.link_id, l.code, l.source_id, l.file_path, l.file_name, l.file_ext, l.file_size,
+        select l.link_id, l.access_version, l.code, l.source_id, l.file_path, l.file_name, l.file_ext, l.file_size,
                l.content_type, l.storage_type, l.storage_location, l.password_hash, l.expire_at,
                l.max_views, l.view_count, l.burn_after_read, l.cache_status, l.cache_error,
                l.cache_retry_count, l.status, l.last_view_time,
@@ -43,7 +44,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </sql>
 
     <select id="selectShareLinkList" parameterType="ShareLink" resultMap="ShareLinkResult">
-        select l.link_id, l.code, l.source_id, l.file_path, l.file_name, l.file_ext, l.file_size,
+        select l.link_id, l.access_version, l.code, l.source_id, l.file_path, l.file_name, l.file_ext, l.file_size,
                l.content_type, l.storage_type, l.storage_location, l.password_hash, l.expire_at,
                l.max_views, l.view_count, l.burn_after_read, l.cache_status, l.cache_error,
                l.cache_retry_count, l.status, l.last_view_time,
@@ -99,6 +100,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <update id="updateShareLink" parameterType="ShareLink">
         update share_link
         <set>
+            access_version = access_version + 1,
             <if test="passwordHash != null">password_hash = #{passwordHash},</if>
             expire_at = #{expireAt},
             <if test="maxViews != null">max_views = #{maxViews},</if>
@@ -124,6 +126,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         set view_count = view_count + 1, last_view_time = sysdate()
         where link_id = #{linkId}
           and status = '0'
+          and access_version = #{accessVersion}
+          and (expire_at is null or expire_at &gt; sysdate())
           and (max_views &lt;= 0 or view_count &lt; max_views)
     </update>
 
@@ -159,7 +163,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </update>
 
     <update id="updateStatus">
-        update share_link set status = #{status}, update_time = sysdate() where link_id = #{linkId}
+        update share_link set status = #{status}, access_version = access_version + 1, update_time = sysdate() where link_id = #{linkId}
     </update>
 
     <update id="resetCacheStatus">

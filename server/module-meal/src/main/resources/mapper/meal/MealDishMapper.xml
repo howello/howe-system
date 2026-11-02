@@ -5,6 +5,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 <mapper namespace="com.howe.meal.mapper.MealDishMapper">
 
     <resultMap type="MealDish" id="MealDishResult">
+        <result property="dataVersion" column="data_version" />
         <result property="dishId"       column="dish_id"       />
         <result property="deptId"       column="dept_id"       />
         <result property="name"         column="name"          />
@@ -36,7 +37,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
       每条菜品最多一条关联，取该主类名称即可，不会放大结果集。
     -->
     <sql id="selectMealDishVo">
-        select d.dish_id, d.dept_id, d.name, d.cover, d.description, d.tags,
+        select d.dish_id, d.data_version, d.dept_id, d.name, d.cover, d.description, d.tags,
                d.duration, d.level, d.serve, d.kcal, d.ingredients, d.steps, d.tips,
                d.status, d.sort, d.source, d.del_flag,
                d.create_by, d.create_time, d.update_by, d.update_time, d.remark,
@@ -110,6 +111,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <update id="updateMealDish" parameterType="MealDish">
         update meal_dish
         <set>
+            data_version = data_version + 1,
             <if test="deptId != null">dept_id = #{deptId},</if>
             <if test="name != null and name != ''">name = #{name},</if>
             <if test="cover != null">cover = #{cover},</if>
@@ -129,6 +131,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             update_time = sysdate()
         </set>
         where dish_id = #{dishId} and del_flag = '0'
+        <if test="params.expectedVersion != null">and data_version = #{params.expectedVersion}</if>
     </update>
 
     <update id="deleteMealDishByIds" parameterType="Long">
@@ -146,7 +149,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
       不按菜名合并：同一道菜改过名仍按 dish_id 聚合。
     -->
     <select id="selectSignatureDishes" resultMap="MealDishResult">
-        select d.dish_id, d.dept_id, d.name, d.cover, d.description, d.tags,
+        select d.dish_id, d.data_version, d.dept_id, d.name, d.cover, d.description, d.tags,
                d.duration, d.level, d.serve, d.kcal, d.ingredients, d.steps, d.tips,
                d.status, d.sort, d.source, d.del_flag,
                d.create_by, d.create_time, d.update_by, d.update_time, d.remark,

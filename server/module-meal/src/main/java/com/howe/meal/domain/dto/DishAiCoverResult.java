@@ -19,4 +19,10 @@ public class DishAiCoverResult {
 
     @Schema(description = "图片未生成时的可读原因")
     private String imageError;
+
+    @Schema(description = "封面保存状态：READY 已就绪，PENDING_TRANSFER 等待补偿保存")
+    private String transferStatus;
+
+    @Schema(description = "图片转存任务 ID")
+    private String transferTaskId;
 }

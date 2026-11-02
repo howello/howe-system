@@ -125,10 +125,12 @@
 </template>
 
 <script setup lang="ts" name="Logininfor">
+import type { TableInstance } from 'element-plus/es/components/table'
+import { templateRef, useAppProxy } from '@/utils/appProxy'
 import { list, delLogininfor, cleanLogininfor, unlockLogininfor } from "@/api/monitor/logininfor"
 import type { SysLogininfor, LogininforQueryParams } from '@/types/api/monitor/logininfor'
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 const { sys_common_status } = useDict("sys_common_status")
 
 const logininforList = ref<SysLogininfor[]>([])
@@ -174,7 +176,7 @@ function resetQuery() {
   dateRange.value = []
   proxy.resetForm("queryRef")
   queryParams.value.pageNum = 1
-  proxy.$refs["logininforRef"].sort(defaultSort.value.prop, defaultSort.value.order)
+  templateRef<TableInstance>(proxy.$refs["logininforRef"]).sort(defaultSort.value.prop, defaultSort.value.order)
 }
 
 /** 多选框选中数据 */
@@ -215,7 +217,8 @@ function handleClean() {
 
 /** 解锁按钮操作 */
 function handleUnlock() {
-  const username = selectName.value
+  const username = selectName.value[0]
+  if (!username) return
   proxy.$modal.confirm('是否确认解锁用户"' + username + '"数据项?').then(function () {
     return unlockLogininfor(username)
   }).then(() => {

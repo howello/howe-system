@@ -124,12 +124,12 @@ export function updateAuthRole(data: SysUserRoles): Promise<AjaxResult> {
   return request({
     url: '/system/user/authRole',
     method: 'put',
-    params: data
+    params: { ...data, roleIds: data.roleIds?.join(',') }
   })
 }
 
 // 查询部门下拉树结构
-export function deptTreeSelect(): Promise<AjaxResult<TreeSelect>> {
+export function deptTreeSelect(): Promise<AjaxResult<TreeSelect[]>> {
   return request({
     url: '/system/user/deptTree',
     method: 'get'

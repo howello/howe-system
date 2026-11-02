@@ -33,10 +33,11 @@
 </template>
 <script setup lang="ts">
 const open = defineModel()
-const emit = defineEmits(['confirm'])
+const emit = defineEmits(['commit'])
 const formData = ref({
-  label: undefined,
-  value: undefined
+  label: '',
+  value: '' as string | number,
+  id: undefined as number | undefined
 })
 const rules = {
   label: [
@@ -70,8 +71,9 @@ const treeNodeForm = ref<any>()
 
 function onOpen(): void {
   formData.value = {
-    label: undefined,
-    value: undefined
+    label: '',
+    value: '' as string | number,
+    id: undefined as number | undefined
   }
 }
 

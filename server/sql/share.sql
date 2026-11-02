@@ -43,6 +43,7 @@ drop table if exists share_link;
 create table share_link (
   link_id           bigint(20)    not null auto_increment comment '分享ID',
   code              varchar(16)   not null                comment '短码（随机 Base62）',
+  access_version bigint not null default 1 comment '访问策略版本，修改后旧票据失效',
   source_id         bigint(20)    not null                comment '源ID',
   file_path         varchar(1000) not null                comment 'WebDAV 源文件路径',
   file_name         varchar(255)  not null                comment '文件名',

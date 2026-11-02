@@ -107,12 +107,13 @@
 </template>
 
 <script setup lang="ts" name="ShareSource">
+import { useAppProxy, formRef } from '@/utils/appProxy'
 import { listSource, getSource, addSource, updateSource, delSource, testSource } from '@/api/share/source'
 import type { ShareSource, ShareSourceQueryParams } from '@/types'
 import FileBrowserDialog from '@/views/share/components/FileBrowserDialog.vue'
 import { Search, Refresh, Plus, Edit, Delete, Connection, Folder } from '@element-plus/icons-vue'
 
-const { proxy } = getCurrentInstance() as any
+const proxy = useAppProxy()
 const { sys_normal_disable } = useDict('sys_normal_disable')
 
 const sourceList = ref<ShareSource[]>([])
@@ -206,6 +207,7 @@ function handleUpdate(row?: ShareSource) {
   reset()
   const sourceId = row?.sourceId || ids.value[0]
   getSource(sourceId).then((response) => {
+    if (!response.data) { proxy.$modal.msgError("记录不存在或已删除"); return }
     form.value = response.data
     form.value.password = undefined
     open.value = true
@@ -214,7 +216,7 @@ function handleUpdate(row?: ShareSource) {
 }
 
 function submitForm() {
-  proxy.$refs['formRef'].validate((valid: boolean) => {
+  formRef(proxy.$refs['formRef']).validate((valid: boolean) => {
     if (!valid) return
     const payload = { ...form.value }
     if (payload.sourceId && !payload.password) {

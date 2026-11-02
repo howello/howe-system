@@ -18,7 +18,7 @@
                 <el-checkbox :indeterminate="isIndeterminate" v-model="isChecked" @change="toggleCheckAll"> 列展示 </el-checkbox>
               </el-dropdown-item>
               <div class="check-line"></div>
-              <template v-for="(item, key) in columns" :key="item.key">
+              <template v-for="(item, key) in columnEntries" :key="item.key">
                 <el-dropdown-item>
                   <el-checkbox v-model="item.visible" @change="checkboxChange($event, key)" :label="item.label" />
                 </el-dropdown-item>
@@ -40,7 +40,9 @@
 </template>
 
 <script setup lang="ts">
+import { useAppProxy } from '@/utils/appProxy'
 import cache from '@/plugins/cache'
+import type { PropType } from 'vue'
 import type { TableShowColumns } from '@/types/api/common'
 
 const props = defineProps({
@@ -51,7 +53,7 @@ const props = defineProps({
   },
   /* 显隐列信息（数组格式、对象格式） */
   columns: {
-    type: [Array, Object],
+    type: [Array, Object] as PropType<Record<string, TableShowColumns & { key?: string }> | (TableShowColumns & { key?: string })[]>,
     default: () => ({})
   },
   /* 是否显示检索图标 */
@@ -76,6 +78,10 @@ const props = defineProps({
   }
 })
 
+/** 统一数组与对象的列遍历类型，避免数组原型成员进入模板推导。 */
+const columnEntries = computed<Record<string, TableShowColumns & { key?: string }>>(() =>
+  Object.fromEntries(Object.entries(props.columns)))
+
 const emits = defineEmits(['update:showSearch', 'queryTable'])
 
 // 显隐数据
@@ -99,10 +105,15 @@ const isChecked = computed({
   set: () => {}
 })
 const isIndeterminate = computed(() => Array.isArray(props.columns) ? props.columns.some((col: TableShowColumns) => col.visible) && !isChecked.value : Object.values(props.columns).some((col) => (col as TableShowColumns).visible) && !isChecked.value)
-const transferData = computed(() => Array.isArray(props.columns) ? props.columns.map((item: TableShowColumns, index: number) => ({ key: index, label: item.label })) : Object.keys(props.columns).map((key, index) => ({ key: index, label: props.columns[key].label })))
+const transferData = computed(() => Array.isArray(props.columns) ? props.columns.map((item: TableShowColumns, index: number) => ({ key: index, label: item.label })) : Object.keys(props.columns).map((key, index) => ({ key: index, label: columnAt(key).label })))
+
+/** 按数组索引或对象键读取列信息。 */
+function columnAt(key: string | number) {
+  return Array.isArray(props.columns) ? props.columns[Number(key)] : props.columns[key]
+}
 
 // 搜索
-const { proxy } = getCurrentInstance()!
+const proxy = useAppProxy()
 function toggleSearch(): void {
   let el: HTMLElement | null = proxy!.$el
   let formEl: HTMLElement | null = null
@@ -143,11 +154,11 @@ function dataChange(data: number[]): void {
   if (Array.isArray(props.columns)) {
     for (let item in props.columns) {
       const key = props.columns[item].key
-      props.columns[item].visible = !data.includes(parseInt(key))
+      props.columns[item].visible = !data.includes(Number(key))
     }
   } else {
     Object.keys(props.columns).forEach((key, index) => {
-      props.columns[key].visible = !data.includes(index)
+      columnAt(key).visible = !data.includes(index)
     })
   }
   saveStorage()
@@ -169,7 +180,7 @@ if (props.storageKey) {
         })
       } else {
         Object.keys(props.columns).forEach(key => {
-          if (saved[key] !== undefined) props.columns[key].visible = saved[key]
+          if (saved[key] !== undefined) columnAt(key).visible = saved[key]
         })
       }
     }
@@ -185,7 +196,7 @@ if (props.showColumnsType == "transfer") {
     }
   } else {
     Object.keys(props.columns).forEach((key, index) => {
-      if (props.columns[key].visible === false) {
+      if (columnAt(key).visible === false) {
         value.value.push(index)
       }
     })
@@ -193,14 +204,14 @@ if (props.showColumnsType == "transfer") {
 }
 
 // 单勾选
-function checkboxChange(event: boolean, key: string): void {
+function checkboxChange(event: boolean, key: string | number): void {
   if (Array.isArray(props.columns)) {
     const col = props.columns.filter((item: any) => item.key == key)[0]
     if (col) {
       col.visible = event
     }
   } else {
-    props.columns[key].visible = event
+    columnAt(key).visible = event
   }
   saveStorage()
 }
@@ -224,7 +235,7 @@ function saveStorage(): void {
     if (Array.isArray(props.columns)) {
       props.columns.forEach((col: TableShowColumns, index: number) => { state[index] = col.visible })
     } else {
-      Object.keys(props.columns).forEach(key => { state[key] = props.columns[key].visible })
+      Object.keys(props.columns).forEach(key => { state[key] = columnAt(key).visible })
     }
     cache.local.setJSON(props.storageKey, state)
   } catch (e) {}

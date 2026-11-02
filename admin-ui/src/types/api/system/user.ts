@@ -42,6 +42,10 @@ export interface SysUser extends BaseEntity {
   phonenumber?: string;
   /** 用户性别（0男 1女 2未知） */
   sex?: '0' | '1' | '2';
+  /** 最近登录IP */
+  loginIp?: string;
+  /** 最近登录时间 */
+  loginDate?: string;
   /** 用户头像 */
   avatar?: string;
   /** 密码 */

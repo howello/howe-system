@@ -72,8 +72,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         )
     </insert>
 
-    <delete id="deleteBefore">
-        delete from ai_call_log where create_time &lt; #{before}
+    <select id="selectExpiredIds" resultType="long">
+        select id from ai_call_log where create_time &lt; #{before} order by id limit #{limit}
+    </select>
+    <delete id="deleteByIds">
+        delete from ai_call_log where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
     </delete>
 
     <select id="selectStats" resultType="com.howe.ai.persistence.domain.vo.AiCallLogStats">

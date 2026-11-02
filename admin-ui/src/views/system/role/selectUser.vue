@@ -61,8 +61,10 @@
 </template>
 
 <script setup lang="ts" name="SelectUser">
+import type { TableInstance } from 'element-plus/es/components/table'
+import { templateRef, useAppProxy } from '@/utils/appProxy'
 import { authUserSelectAll, unallocatedUserList } from "@/api/system/role"
-import type { SysUser, UserQueryParams } from '@/types/api/system/user'
+import type { SysUser, AuthUserQueryParams } from '@/types/api/system/user'
 
 const props = defineProps({
   roleId: {
@@ -70,7 +72,7 @@ const props = defineProps({
   }
 })
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 const { sys_normal_disable } = useDict("sys_normal_disable")
 
 const userList = ref<SysUser[]>([])
@@ -78,7 +80,7 @@ const visible = ref<boolean>(false)
 const total = ref<number>(0)
 const userIds = ref<number[]>([])
 
-const queryParams = reactive<UserQueryParams>({
+const queryParams = reactive<AuthUserQueryParams>({
   pageNum: 1,
   pageSize: 10,
   roleId: undefined,
@@ -88,14 +90,14 @@ const queryParams = reactive<UserQueryParams>({
 
 // 显示弹框
 function show() {
-  queryParams.roleId = props.roleId
+  queryParams.roleId = Number(props.roleId)
   getList()
   visible.value = true
 }
 
 /**选择行 */
 function clickRow(row: SysUser) {
-  proxy.$refs["refTable"].toggleRowSelection(row)
+  templateRef<TableInstance>(proxy.$refs["refTable"]).toggleRowSelection(row)
 }
 
 // 多选框选中数据
@@ -132,7 +134,7 @@ function handleSelectUser() {
     proxy.$modal.msgError("请选择要分配的用户")
     return
   }
-  authUserSelectAll({ roleId: roleId!, userIds: uIds }).then(res => {
+  authUserSelectAll({ roleId: roleId!, userIds: userIds.value }).then(res => {
     proxy.$modal.msgSuccess(res.msg)
     visible.value = false
     emit("ok")

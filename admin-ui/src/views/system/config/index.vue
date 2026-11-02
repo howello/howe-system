@@ -226,10 +226,11 @@
 </template>
 
 <script setup lang="ts" name="Config">
+import { useAppProxy, formRef } from '@/utils/appProxy'
 import type { SysConfig, ConfigQueryParams } from '@/types/api/system/config'
 import { listConfig, getConfig, delConfig, addConfig, updateConfig, refreshCache } from "@/api/system/config"
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 const { sys_yes_no } = useDict("sys_yes_no")
 
 const configList = ref<SysConfig[]>([])
@@ -336,6 +337,7 @@ function handleUpdate(row: SysConfig) {
   reset()
   const configId = row.configId || ids.value[0]
   getConfig(configId).then(response => {
+    if (!response.data) { proxy.$modal.msgError("记录不存在或已删除"); return }
     form.value = response.data
     // 敏感值后端只给掩码，直接回填会在提交时把 sk-****abcd 当成新密钥存进去。
     // 清空后由后端按「留空不改」沿用原值；需要换密钥时重新输入即可。
@@ -349,7 +351,7 @@ function handleUpdate(row: SysConfig) {
 
 /** 提交按钮 */
 function submitForm() {
-  proxy.$refs["configRef"].validate((valid: boolean) => {
+  formRef(proxy.$refs["configRef"]).validate((valid: boolean) => {
     if (valid) {
       if (form.value.configId != undefined) {
         updateConfig(form.value).then(() => {

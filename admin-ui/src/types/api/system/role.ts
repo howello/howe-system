@@ -40,6 +40,8 @@ export interface SysUserRoles {
 
 /** 角色信息 */
 export interface SysRole extends BaseEntity {
+  /** 用户授权角色页面的选中标记 */
+  flag?: boolean;
   /** 角色编号 */
   roleId?: number;
   /** 角色名称 */

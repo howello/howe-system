@@ -17,7 +17,7 @@ export interface TableDataInfo<T = any> {
   /** 总记录数 */
   total: number
   /** 列表数据 */
-  rows: T[]
+  rows: T
 }
 
 /** 分页参数类型 */

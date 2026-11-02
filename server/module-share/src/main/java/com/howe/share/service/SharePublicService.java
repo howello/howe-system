@@ -74,7 +74,7 @@ public class SharePublicService {
         }
         String state = resolveState(link);
         boolean needPwd = StrUtil.isNotBlank(link.getPasswordHash());
-        boolean verified = needPwd && ticketService.hasPwd(code, request);
+        boolean verified = needPwd && ticketService.hasPwd(link, request);
         logAccess(link, ShareConstants.ACTION_DETAIL, ShareConstants.RESULT_SUCCESS, state, request);
         return new SharePublicDetail(
                 code,
@@ -112,7 +112,7 @@ public class SharePublicService {
         }
         if (StrUtil.isBlank(link.getPasswordHash())) {
             // 无需密码，直接视为通过
-            ticketService.issuePwd(code, request, response);
+            ticketService.issuePwd(link, request, response);
             return;
         }
         assertPasswordAttemptsAllowed(code);
@@ -122,7 +122,7 @@ public class SharePublicService {
             throw new ServiceException("密码错误");
         }
         clearPasswordAttempts(code);
-        ticketService.issuePwd(code, request, response);
+        ticketService.issuePwd(link, request, response);
         logAccess(link, ShareConstants.ACTION_VERIFY, ShareConstants.RESULT_SUCCESS, null, request);
     }
 
@@ -144,16 +144,16 @@ public class SharePublicService {
             logAccess(link, ShareConstants.ACTION_OPEN, ShareConstants.RESULT_FAIL, state, request);
             throw new ServiceException(messageOf(state));
         }
-        if (StrUtil.isNotBlank(link.getPasswordHash()) && !ticketService.hasPwd(code, request)) {
+        if (StrUtil.isNotBlank(link.getPasswordHash()) && !ticketService.hasPwd(link, request)) {
             throw new ServiceException("需要先校验密码");
         }
         // 原子计数：受影响行数为 1 才算一次有效访问
-        int rows = shareLinkMapper.incrementViewCount(link.getLinkId());
+        int rows = shareLinkMapper.incrementViewCount(link.getLinkId(), link.getAccessVersion());
         if (rows == 0) {
             logAccess(link, ShareConstants.ACTION_OPEN, ShareConstants.RESULT_FAIL, "次数用尽", request);
             throw new ServiceException("查看次数已用尽");
         }
-        ticketService.issueView(code, request, response);
+        ticketService.issueView(link, request, response);
         ShareLink latest = shareLinkMapper.selectShareLinkById(link.getLinkId());
         if (latest == null) {
             // 并发删除等极端情况：本次计数已生效但记录已不在，按已用尽处理
@@ -178,8 +178,15 @@ public class SharePublicService {
      * @return 读取结果
      */
     public StoredObject openFile(String code, String action, HttpServletRequest request) {
-        if (!ticketService.hasView(code, request)) {
-            throw new ServiceException("请先进入分享页面再读取文件");
+        ShareLink current = shareLinkMapper.selectShareLinkByCode(code);
+        if (current == null || (!ShareConstants.STATUS_NORMAL.equals(current.getStatus())
+                && !ShareConstants.STATUS_BURNED.equals(current.getStatus()))
+                || current.getExpireAt() != null && !current.getExpireAt().after(new Date())) {
+            throw new ServiceException("分享已失效或已过期");
+        }
+        // 逻辑焚毁保留最后一个合法会话，手动失效与改密通过策略版本立即撤销。
+        if (!ticketService.hasView(current, request)) {
+            throw new ServiceException("访问票据已失效，请重新进入分享页面");
         }
         ShareRoute route = routeCache.get(code);
         if (route == null) {

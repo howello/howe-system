@@ -197,6 +197,7 @@
 </template>
 
 <script setup lang="ts" name="AiPlayground">
+import { useAppProxy } from '@/utils/appProxy'
 import { chat, chatStream, embed, image, vision } from "@/api/ai/playground"
 import { listChannel } from "@/api/ai/channel"
 import { listModel } from "@/api/ai/model"
@@ -235,7 +236,7 @@ interface MessageMeta {
   firstDeltaMs?: number
 }
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 
 const capabilityOptions = [
   { label: "文本对话", value: "CHAT" },

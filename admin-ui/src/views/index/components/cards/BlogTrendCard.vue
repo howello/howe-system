@@ -99,7 +99,7 @@ const tableColumns: ChartTableColumn[] = [
   { key: 'total', label: '合计', num: true }
 ]
 
-interface TrendRow {
+type TrendRow = {
   date: string
   articles: number
   talks: number

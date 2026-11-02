@@ -12,7 +12,6 @@ import com.howe.common.constant.ConfigConstants;
 import com.howe.common.exception.ServiceException;
 import com.howe.common.utils.ConfigUtils;
 import com.howe.common.utils.SecurityUtils;
-import com.howe.common.utils.spring.SpringUtils;
 import com.howe.meal.constant.MealCategoryTaxonomy;
 import com.howe.meal.domain.MealCategory;
 import com.howe.meal.domain.MealCategoryRef;
@@ -40,7 +39,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Executor;
 
 /**
  * 菜品一键 AI 补齐服务
@@ -77,9 +75,6 @@ public class MealDishAiService {
 
     /** 菜品 AI 更新场景（路由 key）：从完整做法提取字段并覆盖入库 */
     private static final String SCENE_UPDATE = "meal.dish.update";
-
-    /** 业务线程池的 bean 名，由 module-framework 提供 */
-    private static final String EXECUTOR_BEAN = "threadPoolTaskExecutor";
 
     /** AI 更新写入的操作人标识 */
     private static final String AI_UPDATER = "AI 自动更新";
@@ -179,9 +174,8 @@ public class MealDishAiService {
     private final MealDishMapper mealDishMapper;
 
     private final IMealWeComNotifyService mealWeComNotifyService;
-
-    /** 线程池，延迟解析：容器未就绪或模块单独使用时退化为同步执行 */
-    private volatile Executor executor;
+    /** 独立任务受理和结果查询。 */
+    private final MealDishAiTaskService aiTaskService;
 
     /**
      * 按菜名补齐当前为空的文本字段（不含封面）
@@ -197,12 +191,13 @@ public class MealDishAiService {
      * 提交一次异步 AI 更新：校验在请求线程完成，提取与落库在线程池执行
      *
      * <p>请求线程只做参数校验、菜品可见性与写权限校验，随后立即返回；AI 调用与数据库更新
-     * 在业务线程池中进行。异步线程没有登录态，因此落库使用 {@link MealDishMapper} 直接更新，
-     * 操作人记为 {@link #AI_UPDATER}，不再读取 {@code SecurityUtils}。线程池不可用时退化为同步执行。</p>
+     * 在独立线程池中进行。调用者身份传播到任务线程供统一 AI 配额归属使用；
+     * 落库仍使用 {@link MealDishMapper}，操作人记为 {@link #AI_UPDATER}。
+     * 任务池不可用或已满时明确拒绝，不退化为同步调用。</p>
      *
      * @param request AI 更新请求（菜品 ID + 完整做法文本）
      */
-    public void submitUpdateFromText(DishAiUpdateRequest request) {
+    public String submitUpdateFromText(DishAiUpdateRequest request) {
         if (request == null || request.getDishId() == null) {
             throw new ServiceException("请选择要更新的菜品");
         }
@@ -222,17 +217,9 @@ public class MealDishAiService {
         Long operatorId = SecurityUtils.getUserId();
         Long operatorDeptId = SecurityUtils.getDeptId();
         Long deptId = operatorDeptId != null ? operatorDeptId : exist.getDeptId();
-        Executor target = resolveExecutor();
-        if (target == null) {
-            // 线程池不可用时同步执行，保证功能可用
-            applyUpdateFromText(dishId, name, text, deptId, operatorId);
-            return;
-        }
-        try {
-            target.execute(() -> applyUpdateFromText(dishId, name, text, deptId, operatorId));
-        } catch (Exception e) {
-            log.warn("提交菜品 AI 更新任务失败，dishId={}", dishId, e);
-        }
+        if (text.length() > 30000) throw new ServiceException("做法文本不能超过30000个字符");
+        return aiTaskService.submit(dishId,
+                () -> applyUpdateFromText(dishId, name, text, deptId, operatorId, exist.getDataVersion()));
     }
 
     /**
@@ -247,8 +234,9 @@ public class MealDishAiService {
      * @param text       用户输入的完整做法
      * @param deptId     菜品归属家庭 ID
      * @param operatorId 发起更新的用户 ID
+     * @param expectedVersion 受理时的菜品版本，防止覆盖后续人工修改
      */
-    private void applyUpdateFromText(Long dishId, String name, String text, Long deptId, Long operatorId) {
+    private boolean applyUpdateFromText(Long dishId, String name, String text, Long deptId, Long operatorId, Long expectedVersion) {
         String model = null;
         try {
             // 分类只在当前为空时补齐，已有主类不请求、不覆盖
@@ -272,7 +260,7 @@ public class MealDishAiService {
                 log.warn("菜品 AI 更新未返回可解析的结构化结果，dishId={}，raw={}", dishId,
                         abbreviate(chatResult.getText()));
                 notifyUpdateResult(deptId, dishId, name, operatorId, false, "AI 没有看懂这段做法，这次先不改了", model);
-                return;
+                return false;
             }
             Map<String, Object> data = toMap(structured);
 
@@ -297,13 +285,16 @@ public class MealDishAiService {
             if (fields.isEmpty() && categoryId == null) {
                 log.info("菜品 AI 更新未提取到可用字段，dishId={}", dishId);
                 notifyUpdateResult(deptId, dishId, name, operatorId, false, "这段做法里没有找到能补充的菜品信息", model);
-                return;
+                return false;
             }
             update.setUpdateBy(AI_UPDATER);
+            update.getParams().put("expectedVersion", expectedVersion);
             Long finalCategoryId = categoryId;
             // 文本字段与主类写入放在同一事务：任一步失败整体回滚，不出现「文本已改、主类没写」的中间态
             transactionTemplate.executeWithoutResult(status -> {
-                mealDishMapper.updateMealDish(update);
+                if (mealDishMapper.updateMealDish(update) != 1) {
+                    throw new ServiceException("菜品已被修改，请刷新后重新提交 AI 更新");
+                }
                 if (finalCategoryId != null) {
                     saveDishCategory(dishId, finalCategoryId);
                 }
@@ -314,10 +305,12 @@ public class MealDishAiService {
             log.info("菜品 AI 更新完成，dishId={}，写入字段={}", dishId, fields.keySet());
             notifyUpdateResult(deptId, dishId, name, operatorId, true,
                     humanFieldNames(fields.keySet()), model);
+            return true;
         } catch (Exception e) {
             // 异步失败只记录日志：数据库保持原值，用户可稍后重试
             log.warn("菜品 AI 更新失败，dishId={}", dishId, e);
             notifyUpdateResult(deptId, dishId, name, operatorId, false, readableMessage(e), model);
+            return false;
         }
     }
 
@@ -385,23 +378,6 @@ public class MealDishAiService {
         return String.join("、", result);
     }
 
-    /** 解析业务线程池；容器未就绪或没有该 bean 时返回 null */
-    private Executor resolveExecutor() {
-        Executor current = this.executor;
-        if (current != null) {
-            return current;
-        }
-        try {
-            Object bean = SpringUtils.getBean(EXECUTOR_BEAN);
-            if (bean instanceof Executor target) {
-                this.executor = target;
-                return target;
-            }
-        } catch (Exception e) {
-            log.debug("未找到 {} 线程池，菜品 AI 更新改为同步执行", EXECUTOR_BEAN);
-        }
-        return null;
-    }
 
     /**
      * 按菜名与家庭 ID 补齐当前为空的文本字段（不依赖登录态，供异步线程复用）
@@ -786,11 +762,13 @@ public class MealDishAiService {
                     .prompt(buildCoverPrompt(name, description))
                     .style(STYLE_KEY)
                     .build());
-            String url = firstImageUrl(imageResult);
-            if (url == null) {
+            AiImage image = firstImage(imageResult);
+            if (image == null) {
                 result.setImageError("图片生成未返回结果");
             } else {
-                result.setCover(url);
+                result.setCover(image.getUrl());
+                result.setTransferStatus(image.getTransferStatus());
+                result.setTransferTaskId(image.getTransferTaskId());
             }
         } catch (AiException e) {
             result.setImageError(e.getMessage());
@@ -1187,13 +1165,14 @@ public class MealDishAiService {
         }
     }
 
-    private String firstImageUrl(AiImageResult result) {
+    /** 提取首张可用图片，并保留转存状态供调用端提示。 */
+    private AiImage firstImage(AiImageResult result) {
         if (result == null || result.getImages() == null) {
             return null;
         }
         for (AiImage image : result.getImages()) {
             if (image != null && image.getUrl() != null && !image.getUrl().isEmpty()) {
-                return image.getUrl();
+                return image;
             }
         }
         return null;

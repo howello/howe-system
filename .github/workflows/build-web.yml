@@ -32,6 +32,17 @@ jobs:
       - name: 检出源码
         uses: actions/checkout@v4
 
+      - name: 配置 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: admin-ui/package-lock.json
+
+      - name: 安装依赖并检查类型
+        run: npm ci && npm run type-check
+        working-directory: admin-ui
+
       - name: 计算短 SHA
         id: vars
         # 供回滚使用的版本标签，取 commit sha 前 7 位

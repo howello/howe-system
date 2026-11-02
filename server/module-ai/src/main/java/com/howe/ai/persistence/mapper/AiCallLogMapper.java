@@ -12,8 +12,7 @@ import java.util.List;
  *
  * @author howe
  */
-public interface AiCallLogMapper
-{
+public interface AiCallLogMapper {
     /**
      * 查询调用记录列表
      *
@@ -44,7 +43,10 @@ public interface AiCallLogMapper
      * @param before 时间点
      * @return 删除行数
      */
-    int deleteBefore(@Param("before") Date before);
+    List<Long> selectExpiredIds(@Param("before") Date before, @Param("limit") int limit);
+
+    /** 按已选择的过期主键清理日志，不删除生成图资产。 */
+    int deleteByIds(@Param("ids") List<Long> ids);
 
     /**
      * 按维度聚合用量统计

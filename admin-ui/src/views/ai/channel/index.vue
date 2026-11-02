@@ -151,10 +151,11 @@
 </template>
 
 <script setup lang="ts" name="AiChannel">
+import { useAppProxy, formRef } from '@/utils/appProxy'
 import { listChannel, getChannel, addChannel, updateChannel, delChannel, changeChannelStatus, testChannel, listProviderOptions } from "@/api/ai/channel"
 import type { AiChannel, AiChannelQueryParams, AiProvider } from "@/types/api/ai/channel"
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 
 const channelList = ref<AiChannel[]>([])
 const providerOptions = ref<AiProvider[]>([])
@@ -273,7 +274,7 @@ function handleUpdate(row?: AiChannel) {
 
 /** 提交按钮 */
 function submitForm() {
-  proxy.$refs["channelRef"].validate((valid: boolean) => {
+  formRef(proxy.$refs["channelRef"]).validate((valid: boolean) => {
     if (!valid) {
       return
     }

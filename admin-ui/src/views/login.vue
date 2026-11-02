@@ -73,6 +73,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAppProxy, formRef } from '@/utils/appProxy'
 import { getCodeImg } from "@/api/login"
 import Cookies from "js-cookie"
 import { encrypt, decrypt } from "@/utils/jsencrypt"
@@ -86,7 +87,7 @@ const footerContent = defaultSettings.footerContent
 const userStore = useUserStore()
 const route = useRoute()
 const router = useRouter()
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 
 const loginForm = ref<LoginForm>({
   username: "",
@@ -124,7 +125,7 @@ function handleTurnstileError(message: string): void {
 }
 
 function handleLogin(): void {
-  proxy.$refs.loginRef.validate((valid: boolean) => {
+  formRef(proxy.$refs.loginRef).validate((valid: boolean) => {
     if (valid) {
       if (turnstileEnabled.value && !loginForm.value.turnstileToken) {
         proxy.$modal.msgWarning("请先完成人机校验")
@@ -187,7 +188,7 @@ function getCookie(): void {
   loginForm.value = {
     ...loginForm.value,
     username: username === undefined ? loginForm.value.username : username,
-    password: password === undefined ? loginForm.value.password : decrypt(password),
+    password: password === undefined ? loginForm.value.password : decrypt(password) || '',
     rememberMe: rememberMe === undefined ? false : Boolean(rememberMe)
   }
 }

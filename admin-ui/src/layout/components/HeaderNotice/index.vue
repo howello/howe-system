@@ -38,6 +38,7 @@
 </template>
 
 <script setup lang="ts">
+import { templateRef, useAppProxy } from '@/utils/appProxy'
 import NoticeDetailView from './DetailView.vue'
 import { listNoticeTop, markNoticeRead, markNoticeReadAll } from '@/api/system/notice'
 import type { SysNotice } from '@/types/api/system/notice'
@@ -52,7 +53,7 @@ const unreadCount = ref<number>(0)
 const noticeLoading = ref<boolean>(false)
 const noticeVisible = ref<boolean>(false)
 const noticeLeaveTimer = ref<ReturnType<typeof setTimeout> | null>(null)
-  const { proxy } = getCurrentInstance()
+  const proxy = useAppProxy()
 
 // 加载顶部公告列表
 function loadNoticeTop(): void {
@@ -96,7 +97,7 @@ function previewNotice(item: SysNotice): void {
     if (idx !== -1) noticeList.value[idx] = { ...item, isRead: true }
     unreadCount.value = Math.max(0, unreadCount.value - 1)
   }
-  proxy.$refs["noticeViewRef"].open(item.noticeId)
+  if (item.noticeId != null) templateRef<InstanceType<typeof NoticeDetailView>>(proxy.$refs["noticeViewRef"]).open(item.noticeId)
 }
 
 // 全部已读

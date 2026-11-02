@@ -18,8 +18,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Schema(description = "生成图")
-public class AiImage
-{
+public class AiImage {
     @Schema(description = "永久访问地址")
     private String url;
 
@@ -31,4 +30,11 @@ public class AiImage
 
     @Schema(description = "高度（像素）")
     private Integer height;
+
+    @Builder.Default
+    @Schema(description = "转存状态：READY 已就绪，PENDING_TRANSFER 正在补偿转存")
+    private String transferStatus = "READY";
+
+    @Schema(description = "待补偿转存任务 ID，仅待转存时返回")
+    private String transferTaskId;
 }

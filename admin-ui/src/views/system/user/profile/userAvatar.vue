@@ -59,6 +59,14 @@
 </template>
 
 <script setup lang="ts">
+/** 图片裁剪器在页面实际使用的公开能力。 */
+interface CropperRef {
+  rotateLeft(): void
+  rotateRight(): void
+  changeScale(scale: number): void
+  getCropBlob(callback: (data: Blob) => void): void
+}
+import { templateRef, useAppProxy } from '@/utils/appProxy'
 import "vue-cropper/dist/index.css"
 import { VueCropper } from "vue-cropper"
 import { uploadAvatar } from "@/api/system/user"
@@ -66,7 +74,7 @@ import { resolveFileUrl } from "@/utils/commonUtils"
 import useUserStore from "@/store/modules/user"
 
 const userStore = useUserStore()
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 
 const open = ref<boolean>(false)
 const visible = ref<boolean>(false)
@@ -99,18 +107,18 @@ function requestUpload() {}
 
 /** 向左旋转 */
 function rotateLeft() {
-  proxy.$refs.cropper.rotateLeft()
+  templateRef<CropperRef>(proxy.$refs.cropper).rotateLeft()
 }
 
 /** 向右旋转 */
 function rotateRight() {
-  proxy.$refs.cropper.rotateRight()
+  templateRef<CropperRef>(proxy.$refs.cropper).rotateRight()
 }
 
 /** 图片缩放 */
 function changeScale(num: number) {
   num = num || 1
-  proxy.$refs.cropper.changeScale(num)
+  templateRef<CropperRef>(proxy.$refs.cropper).changeScale(num)
 }
 
 /** 上传预处理 */
@@ -129,7 +137,7 @@ function beforeUpload(file: File) {
 
 /** 上传图片 */
 function uploadImg() {
-  proxy.$refs.cropper.getCropBlob((data: Blob) => {
+  templateRef<CropperRef>(proxy.$refs.cropper).getCropBlob((data: Blob) => {
     const formData = new FormData()
     formData.append("avatarfile", data, options.filename)
     uploadAvatar(formData).then(response => {

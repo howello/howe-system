@@ -306,12 +306,13 @@
 </template>
 
 <script setup lang="ts" name="Menu">
+import { useAppProxy, formRef } from '@/utils/appProxy'
 import { addMenu, delMenu, getMenu, listMenu, updateMenu, updateMenuSort, } from "@/api/system/menu"
 import SvgIcon from "@/components/SvgIcon/index.vue"
 import IconSelect from "@/components/IconSelect/index.vue"
 import type { SysMenu, MenuQueryParams } from '@/types/api/system/menu'
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 const { sys_show_hide, sys_normal_disable } = useDict("sys_show_hide", "sys_normal_disable")
 
 const menuList = ref<any[]>([])
@@ -344,7 +345,7 @@ const { queryParams, form, rules } = toRefs(data)
 function getList() {
   loading.value = true
   listMenu(queryParams.value).then(response => {
-    menuList.value = proxy.handleTree(response.data, "menuId")
+    menuList.value = proxy.handleTree(response.data ?? [], "menuId")
     recordOriginalOrders(menuList.value)
     loading.value = false
   })
@@ -354,8 +355,8 @@ function getList() {
 function getTreeselect() {
   menuOptions.value = []
   listMenu().then(response => {
-    const menu = { menuId: 0, menuName: "主类目", children: [] }
-    menu.children = proxy.handleTree(response.data, "menuId")
+    const menu: SysMenu = { menuId: 0, menuName: "主类目", children: [] }
+    menu.children = proxy.handleTree(response.data ?? [], "menuId")
     menuOptions.value.push(menu)
   })
 }
@@ -439,7 +440,7 @@ async function handleUpdate(row: SysMenu) {
 
 /** 提交按钮 */
 function submitForm() {
-  proxy.$refs["menuRef"].validate((valid: boolean) => {
+  formRef(proxy.$refs["menuRef"]).validate((valid: boolean) => {
     if (valid) {
       if (form.value.menuId != undefined) {
         updateMenu(form.value).then(() => {
@@ -461,7 +462,7 @@ function submitForm() {
 /** 递归记录原始排序 */
 function recordOriginalOrders(list: SysMenu[]) {
   list.forEach(item => {
-    originalOrders.value[item.menuId] = item.orderNum
+    if (item.menuId != null) originalOrders.value[item.menuId] = item.orderNum ?? 0
     if (item.children && item.children.length) {
       recordOriginalOrders(item.children)
     }

@@ -6,6 +6,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
+    "type-check": "vue-tsc --noEmit",
     "admin - dev": "vite",
     "build:prod": "vite build",
     "build:stage": "vite build --mode staging",

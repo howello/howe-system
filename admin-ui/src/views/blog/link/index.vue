@@ -169,12 +169,13 @@
 </template>
 
 <script setup lang="ts" name="BlogLink">
+import { useAppProxy, formRef } from '@/utils/appProxy'
 import { Upload } from "@element-plus/icons-vue"
 import { getToken } from "@/utils/auth"
 import { listLink, getLink, delLink, addLink, updateLink } from "@/api/blog/link"
 import type { BlogLink, BlogLinkQueryParams } from "@/types/api/blog/link"
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 
 // 分组用字典而非自由文本，避免「技术」「技术 」变成两个组
 const { blog_link_group } = useDict("blog_link_group")
@@ -417,7 +418,7 @@ function handleUpdate(row?: BlogLink) {
 
 /** 提交按钮 */
 function submitForm() {
-  proxy.$refs["linkRef"].validate((valid: boolean) => {
+  formRef(proxy.$refs["linkRef"]).validate((valid: boolean) => {
     if (!valid) {
       return
     }

@@ -14,6 +14,7 @@
 </template>
 
 <script setup lang="ts" name="MarkdownEditor">
+import { useAppProxy } from '@/utils/appProxy'
 import axios from "axios"
 import { MdEditor } from "md-editor-v3"
 import "md-editor-v3/lib/style.css"
@@ -49,7 +50,7 @@ const props = defineProps({
 
 const emit = defineEmits(["update:modelValue"])
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 
 // 固定浅色：与 blog-ui 的 shiki github-light 代码高亮主题保持一致，预览效果贴近线上
 const theme = "light"

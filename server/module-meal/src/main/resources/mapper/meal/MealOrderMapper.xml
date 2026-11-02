@@ -306,10 +306,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </update>
 
-    <!-- 订单号流水：逻辑删除的订单仍占用订单号，所以这里不加 del_flag 条件 -->
-    <select id="selectMaxOrderNo" resultType="String">
-        select max(order_no) from meal_order where order_no like concat(#{prefix}, '%')
-    </select>
+    <!-- 主键唯一，业务号与历史三位流水使用不同格式，避免并发及历史号碰撞。 -->
+    <update id="updateOrderNo">
+        update meal_order set order_no = #{orderNo} where order_id = #{orderId}
+    </update>
 
     <!--
       拒绝流程的行锁：同一订单的并发拒绝在这行上串行化。

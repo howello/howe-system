@@ -62,6 +62,7 @@ create table meal_category (
 drop table if exists meal_dish;
 create table meal_dish (
   dish_id      bigint(20)   not null auto_increment    comment '菜品ID',
+  data_version bigint not null default 0 comment '菜品数据版本',
   dept_id      bigint(20)   default 0                  comment '所属家庭ID（0=公共菜谱）',
   name         varchar(128) not null                   comment '菜名',
   cover        varchar(500) default ''                 comment '封面图地址',
@@ -93,7 +94,7 @@ create table meal_dish (
 drop table if exists meal_order;
 create table meal_order (
   order_id     bigint(20)   not null auto_increment    comment '订单ID',
-  order_no     varchar(32)  not null                   comment '订单号（如 M20260922001）',
+  order_no     varchar(32)  not null                   comment '订单号（M+日期-全局订单主键，如 M20261102-1001）',
   dept_id      bigint(20)                              comment '所属家庭ID',
   user_id      bigint(20)                              comment '点餐人ID',
   user_name    varchar(64)  default ''                 comment '点餐人昵称（冗余，列表直接展示）',
