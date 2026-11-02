@@ -132,12 +132,13 @@
 </template>
 
 <script setup lang="ts" name="AiSceneRoute">
+import { useAppProxy, formRef } from '@/utils/appProxy'
 import { listRoute, saveRoute, delRoute } from "@/api/ai/route"
 import { listModel } from "@/api/ai/model"
 import type { AiSceneRoute, AiSceneRouteQueryParams } from "@/types/api/ai/route"
 import type { AiModel } from "@/types/api/ai/model"
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 
 const routeList = ref<AiSceneRoute[]>([])
 const modelOptions = ref<AiModel[]>([])
@@ -309,7 +310,7 @@ function isValidJsonObject(text?: string): boolean {
 
 /** 提交按钮 */
 function submitForm() {
-  proxy.$refs["routeRef"].validate((valid: boolean) => {
+  formRef(proxy.$refs["routeRef"]).validate((valid: boolean) => {
     if (!valid) {
       return
     }

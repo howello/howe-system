@@ -1,6 +1,7 @@
 package com.howe.share.service;
 
 import cn.hutool.core.util.IdUtil;
+import com.howe.share.domain.ShareLink;
 import cn.hutool.core.util.StrUtil;
 import com.howe.common.constant.ConfigConstants;
 import com.howe.common.core.redis.RedisCache;
@@ -41,55 +42,55 @@ public class ShareTicketService {
     /**
      * 下发密码票据
      *
-     * @param code     短码
+     * @param link     分享策略快照
      * @param request  请求（判断是否 https，决定 cookie 的 Secure）
      * @param response 响应
      */
-    public void issuePwd(String code, HttpServletRequest request, HttpServletResponse response) {
-        issue(ShareConstants.TICKET_KEY_PWD, ShareConstants.TICKET_COOKIE_PWD, code, request, response);
+    public void issuePwd(ShareLink link, HttpServletRequest request, HttpServletResponse response) {
+        issue(ShareConstants.TICKET_KEY_PWD, ShareConstants.TICKET_COOKIE_PWD, link, request, response);
     }
 
     /**
      * 下发就绪票据
      *
-     * @param code     短码
+     * @param link     分享策略快照
      * @param request  请求
      * @param response 响应
      */
-    public void issueView(String code, HttpServletRequest request, HttpServletResponse response) {
-        issue(ShareConstants.TICKET_KEY_VIEW, ShareConstants.TICKET_COOKIE_VIEW, code, request, response);
+    public void issueView(ShareLink link, HttpServletRequest request, HttpServletResponse response) {
+        issue(ShareConstants.TICKET_KEY_VIEW, ShareConstants.TICKET_COOKIE_VIEW, link, request, response);
     }
 
     /**
      * 是否持有该短码的密码票据
      *
-     * @param code    短码
+     * @param link    分享策略快照
      * @param request 请求
      * @return 有效返回 true
      */
-    public boolean hasPwd(String code, HttpServletRequest request) {
-        return validate(ShareConstants.TICKET_KEY_PWD, ShareConstants.TICKET_COOKIE_PWD, code, request);
+    public boolean hasPwd(ShareLink link, HttpServletRequest request) {
+        return validate(ShareConstants.TICKET_KEY_PWD, ShareConstants.TICKET_COOKIE_PWD, link, request);
     }
 
     /**
      * 是否持有该短码的就绪票据
      *
-     * @param code    短码
+     * @param link    分享策略快照
      * @param request 请求
      * @return 有效返回 true
      */
-    public boolean hasView(String code, HttpServletRequest request) {
-        return validate(ShareConstants.TICKET_KEY_VIEW, ShareConstants.TICKET_COOKIE_VIEW, code, request);
+    public boolean hasView(ShareLink link, HttpServletRequest request) {
+        return validate(ShareConstants.TICKET_KEY_VIEW, ShareConstants.TICKET_COOKIE_VIEW, link, request);
     }
 
     /**
-     * 签发票据：随机 token 存 Redis（值为短码），并写 HttpOnly Cookie
+     * 签发票据：随机 token 存 Redis（值为短码与访问策略版本），并写 HttpOnly Cookie
      */
-    private void issue(String keyPrefix, String cookieName, String code,
+    private void issue(String keyPrefix, String cookieName, ShareLink link,
                        HttpServletRequest request, HttpServletResponse response) {
         int ttl = ttl();
         String token = IdUtil.fastSimpleUUID();
-        redisCache.setCacheObject(keyPrefix + token, code, ttl, TimeUnit.SECONDS);
+        redisCache.setCacheObject(keyPrefix + token, link.getCode() + ":" + link.getAccessVersion(), ttl, TimeUnit.SECONDS);
         ResponseCookie cookie = ResponseCookie.from(cookieName, token)
                 .httpOnly(true)
                 .secure(request != null && request.isSecure())
@@ -101,15 +102,15 @@ public class ShareTicketService {
     }
 
     /**
-     * 校验票据：存在且值等于短码
+     * 校验票据：存在且值等于分享策略快照
      */
-    private boolean validate(String keyPrefix, String cookieName, String code, HttpServletRequest request) {
+    private boolean validate(String keyPrefix, String cookieName, ShareLink link, HttpServletRequest request) {
         String token = readCookie(request, cookieName);
         if (StrUtil.isBlank(token)) {
             return false;
         }
         Object stored = redisCache.getCacheObject(keyPrefix + token);
-        return stored != null && code.equals(String.valueOf(stored));
+        return stored != null && (link.getCode() + ":" + link.getAccessVersion()).equals(String.valueOf(stored));
     }
 
     /**

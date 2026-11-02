@@ -112,10 +112,11 @@
 </template>
 
 <script setup lang="ts" name="MealCategory">
+import { useAppProxy, formRef } from '@/utils/appProxy'
 import { getCategory, listCategory, updateCategory } from "@/api/meal/category"
 import type { MealCategory, MealCategoryQueryParams } from "@/types/api/meal/category"
 
-const { proxy } = getCurrentInstance() as any
+const proxy = useAppProxy()
 
 const categoryList = ref<MealCategory[]>([])
 const open = ref<boolean>(false)
@@ -200,7 +201,7 @@ function handleUpdate(row?: MealCategory) {
 }
 
 function submitForm() {
-  proxy.$refs["formRef"].validate((valid: boolean) => {
+  formRef(proxy.$refs["formRef"]).validate((valid: boolean) => {
     if (!valid) {
       return
     }

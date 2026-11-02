@@ -2,6 +2,9 @@ package com.howe.meal.domain.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -32,8 +35,9 @@ public class MealOrderSubmitBody implements Serializable {
 
     @Schema(description = "点餐明细", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotEmpty(message = "请至少点一道菜")
+    @Size(max = 100, message = "每单最多100道菜")
     @Valid
-    private List<Item> items;
+    private List<@NotNull(message = "点餐明细不能为空") Item> items;
 
     /**
      * 单条点餐明细
@@ -44,9 +48,12 @@ public class MealOrderSubmitBody implements Serializable {
         private static final long serialVersionUID = 1L;
 
         @Schema(description = "菜品ID", example = "1")
+        @NotNull(message = "菜品ID不能为空")
         private Long dishId;
 
         @Schema(description = "份数", example = "1")
+        @Min(value = 1, message = "份数至少为1")
+        @Max(value = 99, message = "单道菜最多99份")
         private Integer count;
 
         @Schema(description = "单项备注（如不要辣）", example = "不要放太辣")

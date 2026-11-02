@@ -173,6 +173,7 @@
 </template>
 
 <script setup lang="ts" name="ShareLink">
+import { useAppProxy, formRef } from '@/utils/appProxy'
 import {
   listLink,
   getLink,
@@ -188,7 +189,7 @@ import type { ShareLink, ShareLinkQueryParams, ShareSource, WebDavEntry, ShareAc
 import FileBrowserDialog from '@/views/share/components/FileBrowserDialog.vue'
 import { Search, Refresh, Plus, Delete, Edit, CopyDocument, FolderOpened } from '@element-plus/icons-vue'
 
-const { proxy } = getCurrentInstance() as any
+const proxy = useAppProxy()
 
 const linkList = ref<ShareLink[]>([])
 const sourceOptions = ref<ShareSource[]>([])
@@ -346,7 +347,7 @@ function handleUpdate(row: ShareLink) {
 }
 
 function submitForm() {
-  proxy.$refs['formRef'].validate((valid: boolean) => {
+  formRef(proxy.$refs['formRef']).validate((valid: boolean) => {
     if (!valid) return
     if (form.value.linkId) {
       submitUpdate()

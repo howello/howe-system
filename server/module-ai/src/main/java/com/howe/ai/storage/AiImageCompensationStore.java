@@ -5,6 +5,9 @@ import cn.hutool.core.util.IdUtil;
 import com.howe.common.config.YmlConfig;
 import com.howe.common.core.redis.RedisCache;
 import com.howe.common.utils.StringUtils;
+import com.howe.common.exception.ServiceException;
+import com.howe.common.core.domain.model.LoginUser;
+import com.howe.common.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -27,13 +30,18 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class AiImageCompensationStore
-{
+public class AiImageCompensationStore {
     /** 待重传任务索引：ZSet，member=taskId，score=下次重试时间戳 */
     private static final String PENDING_KEY = "ai:transfer:pending";
 
     /** 单个任务详情键前缀 */
     private static final String TASK_KEY_PREFIX = "ai:transfer:task:";
+
+    private static final String STATUS_KEY_PREFIX = "ai:transfer:status:";
+
+    /** 补偿的可查询结果，失败原因使用固定提示，不暴露存储凭据。 */
+    public record TransferStatus(String taskId, Long userId, Long deptId, String state, String message, long expireTime) {
+    }
 
     /** 字节暂存子目录 */
     private static final String DIR_NAME = "ai-transfer";
@@ -52,8 +60,7 @@ public class AiImageCompensationStore
      * @param expireMinutes 任务保留时长（分钟）
      * @param error         本次失败原因
      */
-    public void enqueue(String objectKey, byte[] data, String contentType, int expireMinutes, String error)
-    {
+    public String enqueue(String objectKey, byte[] data, String contentType, int expireMinutes, String error) {
         String taskId = IdUtil.fastSimpleUUID();
         long now = System.currentTimeMillis();
         AiTransferTask task = new AiTransferTask();
@@ -65,18 +72,57 @@ public class AiImageCompensationStore
         task.setCreateTime(now);
         task.setExpireTime(now + TimeUnit.MINUTES.toMillis(expireMinutes));
         task.setLastError(error);
-        try
-        {
+        try {
             FileUtil.writeBytes(data, fileOf(task).getAbsolutePath());
-        }
-        catch (Exception e)
-        {
+        } catch (Exception e) {
             log.error("暂存待补偿图片失败，放弃补偿：objectKey={}", objectKey, e);
-            return;
+            throw new ServiceException("无法持久化图片补偿文件");
         }
-        save(task);
-        redisCache.zAdd(PENDING_KEY, taskId, now);
+        try {
+            save(task);
+            var authentication = SecurityUtils.getAuthentication();
+            LoginUser user = authentication != null && authentication.getPrincipal() instanceof LoginUser login ? login : null;
+            saveStatus(new TransferStatus(taskId, user == null ? 0L : user.getUserId(),
+                    user == null ? 0L : user.getDeptId(), "PENDING_TRANSFER", "图片正在转存", task.getExpireTime()));
+            if (!redisCache.zAdd(PENDING_KEY, taskId, now)) {
+                throw new ServiceException("图片补偿任务未写入索引");
+            }
+        } catch (Exception e) {
+            try {
+                discard(task);
+            } catch (Exception cleanupError) {
+                log.warn("清理未完整入队的图片补偿任务失败，taskId={}", taskId, cleanupError);
+            }
+            throw new ServiceException("无法持久化图片补偿任务");
+        }
         log.warn("图片转存失败已入补偿队列：objectKey={}, taskId={}, error={}", objectKey, taskId, error);
+        return taskId;
+    }
+
+    /** 仅仍属于原家庭的任务本人或管理员可查询；超过补偿窗口立即展示失败。 */
+    public TransferStatus status(String taskId) {
+        if (taskId == null || !taskId.matches("[a-f0-9]{32}")) throw new ServiceException("转存任务不存在");
+        TransferStatus status = redisCache.getCacheObject(STATUS_KEY_PREFIX + taskId);
+        if (status == null) throw new ServiceException("转存结果已过期，请检查图片后重试");
+        if (!SecurityUtils.isAdmin() && (!status.userId().equals(SecurityUtils.getUserId())
+                || !status.deptId().equals(SecurityUtils.getDeptId()))) throw new ServiceException("无权查看该转存任务");
+        if ("PENDING_TRANSFER".equals(status.state()) && status.expireTime() <= System.currentTimeMillis()) {
+            status = new TransferStatus(taskId, status.userId(), status.deptId(), "FAILED", "图片转存超时，请重新生成", status.expireTime());
+            saveStatus(status);
+        }
+        return status;
+    }
+
+    /** 终态保留一天；待处理状态覆盖完整补偿窗口，不能提前消失。 */
+    private void saveStatus(TransferStatus status) {
+        long seconds = Math.max(86400L, TimeUnit.MILLISECONDS.toSeconds(status.expireTime() - System.currentTimeMillis()) + 86400L);
+        redisCache.setCacheObject(STATUS_KEY_PREFIX + status.taskId(), status, (int) Math.min(Integer.MAX_VALUE, seconds), TimeUnit.SECONDS);
+    }
+
+    /** 更新已有结果，兼容升级前没有结果记录的旧补偿任务。 */
+    private void finishStatus(AiTransferTask task, String state, String message) {
+        TransferStatus current = redisCache.getCacheObject(STATUS_KEY_PREFIX + task.getTaskId());
+        if (current != null) saveStatus(new TransferStatus(current.taskId(), current.userId(), current.deptId(), state, message, current.expireTime()));
     }
 
     /**
@@ -85,15 +131,12 @@ public class AiImageCompensationStore
      * @param limit 最多取多少条
      * @return 待重传任务
      */
-    public List<AiTransferTask> dueTasks(int limit)
-    {
+    public List<AiTransferTask> dueTasks(int limit) {
         Set<String> ids = redisCache.zRangeByScore(PENDING_KEY, 0, System.currentTimeMillis(), limit);
         List<AiTransferTask> tasks = new ArrayList<>(ids.size());
-        for (String id : ids)
-        {
+        for (String id : ids) {
             AiTransferTask task = find(id);
-            if (task == null)
-            {
+            if (task == null) {
                 // 详情键已过期，顺手清掉索引
                 redisCache.zRemove(PENDING_KEY, id);
                 continue;
@@ -109,8 +152,7 @@ public class AiImageCompensationStore
      * @param taskId 任务 ID
      * @return 任务；不存在时返回 null
      */
-    public AiTransferTask find(String taskId)
-    {
+    public AiTransferTask find(String taskId) {
         return redisCache.getCacheObject(TASK_KEY_PREFIX + taskId);
     }
 
@@ -120,19 +162,14 @@ public class AiImageCompensationStore
      * @param task 任务
      * @return 图片字节；文件缺失时返回 null
      */
-    public byte[] readBytes(AiTransferTask task)
-    {
+    public byte[] readBytes(AiTransferTask task) {
         File file = fileOf(task);
-        if (!file.isFile())
-        {
+        if (!file.isFile()) {
             return null;
         }
-        try
-        {
+        try {
             return FileUtil.readBytes(file);
-        }
-        catch (Exception e)
-        {
+        } catch (Exception e) {
             log.warn("读取待补偿图片失败：{}", file.getAbsolutePath(), e);
             return null;
         }
@@ -143,9 +180,9 @@ public class AiImageCompensationStore
      *
      * @param task 任务
      */
-    public void markSuccess(AiTransferTask task)
-    {
-        discard(task);
+    public void markSuccess(AiTransferTask task) {
+        finishStatus(task, "READY", "图片已保存");
+        cleanup(task);
     }
 
     /**
@@ -154,8 +191,7 @@ public class AiImageCompensationStore
      * @param task  任务
      * @param error 失败原因
      */
-    public void markRetry(AiTransferTask task, String error)
-    {
+    public void markRetry(AiTransferTask task, String error) {
         task.setAttempt(task.getAttempt() + 1);
         task.setLastError(error);
         save(task);
@@ -169,16 +205,18 @@ public class AiImageCompensationStore
      *
      * @param task 任务
      */
-    public void discard(AiTransferTask task)
-    {
+    public void discard(AiTransferTask task) {
+        finishStatus(task, "FAILED", "图片转存失败或已过期，请重新生成");
+        cleanup(task);
+    }
+
+    /** 清理任务详情和本地字节，保留可查询的终态。 */
+    private void cleanup(AiTransferTask task) {
         redisCache.zRemove(PENDING_KEY, task.getTaskId());
         redisCache.deleteObject(TASK_KEY_PREFIX + task.getTaskId());
-        try
-        {
+        try {
             FileUtil.del(fileOf(task));
-        }
-        catch (Exception e)
-        {
+        } catch (Exception e) {
             log.warn("删除待补偿图片暂存文件失败：{}", task.getFile(), e);
         }
     }
@@ -186,11 +224,9 @@ public class AiImageCompensationStore
     /**
      * 写入任务详情，TTL 取剩余存活时间
      */
-    private void save(AiTransferTask task)
-    {
+    private void save(AiTransferTask task) {
         long remainMs = task.getExpireTime() - System.currentTimeMillis();
-        if (remainMs <= 0)
-        {
+        if (remainMs <= 0) {
             return;
         }
         redisCache.setCacheObject(TASK_KEY_PREFIX + task.getTaskId(), task,
@@ -200,23 +236,19 @@ public class AiImageCompensationStore
     /**
      * 暂存文件路径
      */
-    private File fileOf(AiTransferTask task)
-    {
+    private File fileOf(AiTransferTask task) {
         return FileUtil.file(cacheDir() + "/" + DIR_NAME + "/" + task.getFile());
     }
 
     /**
      * 缓存根目录：未配置时依次回退到上传目录、系统临时目录
      */
-    private String cacheDir()
-    {
+    private String cacheDir() {
         String dir = YmlConfig.getCacheDir();
-        if (StringUtils.isEmpty(dir))
-        {
+        if (StringUtils.isEmpty(dir)) {
             dir = YmlConfig.getProfile();
         }
-        if (StringUtils.isEmpty(dir))
-        {
+        if (StringUtils.isEmpty(dir)) {
             dir = System.getProperty("java.io.tmpdir");
         }
         return dir;

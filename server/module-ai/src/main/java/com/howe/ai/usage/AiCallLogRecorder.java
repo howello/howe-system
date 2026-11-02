@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * 调用记录落库
@@ -28,19 +29,18 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class AiCallLogRecorder
-{
+public class AiCallLogRecorder {
     /** 取回调用记录 ID 的等待上限（毫秒） */
     private static final long WAIT_MS = 500L;
 
     /** 业务线程池的 bean 名，由 module-framework 提供 */
-    private static final String EXECUTOR_BEAN = "threadPoolTaskExecutor";
+    private static final String EXECUTOR_BEAN = "aiLogExecutor";
 
     private final AiCallLogMapper aiCallLogMapper;
 
     private final AiImageAssetMapper aiImageAssetMapper;
 
-    /** 线程池，延迟解析：模块单独使用时可以退化为同步写入 */
+    /** 线程池，延迟解析：缺少日志池时跳过辅助记录 */
     private volatile Executor executor;
 
     /**
@@ -50,25 +50,22 @@ public class AiCallLogRecorder
      * @param assets  生成图资产，可为空
      * @return 调用记录 ID；写入超时或失败时返回 null
      */
-    public Long record(AiCallLog callLog, List<AiImageAsset> assets)
-    {
+    public Long record(AiCallLog callLog, List<AiImageAsset> assets) {
         Executor target = resolveExecutor();
-        if (target == null)
-        {
-            return write(callLog, assets);
-        }
-        CompletableFuture<Long> future = CompletableFuture.supplyAsync(() -> write(callLog, assets), target);
-        try
-        {
-            return future.get(WAIT_MS, TimeUnit.MILLISECONDS);
-        }
-        catch (InterruptedException e)
-        {
-            Thread.currentThread().interrupt();
+        if (target == null) {
+            log.warn("AI 日志池不可用，跳过本次记录");
             return null;
         }
-        catch (Exception e)
-        {
+        try {
+            CompletableFuture<Long> future = CompletableFuture.supplyAsync(() -> write(callLog, assets), target);
+            return future.get(WAIT_MS, TimeUnit.MILLISECONDS);
+        } catch (RejectedExecutionException e) {
+            log.warn("AI 日志池已满，本次辅助记录未写入");
+            return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        } catch (Exception e) {
             log.warn("等待调用记录落库超时，记录将在后台继续写入：{}", e.getMessage());
             return null;
         }
@@ -81,24 +78,18 @@ public class AiCallLogRecorder
      * @param assets  生成图资产
      * @return 调用记录 ID，失败时返回 null
      */
-    private Long write(AiCallLog callLog, List<AiImageAsset> assets)
-    {
-        try
-        {
+    private Long write(AiCallLog callLog, List<AiImageAsset> assets) {
+        try {
             aiCallLogMapper.insertAiCallLog(callLog);
             Long callLogId = callLog.getId();
-            if (assets != null && !assets.isEmpty() && callLogId != null)
-            {
-                for (AiImageAsset asset : assets)
-                {
+            if (assets != null && !assets.isEmpty() && callLogId != null) {
+                for (AiImageAsset asset : assets) {
                     asset.setCallLogId(callLogId);
                     aiImageAssetMapper.insertAiImageAsset(asset);
                 }
             }
             return callLogId;
-        }
-        catch (Exception e)
-        {
+        } catch (Exception e) {
             log.error("写入 AI 调用记录失败，不影响业务返回", e);
             return null;
         }
@@ -109,25 +100,19 @@ public class AiCallLogRecorder
      *
      * @return 线程池；容器未就绪或没有该 bean 时返回 null
      */
-    private Executor resolveExecutor()
-    {
+    private Executor resolveExecutor() {
         Executor current = this.executor;
-        if (current != null)
-        {
+        if (current != null) {
             return current;
         }
-        try
-        {
+        try {
             Object bean = SpringUtils.getBean(EXECUTOR_BEAN);
-            if (bean instanceof Executor target)
-            {
+            if (bean instanceof Executor target) {
                 this.executor = target;
                 return target;
             }
-        }
-        catch (Exception e)
-        {
-            log.debug("未找到 {} 线程池，调用记录改为同步写入", EXECUTOR_BEAN);
+        } catch (Exception e) {
+            log.debug("未找到 {} 线程池，跳过本次调用记录", EXECUTOR_BEAN);
         }
         return null;
     }

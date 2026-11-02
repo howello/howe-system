@@ -73,11 +73,11 @@
           </el-form-item>
           <el-form-item v-if="activeData.tag === 'el-checkbox-group'" label="至少应选">
             <el-input-number :value="activeData.min" :min="0" placeholder="至少应选"
-              @input="$set(activeData, 'min', $event ? $event : undefined)" />
+              @update:model-value="activeData.min = $event ?? undefined" />
           </el-form-item>
           <el-form-item v-if="activeData.tag === 'el-checkbox-group'" label="最多可选">
             <el-input-number :value="activeData.max" :min="0" placeholder="最多可选"
-              @input="$set(activeData, 'max', $event ? $event : undefined)" />
+              @update:model-value="activeData.max = $event ?? undefined" />
           </el-form-item>
           <el-form-item v-if="activeData.prepend !== undefined" label="前缀">
             <el-input v-model="activeData.prepend" placeholder="请输入前缀" />
@@ -466,13 +466,14 @@
 </template>
 
 <script setup lang="ts">
+import { useAppProxy } from '@/utils/appProxy'
 import draggable from "vuedraggable/dist/vuedraggable.common"
 import { isNumberStr } from '@/utils/index'
 import IconsDialog from './IconsDialog.vue'
 import TreeNodeDialog from './TreeNodeDialog.vue'
 import { inputComponents, selectComponents } from '@/utils/generator/config'
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 const dateTimeFormat: Record<string, string> = {
   date: 'YYYY-MM-DD',
   week: 'YYYY 第 ww 周',
@@ -491,10 +492,10 @@ const props = defineProps<{
 
 const data = reactive({
   currentTab: 'field',
-  currentNode: null,
+  currentNode: null as unknown[] | null,
   dialogVisible: false,
   iconsVisible: false,
-  currentIconModel: null,
+  currentIconModel: '',
   dateTypeOptions: [
     {
       label: '日(date)',
@@ -629,7 +630,6 @@ function addSelectItem(): void {
 }
 
 function addTreeItem(): void {
-  ++proxy.idGlobal
   dialogVisible.value = true
   currentNode.value = props.activeData.options
 }

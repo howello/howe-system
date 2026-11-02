@@ -10,12 +10,14 @@
 </template>
 
 <script setup lang="ts">
+import type { ScrollbarInstance } from 'element-plus/es/components/scrollbar'
+import { templateRef, useAppProxy } from '@/utils/appProxy'
 import useTagsViewStore from '@/store/modules/tagsView'
 
 const tagAndTagSpacing = ref<number>(4)
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 
-const scrollWrapper = computed(() => proxy.$refs.scrollContainer.$refs.wrapRef)
+const scrollWrapper = computed(() => templateRef<ScrollbarInstance>(proxy.$refs.scrollContainer).wrapRef!)
 
 onMounted(() => {
   scrollWrapper.value.addEventListener('scroll', emitScroll, true)
@@ -75,7 +77,7 @@ const tagsViewStore = useTagsViewStore()
 const visitedViews = computed(() => tagsViewStore.visitedViews)
 
 function moveToTarget(currentTag: any): void {
-  const $container = proxy.$refs.scrollContainer.$el
+  const $container = templateRef<ScrollbarInstance>(proxy.$refs.scrollContainer).$el
   const $containerWidth = $container.offsetWidth
   const $scrollWrapper = scrollWrapper.value
 

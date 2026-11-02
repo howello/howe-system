@@ -48,7 +48,15 @@ const props = defineProps({
   }
 })
 
-const onlyOneChild = ref({})
+/** 菜单单子项的展示结构。 */
+interface SidebarRoute {
+  path: string
+  query?: string
+  children?: SidebarRoute[]
+  noShowingChildren?: boolean
+  meta?: { icon?: string; title?: string }
+}
+const onlyOneChild = ref<SidebarRoute>({ path: '' })
 
 function hasOneShowingChild(children: any[] = [], parent: any) {
   if (!children) {
@@ -76,6 +84,8 @@ function hasOneShowingChild(children: any[] = [], parent: any) {
   return false
 }
 
+function resolvePath(routePath: string): string
+function resolvePath(routePath: string, routeQuery?: string): string | { path: string; query: Record<string, unknown> }
 function resolvePath(routePath: string, routeQuery?: string): string | { path: string; query: Record<string, any> } {
   if (isExternal(routePath)) {
     return routePath
@@ -90,7 +100,7 @@ function resolvePath(routePath: string, routeQuery?: string): string | { path: s
   return getNormalPath(props.basePath + '/' + routePath)
 }
 
-function hasTitle(title: string): string {
+function hasTitle(title = ''): string {
   if (title.length > 5) {
     return title
   } else {

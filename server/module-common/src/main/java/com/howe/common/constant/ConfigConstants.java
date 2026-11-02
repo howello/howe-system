@@ -15,8 +15,9 @@ import java.util.Set;
  *
  * @author howe
  */
-public class ConfigConstants
-{
+public class ConfigConstants {
+    /** AI 受理次数及并发参数前缀，后接能力名和限制类型。 */
+    public static final String AI_USAGE_PREFIX = "ai.usage.";
     /** 存储类型：r2 对象存储 / local 本地磁盘 */
     public static final String STORAGE_TYPE = "sys.storage.type";
 
@@ -302,8 +303,7 @@ public class ConfigConstants
      * @param configKey 参数键名
      * @return true 表示该键的值应按凭据对待
      */
-    public static boolean isSensitiveKey(String configKey)
-    {
+    public static boolean isSensitiveKey(String configKey) {
         return configKey != null && SENSITIVE_KEYS.contains(configKey);
     }
 }

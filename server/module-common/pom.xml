@@ -16,6 +16,12 @@
     </description>
 
     <dependencies>
+        <!-- 仅使用 HTML 解析与安全净化，不使用 jsoup 的网络能力。 -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.23.2</version>
+        </dependency>
 
         <!-- Spring框架基本的核心工具 -->
         <dependency>

@@ -145,10 +145,11 @@
 </template>
 
 <script setup lang="ts" name="Post">
+import { useAppProxy, formRef } from '@/utils/appProxy'
 import { listPost, addPost, delPost, getPost, updatePost } from "@/api/system/post"
 import type { SysPost, PostQueryParams } from '@/types/api/system/post'
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 const { sys_normal_disable } = useDict("sys_normal_disable")
 
 const postList = ref<SysPost[]>([])
@@ -247,7 +248,7 @@ function handleUpdate(row?: SysPost) {
 
 /** 提交按钮 */
 function submitForm() {
-  proxy.$refs["postRef"].validate((valid: boolean) => {
+  formRef(proxy.$refs["postRef"]).validate((valid: boolean) => {
     if (valid) {
       if (form.value.postId != undefined) {
         updatePost(form.value).then(() => {

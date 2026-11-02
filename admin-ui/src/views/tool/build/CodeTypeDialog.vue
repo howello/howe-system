@@ -27,7 +27,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['confirm'])
 const formData = ref({
-  fileName: undefined,
+  fileName: undefined as string | undefined,
   type: 'file'
 })
 const codeTypeForm = ref()

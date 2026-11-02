@@ -148,14 +148,14 @@
           <el-col :span="12">
             <el-form-item label="岗位">
               <el-select v-model="form.postIds" multiple placeholder="请选择">
-                <el-option v-for="item in postOptions" :key="item.postId" :label="item.postName" :value="item.postId" :disabled="item.status == 1"></el-option>
+                <el-option v-for="item in postOptions" :key="item.postId" :label="item.postName" :value="item.postId" :disabled="item.status == '1'"></el-option>
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="角色">
               <el-select v-model="form.roleIds" multiple placeholder="请选择">
-                <el-option v-for="item in roleOptions" :key="item.roleId" :label="item.roleName" :value="item.roleId" :disabled="item.status == 1"></el-option>
+                <el-option v-for="item in roleOptions" :key="item.roleId" :label="item.roleName" :value="item.roleId" :disabled="item.status == '1'"></el-option>
               </el-select>
             </el-form-item>
           </el-col>
@@ -184,6 +184,8 @@
 </template>
 
 <script setup lang="ts" name="User">
+import type { TreeInstance } from 'element-plus/es/components/tree'
+import { templateRef, useAppProxy, formRef } from '@/utils/appProxy'
 import TreePanel from "@/components/TreePanel/index.vue"
 import ExcelImportDialog from "@/components/ExcelImportDialog/index.vue"
 import UserViewDrawer from "./view.vue"
@@ -195,7 +197,7 @@ import type { SysPost } from '@/types/api/system/post'
 import type { TreeSelect, TableShowColumns, AjaxResult } from '@/types/api/common'
 
 const router = useRouter()
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 const { pwdValidator, pwdPromptValidator } = usePasswordRule()
 const { sys_normal_disable, sys_user_sex } = useDict("sys_normal_disable", "sys_user_sex")
 
@@ -293,7 +295,7 @@ function resetQuery() {
   dateRange.value = []
   proxy.resetForm("queryRef")
   queryParams.value.deptId = undefined
-  proxy.$refs.deptTreeRef.setCurrentKey(null)
+  templateRef<TreeInstance>(proxy.$refs.deptTreeRef).setCurrentKey(undefined)
   handleQuery()
 }
 
@@ -370,12 +372,12 @@ function handleSelectionChange(selection: SysUser[]) {
 
 /** 详情按钮操作 */
 function handleViewData(row: SysUser) {
-  proxy.$refs["userViewRef"].open(row.userId)
+  if (row.userId != null) templateRef<InstanceType<typeof UserViewDrawer>>(proxy.$refs["userViewRef"]).open(row.userId)
 }
 
 /** 导入按钮操作 */
 function handleImport() {
-  proxy.$refs["importUserRef"].open()
+  templateRef<InstanceType<typeof ExcelImportDialog>>(proxy.$refs["importUserRef"]).open()
 }
 
 /** 重置操作表单 */
@@ -433,7 +435,7 @@ function handleUpdate(row?: SysUser) {
 
 /** 提交按钮 */
 function submitForm() {
-  proxy.$refs["userRef"].validate((valid: boolean) => {
+  formRef(proxy.$refs["userRef"]).validate((valid: boolean) => {
     if (valid) {
       if (form.value.userId != undefined) {
         updateUser(form.value).then(() => {

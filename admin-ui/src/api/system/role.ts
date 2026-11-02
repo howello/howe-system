@@ -98,7 +98,7 @@ export function authUserCancelAll(data: AuthUserSelectParams): Promise<AjaxResul
   return request({
     url: '/system/role/authUser/cancelAll',
     method: 'put',
-    params: data
+    params: { ...data, userIds: data.userIds.join(',') }
   })
 }
 
@@ -107,7 +107,7 @@ export function authUserSelectAll(data: AuthUserSelectParams): Promise<AjaxResul
   return request({
     url: '/system/role/authUser/selectAll',
     method: 'put',
-    params: data
+    params: { ...data, userIds: data.userIds.join(',') }
   })
 }
 

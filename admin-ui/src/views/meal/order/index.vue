@@ -113,10 +113,11 @@
 </template>
 
 <script setup lang="ts" name="MealOrder">
+import { useAppProxy } from '@/utils/appProxy'
 import { listOrder, getOrder, delOrder } from "@/api/meal/order"
 import type { MealOrder, MealOrderQueryParams } from "@/types/api/meal/order"
 
-const { proxy } = getCurrentInstance() as any
+const proxy = useAppProxy()
 
 const STATUS_TEXT: Record<string, string> = {
   "0": "待接单",

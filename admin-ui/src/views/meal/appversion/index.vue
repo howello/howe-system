@@ -112,10 +112,11 @@
 </template>
 
 <script setup lang="ts" name="MealAppVersion">
+import { useAppProxy, formRef } from '@/utils/appProxy'
 import { getAppVersion, listAppVersion, addAppVersion, updateAppVersion, delAppVersion, uploadAppVersionWgt } from "@/api/meal/appversion"
 import type { MealAppVersion, MealAppVersionQueryParams } from "@/types/api/meal/appversion"
 
-const { proxy } = getCurrentInstance() as any
+const proxy = useAppProxy()
 
 const versionList = ref<MealAppVersion[]>([])
 const open = ref<boolean>(false)
@@ -259,7 +260,7 @@ function handleWgtUpload(options: { file: File }): Promise<void> {
 }
 
 function submitForm() {
-  proxy.$refs["formRef"].validate((valid: boolean) => {
+  formRef(proxy.$refs["formRef"]).validate((valid: boolean) => {
     if (!valid) {
       return
     }

@@ -57,7 +57,7 @@ function registerRef(key: string, el: unknown): void {
 
 const visibleCards = computed<RenderedCard[]>(() =>
   cards.value
-    .map((key: string) => {
+    .map<RenderedCard | null>((key: string) => {
       const reg = resolveCard(key)
       // 后端先于前端上线新卡片时安全跳过，不报错、不白屏
       return reg ? { key, component: reg.component, span: reg.span, rowSpan: reg.rowSpan } : null

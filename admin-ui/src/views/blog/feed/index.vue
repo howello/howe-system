@@ -192,11 +192,12 @@
 </template>
 
 <script setup lang="ts" name="BlogFeed">
+import { useAppProxy, formRef } from '@/utils/appProxy'
 import { listFeed, getFeed, addFeed, updateFeed, delFeed, syncAllFeeds, syncOneFeed, listFeedItems, delFeedItem } from "@/api/blog/feed"
 import type { BlogLink } from "@/types/api/blog/link"
 import type { BlogFeedQueryParams, BlogFeedItem, BlogFeedItemQueryParams, BlogFeedSyncResult } from "@/types/api/blog/feed"
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 
 const feedList = ref<BlogLink[]>([])
 const itemList = ref<BlogFeedItem[]>([])
@@ -378,7 +379,7 @@ function handleUpdate(row: BlogLink) {
 
 /** 提交按钮 */
 function submitForm() {
-  proxy.$refs["feedRef"].validate((valid: boolean) => {
+  formRef(proxy.$refs["feedRef"]).validate((valid: boolean) => {
     if (!valid) {
       return
     }

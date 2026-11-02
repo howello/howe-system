@@ -71,7 +71,7 @@ public interface ShareLinkMapper {
      * @param linkId 分享ID
      * @return 影响行数
      */
-    int incrementViewCount(@Param("linkId") Long linkId);
+    int incrementViewCount(@Param("linkId") Long linkId, @Param("accessVersion") Long accessVersion);
 
     /**
      * 按条件更新缓存状态（CAS，防重复领取）

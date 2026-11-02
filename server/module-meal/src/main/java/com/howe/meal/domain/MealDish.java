@@ -32,6 +32,11 @@ public class MealDish extends BaseEntity {
     @Schema(description = "菜品ID", example = "1")
     private Long dishId;
 
+    /** 数据版本，用于异步 AI 更新的乐观并发校验。 */
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+    private Long dataVersion;
+
+
     @Schema(description = "所属家庭ID（0=公共菜谱）", example = "0")
     private Long deptId;
 

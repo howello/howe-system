@@ -90,6 +90,10 @@ export interface MealDishAiTextResult {
 
 /** 一键 AI 封面生成结果 */
 export interface MealDishAiCoverResult {
+  /** 图片保存状态 */
+  transferStatus?: 'READY' | 'PENDING_TRANSFER';
+  /** 待补偿转存任务 ID */
+  transferTaskId?: string;
   /** 新生成的封面永久地址 */
   cover?: string;
   /** 图片未生成时的可读原因 */

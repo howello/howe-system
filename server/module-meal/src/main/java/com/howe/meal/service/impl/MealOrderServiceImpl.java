@@ -1,6 +1,7 @@
 package com.howe.meal.service.impl;
 
 import com.howe.common.annotation.DataScope;
+import cn.hutool.core.util.IdUtil;
 import com.howe.common.constant.ConfigConstants;
 import com.howe.common.core.domain.model.LoginUser;
 import com.howe.common.exception.ServiceException;
@@ -230,7 +231,8 @@ public class MealOrderServiceImpl implements IMealOrderService {
 
         Date deadline = new Date(System.currentTimeMillis() + acceptTimeoutMinutes() * 60_000L);
         MealOrder order = new MealOrder();
-        order.setOrderNo(generateOrderNo());
+        // 事务内临时唯一号，拿到数据库主键后替换为稳定业务号。
+        order.setOrderNo(IdUtil.fastSimpleUUID());
         order.setDeptId(deptId);
         order.setUserId(userId);
         order.setUserName(currentNickName());
@@ -243,6 +245,11 @@ public class MealOrderServiceImpl implements IMealOrderService {
         order.setDeadlineTime(deadline);
         order.setCreateBy(SecurityUtils.getUsername());
         mealOrderMapper.insertMealOrder(order);
+        String orderNo = ORDER_NO_PREFIX + DateUtils.dateTimeNow("yyyyMMdd") + "-" + order.getOrderId();
+        if (mealOrderMapper.updateOrderNo(order.getOrderId(), orderNo) != 1) {
+            throw new ServiceException("生成订单号失败，请重试");
+        }
+        order.setOrderNo(orderNo);
 
         items.forEach(item -> item.setOrderId(order.getOrderId()));
         mealOrderMapper.insertOrderItems(items);
@@ -468,23 +475,6 @@ public class MealOrderServiceImpl implements IMealOrderService {
         if (MealOrder.STATUS_COOKING.equals(order.getStatus()) && order.getAcceptTime() != null) {
             order.setCookMinutes(Math.max(0, (now - order.getAcceptTime().getTime()) / MILLIS_MINUTE));
         }
-    }
-
-    /**
-     * 订单号：M + yyyyMMdd + 3 位当日流水。并发下极小概率撞号，由 order_no 唯一约束兜底。
-     */
-    private String generateOrderNo() {
-        String prefix = ORDER_NO_PREFIX + DateUtils.dateTimeNow("yyyyMMdd");
-        String max = mealOrderMapper.selectMaxOrderNo(prefix);
-        int seq = 1;
-        if (StringUtils.isNotEmpty(max) && max.length() > prefix.length()) {
-            try {
-                seq = Integer.parseInt(max.substring(prefix.length())) + 1;
-            } catch (NumberFormatException ignored) {
-                // 历史数据格式异常时退回 1，唯一约束会挡住真正的重复
-            }
-        }
-        return prefix + String.format("%03d", seq);
     }
 
     private String currentNickName() {

@@ -46,16 +46,18 @@
 </template>
 
 <script setup lang="ts" name="AuthRole">
+import type { TableInstance } from 'element-plus/es/components/table'
+import { templateRef, useAppProxy } from '@/utils/appProxy'
 import { getAuthRole, updateAuthRole } from "@/api/system/user"
 import type { SysRole } from '@/types/api/system/role'
 import type { SysUser } from '@/types/api/system/user'
 
 const route = useRoute()
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 
 interface SysRoleWithFlag extends SysRole {
   /** 用户是否存在此角色标识 */
-  flag: boolean;
+  flag?: boolean;
 }
 
 const loading = ref<boolean>(true)
@@ -73,7 +75,7 @@ const form = ref<SysUser>({
 /** 单击选中行数据 */
 function clickRow(row: SysRole) {
   if (checkSelectable(row)) {
-    proxy.$refs["roleRef"].toggleRowSelection(row)
+    templateRef<TableInstance>(proxy.$refs["roleRef"]).toggleRowSelection(row)
   }
 }
 
@@ -102,7 +104,7 @@ function close() {
 function submitForm() {
   const userId = form.value.userId
   const rIds = roleIds.value.join(",")
-  updateAuthRole({ userId: userId!, roleIds: rIds }).then(() => {
+  updateAuthRole({ userId: userId!, roleIds: roleIds.value }).then(() => {
     proxy.$modal.msgSuccess("授权成功")
     close()
   })
@@ -119,7 +121,7 @@ function submitForm() {
       nextTick(() => {
         roles.value.forEach((row: SysRoleWithFlag) => {
           if (row.flag) {
-            proxy.$refs["roleRef"].toggleRowSelection(row)
+            templateRef<TableInstance>(proxy.$refs["roleRef"]).toggleRowSelection(row)
           }
         })
       })

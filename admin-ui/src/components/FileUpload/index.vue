@@ -41,6 +41,8 @@
 </template>
 
 <script setup lang="ts">
+import type { UploadInstance } from 'element-plus/es/components/upload'
+import { templateRef, useAppProxy } from '@/utils/appProxy'
 import { getToken } from "@/utils/auth"
 import { resolveFileUrl } from "@/utils/commonUtils"
 import Sortable from 'sortablejs'
@@ -95,7 +97,7 @@ const props = defineProps({
   }
 })
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 const emit = defineEmits()
 const number = ref(0)
 const uploadList = ref<UploadFileItem[]>([])
@@ -111,7 +113,7 @@ watch(() => props.modelValue, (val: any) => {
   if (val) {
     let temp = 1
     // 首先将值转为数组
-    const list = Array.isArray(val) ? val : props.modelValue.split(',')
+    const list = Array.isArray(val) ? val : typeof val === 'string' ? val.split(',') : [val]
     // 然后将数组转为对象数组
     fileList.value = list.map((item: any) => {
       if (typeof item === "string") {
@@ -176,7 +178,7 @@ function handleUploadSuccess(res: UploadFileResult, file: any): void {
     number.value--
     proxy.$modal.closeLoading()
     proxy.$modal.msgError(res.msg)
-    proxy.$refs.fileUpload.handleRemove(file)
+    templateRef<UploadInstance>(proxy.$refs.fileUpload).handleRemove(file)
     uploadedSuccessfully()
   }
 }
@@ -224,7 +226,7 @@ function listToString(list: UploadFileItem[], separator?: string): string {
 onMounted(() => {
   if (props.drag && !props.disabled) {
     nextTick(() => {
-      const element = proxy.$refs.uploadFileList?.$el || proxy.$refs.uploadFileList as HTMLElement
+      const element = proxy.$refs.uploadFileList as HTMLElement | undefined
       if (element) {
         Sortable.create(element, {
           ghostClass: 'file-upload-darg',

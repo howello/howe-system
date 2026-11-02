@@ -10,8 +10,9 @@ import java.util.List;
  *
  * @author howe
  */
-public interface AiImageAssetMapper
-{
+public interface AiImageAssetMapper {
+    /** 日志过期时解除关联，资产记录和对象存储文件继续保留。 */
+    int detachCallLogs(@Param("ids") List<Long> ids);
     /**
      * 新增生成图资产
      *

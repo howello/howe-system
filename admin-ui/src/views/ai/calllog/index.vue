@@ -156,10 +156,11 @@
 </template>
 
 <script setup lang="ts" name="AiCallLog">
+import { useAppProxy } from '@/utils/appProxy'
 import { listCallLog, getCallLog, getCallLogStats } from "@/api/ai/calllog"
 import type { AiCallLog, AiCallLogQueryParams, AiCallLogStats } from "@/types/api/ai/calllog"
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 
 const logList = ref<AiCallLog[]>([])
 const statsList = ref<AiCallLogStats[]>([])

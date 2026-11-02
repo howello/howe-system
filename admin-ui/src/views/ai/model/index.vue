@@ -209,6 +209,7 @@
 </template>
 
 <script setup lang="ts" name="AiModel">
+import { useAppProxy, formRef } from '@/utils/appProxy'
 import { listModel, getModel, addModel, updateModel, delModel, changeModelStatus, listRemoteModel, batchAddModel } from "@/api/ai/model"
 import { listChannel } from "@/api/ai/channel"
 import type { AiModel, AiModelQueryParams, AiRemoteModel } from "@/types/api/ai/model"
@@ -219,7 +220,7 @@ interface ImportRow extends AiRemoteModel {
   capability: string
 }
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 
 const modelList = ref<AiModel[]>([])
 const channelOptions = ref<AiChannel[]>([])
@@ -365,7 +366,7 @@ function handleUpdate(row?: AiModel) {
 
 /** 提交按钮 */
 function submitForm() {
-  proxy.$refs["modelRef"].validate((valid: boolean) => {
+  formRef(proxy.$refs["modelRef"]).validate((valid: boolean) => {
     if (!valid) {
       return
     }

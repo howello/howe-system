@@ -124,12 +124,13 @@
 </template>
 
 <script setup lang="ts">
+import { useAppProxy } from '@/utils/appProxy'
 import useAppStore from '@/store/modules/app'
 import useSettingsStore from '@/store/modules/settings'
 import usePermissionStore from '@/store/modules/permission'
 import { handleThemeStyle } from '@/utils/theme'
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 const appStore = useAppStore()
 const settingsStore = useSettingsStore()
 const permissionStore = usePermissionStore()
@@ -204,7 +205,7 @@ function saveSetting(): void {
     "theme": storeSettings.value.theme
   }
   localStorage.setItem("layout-setting", JSON.stringify(layoutSetting))
-  setTimeout(proxy.$modal.closeLoading(), 1000)
+  setTimeout(() => proxy.$modal.closeLoading(), 1000)
 }
 
 function resetSetting(): void {

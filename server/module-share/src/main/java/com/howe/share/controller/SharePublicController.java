@@ -12,6 +12,8 @@ import com.howe.share.constant.ShareConstants;
 import com.howe.share.domain.dto.ShareVerifyRequest;
 import com.howe.share.domain.vo.SharePublicDetail;
 import com.howe.share.service.SharePublicService;
+import com.howe.share.service.ShareFilePolicy;
+import java.io.BufferedInputStream;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -129,18 +131,25 @@ public class SharePublicController extends BaseController {
      */
     private void writeFile(HttpServletResponse response, StoredObject object, String fileName,
                            boolean attachment) throws IOException {
-        String contentType = StrUtil.blankToDefault(object.contentType(), "application/octet-stream");
-        response.setContentType(contentType);
-        String name = StrUtil.blankToDefault(fileName, "file");
-        String encoded = URLEncoder.encode(name, StandardCharsets.UTF_8).replace("+", "%20");
-        response.setHeader("Content-Disposition",
-                (attachment ? "attachment" : "inline") + "; filename=\"" + encoded + "\"; filename*=UTF-8''" + encoded);
-        response.setHeader("X-Robots-Tag", "noindex");
-        if (object.size() > 0) {
-            response.setContentLengthLong(object.size());
-        }
-        try (StoredObject stored = object) {
-            IoUtil.copy(stored.stream(), response.getOutputStream());
+        try (StoredObject stored = object; BufferedInputStream stream = new BufferedInputStream(stored.stream())) {
+            stream.mark(32);
+            byte[] header = stream.readNBytes(16);
+            stream.reset();
+            String inlineType = ShareFilePolicy.inlineType(fileName, header);
+            attachment = attachment || inlineType == null;
+            response.setContentType(inlineType == null ? "application/octet-stream" : inlineType);
+            response.setHeader("X-Content-Type-Options", "nosniff");
+            response.setHeader("Content-Security-Policy", "sandbox allow-downloads; default-src 'none'; img-src 'self' data:; media-src 'self' blob:; style-src 'unsafe-inline'");
+            response.setHeader("Cache-Control", "no-store");
+            String name = StrUtil.blankToDefault(fileName, "file");
+            String encoded = URLEncoder.encode(name, StandardCharsets.UTF_8).replace("+", "%20");
+            response.setHeader("Content-Disposition",
+                    (attachment ? "attachment" : "inline") + "; filename=\"" + encoded + "\"; filename*=UTF-8''" + encoded);
+            response.setHeader("X-Robots-Tag", "noindex");
+            if (object.size() > 0) {
+                response.setContentLengthLong(object.size());
+            }
+            IoUtil.copy(stream, response.getOutputStream());
         }
     }
 }

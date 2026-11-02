@@ -155,6 +155,7 @@
 </template>
 
 <script setup lang="ts" name="CacheList">
+import { useAppProxy } from '@/utils/appProxy'
 import { listCacheName, listCacheKey, getCacheValue, clearCacheName, clearCacheKey, clearCacheAll } from "@/api/monitor/cache"
 import type { SysCache } from '@/types/api/monitor/cache'
 
@@ -169,7 +170,7 @@ interface CacheForm {
   cacheValue?: string
 }
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 
 const cacheNames = ref<CacheName[]>([])
 const cacheKeys = ref<string[]>([])
@@ -183,7 +184,7 @@ const tableHeight = ref<number>(window.innerHeight - 200)
 function getCacheNames(): void {
   loading.value = true
   listCacheName().then(response => {
-    cacheNames.value = response.data!
+    cacheNames.value = (response.data ?? []).filter((item): item is SysCache & { cacheName: string } => typeof item.cacheName === 'string')
     loading.value = false
   })
 }
@@ -209,10 +210,10 @@ function getCacheKeys(row?: SysCache): void {
     return
   }
   subLoading.value = true
-  listCacheKey(cacheName).then(response => {
+  listCacheKey(cacheName ?? '').then(response => {
     cacheKeys.value = response.data!
     subLoading.value = false
-    nowCacheName.value = cacheName
+    nowCacheName.value = cacheName ?? ''
   })
 }
 

@@ -7,12 +7,16 @@ export default {
   msg(content: string) {
     ElMessage.info(content)
   },
+  /** 信息提示，与其他消息入口保持一致。 */
+  msgInfo(content: string) {
+    ElMessage.info(content)
+  },
   // 错误消息
   msgError(content: string) {
     ElMessage.error(content)
   },
   // 成功消息
-  msgSuccess(content: string) {
+  msgSuccess(content: string | { message: string; type?: string; duration?: number }) {
     ElMessage.success(content)
   },
   // 警告消息
@@ -44,19 +48,20 @@ export default {
     ElNotification.error(content)
   },
   // 成功通知
-  notifySuccess(content: string) {
+  notifySuccess(content: string | { message: string; type?: string; duration?: number }) {
     ElNotification.success(content)
   },
   // 警告通知
-  notifyWarning(content: string) {
+  notifyWarning(content: string | { message: string; type?: string; duration?: number }) {
     ElNotification.warning(content)
   },
   // 确认窗体
-  confirm(content: string) {
-    return ElMessageBox.confirm(content, "系统提示", {
+  confirm(content: string, title = "系统提示", options: Record<string, unknown> = {}) {
+    return ElMessageBox.confirm(content, title, {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: "warning",
+      ...options,
     })
   },
   // 提交内容

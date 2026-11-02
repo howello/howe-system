@@ -50,11 +50,12 @@
 </template>
 
 <script setup lang="ts" name="ShareFileBrowser">
+import { useAppProxy } from '@/utils/appProxy'
 import { browseSource } from '@/api/share/source'
 import type { WebDavEntry } from '@/types'
 import { Back } from '@element-plus/icons-vue'
 
-const { proxy } = getCurrentInstance() as any
+const proxy = useAppProxy()
 
 const props = defineProps<{
   /** 是否显示 */

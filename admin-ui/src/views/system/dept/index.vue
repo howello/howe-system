@@ -200,11 +200,12 @@
 </template>
 
 <script setup lang="ts" name="Dept">
+import { useAppProxy, formRef } from '@/utils/appProxy'
 import { listDept, getDept, delDept, addDept, updateDept, updateDeptSort, listDeptExcludeChild, getFamilyCode, generateFamilyCode, type FamilyCodeInfo } from "@/api/system/dept"
 import type { SysDept, DeptQueryParams } from '@/types/api/system/dept'
 import type { TreeSelect } from '@/types/api/common'
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 const { sys_normal_disable } = useDict("sys_normal_disable")
 
 const deptList = ref<any[]>([])
@@ -243,7 +244,7 @@ const { queryParams, form, rules } = toRefs(data)
 function getList() {
   loading.value = true
   listDept(queryParams.value).then(response => {
-    deptList.value = proxy.handleTree(response.data, "deptId")
+    deptList.value = proxy.handleTree(response.data ?? [], "deptId")
     recordOriginalOrders(deptList.value)
     loading.value = false
   })
@@ -286,7 +287,7 @@ function resetQuery() {
 function handleAdd(row?: SysDept) {
   reset()
   listDept().then(response => {
-    deptOptions.value = proxy.handleTree(response.data, "deptId")
+    deptOptions.value = proxy.handleTree(response.data ?? [], "deptId")
   })
   if (row != undefined) {
     form.value.parentId = row.deptId
@@ -308,7 +309,7 @@ function toggleExpandAll() {
 function handleUpdate(row: SysDept) {
   reset()
   listDeptExcludeChild(row.deptId!).then(response => {
-    deptOptions.value = proxy.handleTree(response.data, "deptId")
+    deptOptions.value = proxy.handleTree(response.data ?? [], "deptId")
   })
   getDept(row.deptId!).then(response => {
     form.value = response.data!
@@ -319,7 +320,7 @@ function handleUpdate(row: SysDept) {
 
 /** 提交按钮 */
 function submitForm() {
-  proxy.$refs["deptRef"].validate((valid: boolean) => {
+  formRef(proxy.$refs["deptRef"]).validate((valid: boolean) => {
     if (valid) {
       // 未选择上级部门时，作为顶级部门（parentId = 0）
       if (form.value.parentId == undefined) {
@@ -345,7 +346,7 @@ function submitForm() {
 /** 递归记录原始排序 */
 function recordOriginalOrders(list: SysDept[]) {
   list.forEach(item => {
-    originalOrders.value[item.deptId] = item.orderNum
+    if (item.deptId != null) originalOrders.value[item.deptId] = item.orderNum ?? 0
     if (item.children && item.children.length) {
       recordOriginalOrders(item.children)
     }

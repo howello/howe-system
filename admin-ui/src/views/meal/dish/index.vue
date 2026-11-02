@@ -147,6 +147,7 @@
               class="cover-thumb"
               preview-teleported
             />
+            <el-button v-if="pendingCover && pendingCover.cover === form.cover" link @click="checkCoverTransfer">查看图片保存状态</el-button>
           </div>
         </el-form-item>
         <el-form-item label="简介" prop="description">
@@ -266,7 +267,8 @@
 </template>
 
 <script setup lang="ts" name="MealDish">
-import { getDish, listDish, addDish, updateDish, delDish, aiGenerateDishText, aiGenerateDishCover } from "@/api/meal/dish"
+import { useAppProxy, formRef } from '@/utils/appProxy'
+import { getDish, listDish, addDish, updateDish, delDish, aiGenerateDishText, aiGenerateDishCover, getImageTransferTask } from "@/api/meal/dish"
 import { listCategory } from "@/api/meal/category"
 import type { MealDish, MealDishQueryParams, MealDishAiCurrent, MealDishAiTextResult } from "@/types/api/meal/dish"
 import type { MealCategory } from "@/types/api/meal/category"
@@ -275,7 +277,7 @@ import useUserStore from "@/store/modules/user"
 /** AI 两步任务状态 */
 type StepState = "idle" | "loading" | "done" | "error" | "skip"
 
-const { proxy } = getCurrentInstance() as any
+const proxy = useAppProxy()
 
 const userStore = useUserStore()
 const isAdmin = computed(() => userStore.roles.includes("admin"))
@@ -287,6 +289,7 @@ const loading = ref<boolean>(true)
 const submitting = ref<boolean>(false)
 const aiTextState = ref<StepState>("idle")
 const aiCoverState = ref<StepState>("idle")
+const pendingCover = ref<{ taskId: string; cover: string } | null>(null)
 const aiLoading = computed(() => aiTextState.value === "loading" || aiCoverState.value === "loading")
 const batchAiLoading = ref<boolean>(false)
 const batchTotal = ref<number>(0)
@@ -444,6 +447,7 @@ function cancel() {
 }
 
 function reset() {
+  pendingCover.value = null
   asPublic.value = false
   selectedCategoryId.value = undefined
   ingredientList.value = []
@@ -605,6 +609,11 @@ async function handleAiGenerate() {
           const result = response.data || {}
           if (result.cover) {
             form.value.cover = result.cover
+            pendingCover.value = result.transferStatus === 'PENDING_TRANSFER' && result.transferTaskId
+              ? { taskId: result.transferTaskId, cover: result.cover } : null
+            if (result.transferStatus === 'PENDING_TRANSFER') {
+              proxy.$modal.msgWarning('封面正在转存，请确认图片正常显示后再保存')
+            }
             aiCoverState.value = "done"
           } else {
             aiCoverState.value = "error"
@@ -704,7 +713,7 @@ async function runBatchAi(rows: MealDish[]) {
         ? aiGenerateDishCover(payload)
             .then((resp: any) => {
               const result = resp.data || {}
-              if (result.cover) {
+              if (result.cover && result.transferStatus !== 'PENDING_TRANSFER') {
                 dish.cover = result.cover
                 batchCoverState.value = "done"
               } else {
@@ -748,8 +757,27 @@ async function runBatchAi(rows: MealDish[]) {
   }
 }
 
-function submitForm() {
-  proxy.$refs["formRef"].validate((valid: boolean) => {
+/** 查询图片转存终态，失败时清除尚未保存的占位地址。 */
+async function checkCoverTransfer() {
+  const pending = pendingCover.value
+  if (!pending) return
+  const response = await getImageTransferTask(pending.taskId)
+  if (pendingCover.value?.taskId !== pending.taskId || !response.data) return
+  if (response.data.state === 'READY') pendingCover.value = null
+  if (response.data.state === 'FAILED') {
+    if (form.value.cover === pending.cover) form.value.cover = undefined
+    pendingCover.value = null
+    aiCoverState.value = 'error'
+  }
+  proxy.$modal.msgInfo(response.data.message)
+}
+
+async function submitForm() {
+  if (pendingCover.value?.cover === form.value.cover && pendingCover.value) {
+    await checkCoverTransfer()
+    if (pendingCover.value) return
+  }
+  formRef(proxy.$refs["formRef"]).validate((valid: boolean) => {
     if (!valid) {
       return
     }

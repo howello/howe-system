@@ -135,7 +135,7 @@
          </el-table-column>
          <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
             <template #default="scope">
-               <el-button link type="primary" icon="View" @click="handleDetail(scope.row, scope.index)" v-hasPermi="['monitor:operlog:query']">详细</el-button>
+               <el-button link type="primary" icon="View" @click="handleDetail(scope.row)" v-hasPermi="['monitor:operlog:query']">详细</el-button>
             </template>
          </el-table-column>
       </el-table>
@@ -153,11 +153,13 @@
 </template>
 
 <script setup lang="ts" name="Operlog">
+import type { TableInstance } from 'element-plus/es/components/table'
+import { templateRef, useAppProxy } from '@/utils/appProxy'
 import OperlogDetail from './detail.vue'
 import { list, delOperlog, cleanOperlog } from "@/api/monitor/operlog"
 import type { SysOperLog, OperlogQueryParams } from '@/types/api/monitor/operlog'
 
-const { proxy } = getCurrentInstance()
+const proxy = useAppProxy()
 const { sys_oper_type, sys_common_status } = useDict("sys_oper_type", "sys_common_status")
 
 const operlogList = ref<SysOperLog[]>([])
@@ -209,7 +211,7 @@ function resetQuery() {
   dateRange.value = []
   proxy.resetForm("queryRef")
   queryParams.value.pageNum = 1
-  proxy.$refs["operlogRef"].sort(defaultSort.value.prop, defaultSort.value.order)
+  templateRef<TableInstance>(proxy.$refs["operlogRef"]).sort(defaultSort.value.prop, defaultSort.value.order)
 }
 
 /** 多选框选中数据 */
