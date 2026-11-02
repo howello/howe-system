@@ -11,6 +11,7 @@ import org.springframework.web.bind.MissingPathVariableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.util.DisconnectedClientHelper;
 import com.howe.common.constant.HttpStatus;
 import com.howe.common.core.domain.AjaxResult;
 import com.howe.common.core.text.Convert;
@@ -94,8 +95,10 @@ public class GlobalExceptionHandler
      * 拦截未知的运行时异常
      */
     @ExceptionHandler(RuntimeException.class)
-    public AjaxResult handleRuntimeException(RuntimeException e, HttpServletRequest request)
-    {
+    public AjaxResult handleRuntimeException(RuntimeException e, HttpServletRequest request) {
+        if (isClientDisconnected(e)) {
+            return null;
+        }
         String requestURI = request.getRequestURI();
         log.error("请求地址'{}',发生未知异常.", requestURI, e);
         return AjaxResult.error(e.getMessage());
@@ -103,13 +106,45 @@ public class GlobalExceptionHandler
 
     /**
      * 系统异常
+     *
+     * <p>
+     * 客户端在响应写完之前断开连接（刷新、关闭页面、网络中断）时，Tomcat 会抛出
+     * {@code ClientAbortException}（message 为 {@code Connection reset by peer}），
+     * 静态资源、下载等长响应尤其常见。这类异常不是服务端故障：
+     * 响应已经提交，既无法也不必再写业务体；若继续返回 {@link AjaxResult}，
+     * 还会因为 {@code Content-Type} 已被固定为 {@code text/html}
+     * 触发二次异常 {@code HttpMessageNotWritableException}，把一条噪声放大成两条。
+     * 因此只记一条 debug 日志并返回 {@code null}，由 Spring 视为已处理。
+     * </p>
      */
     @ExceptionHandler(Exception.class)
-    public AjaxResult handleException(Exception e, HttpServletRequest request)
-    {
+    public AjaxResult handleException(Exception e, HttpServletRequest request) {
+        if (isClientDisconnected(e)) {
+            return null;
+        }
         String requestURI = request.getRequestURI();
         log.error("请求地址'{}',发生系统异常.", requestURI, e);
         return AjaxResult.error(e.getMessage());
+    }
+
+    /**
+     * 判断异常是否由客户端提前断开连接引起
+     *
+     * <p>
+     * 命中时只记一条 debug 日志并返回 {@code true}，调用方据此返回 {@code null} 让 Spring
+     * 视为已处理：响应已提交，再写业务体会触发二次异常，把一条噪声放大成两条。
+     * 真正的服务端故障不受影响，仍按原逻辑记 error 并返回 {@link AjaxResult}。
+     * </p>
+     *
+     * @param e 待判定的异常
+     * @return 客户端已断开返回 {@code true}
+     */
+    private boolean isClientDisconnected(Exception e) {
+        if (DisconnectedClientHelper.isClientDisconnectedException(e)) {
+            log.debug("客户端已断开连接，忽略响应写出异常：{}", e.getMessage());
+            return true;
+        }
+        return false;
     }
 
     /**
