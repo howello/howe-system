@@ -1,13 +1,16 @@
 package com.howe.meal.controller;
 
 import com.howe.common.annotation.Log;
+import com.howe.common.annotation.RateLimiter;
 import com.howe.common.core.controller.BaseController;
 import com.howe.common.core.domain.AjaxResult;
 import com.howe.common.core.page.TableDataInfo;
 import com.howe.common.enums.BusinessType;
+import com.howe.common.enums.LimitType;
 import com.howe.meal.domain.MealDish;
 import com.howe.meal.domain.dto.DishAiGenerateRequest;
 import com.howe.meal.domain.dto.DishAiUpdateRequest;
+import com.howe.meal.service.MealDishSearchService;
 import com.howe.meal.service.IMealDishService;
 import com.howe.meal.service.MealDishAiService;
 import com.howe.meal.service.MealDishAiTaskService;
@@ -24,6 +27,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -49,12 +53,28 @@ public class MealDishController extends BaseController {
 
     private final MealDishAiTaskService aiTaskService;
 
+    private final MealDishSearchService mealDishSearchService;
+
     @Operation(summary = "查询菜品列表", description = "支持按分类、状态、菜名、关键词（菜名或用料）过滤")
     @GetMapping("/list")
     public TableDataInfo list(MealDish mealDish) {
         startPage();
         List<MealDish> list = mealDishService.selectMealDishList(mealDish);
         return getDataTable(list);
+    }
+
+    /**
+     * 搜索当前用户可见的菜品；仅在菜名本地匹配无结果时由服务端调用 AI 语义扩展。
+     *
+     * @param keyword 菜名或简短描述
+     * @return 当前可见菜品候选
+     */
+    @Operation(summary = "搜索可见菜品", description = "先匹配当前菜单中的菜名；无匹配时调用 AI 理解别名与同义词，结果仅来自当前用户可见的上架菜品")
+    @RateLimiter(time = 60, count = 10, limitType = LimitType.IP)
+    @GetMapping("/search")
+    public AjaxResult search(@Parameter(description = "菜名或简短描述", required = true)
+                             @RequestParam("keyword") String keyword) {
+        return success(mealDishSearchService.search(keyword));
     }
 
     @Operation(summary = "获取菜品详情", description = "含用料、做法与小贴士；跨家庭读取私有菜被拒绝")

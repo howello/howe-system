@@ -79,6 +79,36 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by d.sort asc, d.dish_id desc
     </select>
 
+    <!--
+      点餐搜索候选：只返回当前家庭可见、已上架且未删除的菜品。
+      instr 避免 LIKE 中的 % / _ 被当成通配符；AI 词项只用来找库内真实菜名。
+    -->
+    <select id="selectMealDishSearchCandidates" resultMap="MealDishResult">
+        select d.dish_id, d.dept_id, d.name,
+               (select c.name
+                  from meal_category_ref r
+                  join meal_category c on c.category_id = r.category_id and c.del_flag = '0'
+                 where r.biz_type = 1 and r.biz_id = d.dish_id
+                 limit 1) as category_names
+        from meal_dish d
+        <where>
+            d.del_flag = '0'
+            and d.status = '0'
+            <if test="deptId != null">
+                and (d.dept_id = #{deptId} or d.dept_id = 0)
+            </if>
+            <if test="keywords != null and keywords.size() > 0">
+                and (
+                    <foreach collection="keywords" item="term" separator=" or ">
+                        instr(lower(d.name), lower(#{term})) &gt; 0
+                    </foreach>
+                )
+            </if>
+        </where>
+        order by d.sort asc, d.dish_id desc
+        limit #{limit}
+    </select>
+
     <select id="selectMealDishById" parameterType="Long" resultMap="MealDishResult">
         <include refid="selectMealDishVo"/>
         where d.dish_id = #{dishId} and d.del_flag = '0'

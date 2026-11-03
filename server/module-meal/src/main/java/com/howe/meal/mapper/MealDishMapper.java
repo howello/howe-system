@@ -23,6 +23,18 @@ public interface MealDishMapper {
     List<MealDish> selectMealDishList(MealDish mealDish);
 
     /**
+     * 在指定可见范围内按多个菜名词项查找已上架菜品。
+     *
+     * @param keywords 菜名查询词或 AI 识别出的同义词
+     * @param deptId   当前家庭 ID；平台管理员传 null 表示沿用全量可见范围
+     * @param limit    最大返回条数
+     * @return 菜品候选列表
+     */
+    List<MealDish> selectMealDishSearchCandidates(@Param("keywords") List<String> keywords,
+                                                   @Param("deptId") Long deptId,
+                                                   @Param("limit") int limit);
+
+    /**
      * 按主键查询菜品
      *
      * @param dishId 菜品ID
