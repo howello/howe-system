@@ -39,7 +39,12 @@
           <el-avatar v-else :size="40">{{ (scope.row.name || "?").charAt(0) }}</el-avatar>
         </template>
       </el-table-column>
-      <el-table-column label="菜名" align="left" prop="name" :show-overflow-tooltip="true" min-width="140" />
+      <el-table-column label="菜名" align="left" :show-overflow-tooltip="true" min-width="140">
+        <template #default="scope">
+          <!-- 点击跳菜品管理并按菜名查询；未通过的提案也可能有同名菜，空结果属正常 -->
+          <a class="link-type" style="cursor: pointer" title="去菜品管理查询" @click="openDishSearch(scope.row)">{{ scope.row.name }}</a>
+        </template>
+      </el-table-column>
       <el-table-column label="提交人" align="center" prop="userName" width="100" />
       <el-table-column label="建议主类" align="center" prop="categoryNames" :show-overflow-tooltip="true" min-width="110">
         <template #default="scope">
@@ -55,7 +60,7 @@
       </el-table-column>
       <el-table-column label="审核意见" align="left" prop="auditRemark" :show-overflow-tooltip="true" min-width="160" />
       <el-table-column label="提交时间" align="center" prop="createTime" width="170" />
-      <el-table-column label="操作" align="center" width="260" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="260" fixed="right" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="View" @click="handleDetail(scope.row)">详情</el-button>
           <el-button
@@ -122,7 +127,7 @@
     </el-dialog>
 
     <el-dialog title="提案详情" v-model="detailOpen" width="600px" append-to-body>
-      <el-descriptions v-if="detail" :column="1" border>
+      <el-descriptions v-if="detail && !detailLoading" :column="1" border>
         <el-descriptions-item label="参考图">
           <el-image
             v-if="detail.image"
@@ -145,6 +150,7 @@
         <el-descriptions-item label="审核意见">{{ detail.auditRemark || "—" }}</el-descriptions-item>
         <el-descriptions-item label="提交时间">{{ detail.createTime || "—" }}</el-descriptions-item>
       </el-descriptions>
+      <div v-if="detailLoading" v-loading="true" style="min-height: 160px"></div>
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="detailOpen = false">关 闭</el-button>
@@ -156,10 +162,11 @@
 
 <script setup lang="ts" name="MealProposal">
 import { useAppProxy } from '@/utils/appProxy'
-import { listProposal, auditProposal, delProposal } from "@/api/meal/proposal"
+import { listProposal, getProposal, auditProposal, delProposal } from "@/api/meal/proposal"
 import type { MealProposal, MealProposalQueryParams } from "@/types/api/meal/proposal"
 
 const proxy = useAppProxy()
+const router = useRouter()
 
 const STATUS_TEXT: Record<string, string> = {
   "0": "待审核",
@@ -173,6 +180,7 @@ const detail = ref<MealProposal | null>(null)
 const open = ref<boolean>(false)
 const detailOpen = ref<boolean>(false)
 const loading = ref<boolean>(true)
+const detailLoading = ref<boolean>(false)
 const submitting = ref<boolean>(false)
 const showSearch = ref<boolean>(true)
 const ids = ref<number[]>([])
@@ -231,9 +239,28 @@ function handleSelectionChange(selection: MealProposal[]) {
   multiple.value = !selection.length
 }
 
+/** 详情：请求后端接口拿最新数据，不再直接用列表行（列表行可能是旧数据） */
 function handleDetail(row: MealProposal) {
-  detail.value = row
+  detailLoading.value = true
   detailOpen.value = true
+  getProposal(row.proposalId as number)
+    .then((response) => {
+      detail.value = response.data as MealProposal
+      detailLoading.value = false
+    })
+    .catch(() => {
+      // 失败时清空，不展示上一条的旧内容
+      detail.value = {}
+      detailLoading.value = false
+    })
+}
+
+/** 点击菜名：跳菜品管理列表并按菜名查询 */
+function openDishSearch(row: MealProposal) {
+  router.push({
+    path: "/meal/dish",
+    query: { name: row.name || "" }
+  })
 }
 
 function handleAudit(row: MealProposal, status: string) {

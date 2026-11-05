@@ -10,6 +10,7 @@ import com.howe.common.enums.LimitType;
 import com.howe.meal.domain.MealDish;
 import com.howe.meal.domain.dto.DishAiGenerateRequest;
 import com.howe.meal.domain.dto.DishAiUpdateRequest;
+import com.howe.meal.domain.dto.DishOwnerChangeRequest;
 import com.howe.meal.service.MealDishSearchService;
 import com.howe.meal.service.IMealDishService;
 import com.howe.meal.service.MealDishAiService;
@@ -148,5 +149,32 @@ public class MealDishController extends BaseController {
     public AjaxResult remove(@Parameter(description = "菜品ID数组，多个用逗号分隔", required = true)
             @PathVariable Long[] dishIds) {
         return toAjax(mealDishService.deleteMealDishByIds(dishIds));
+    }
+
+    /**
+     * 查询可调整归属的家庭
+     *
+     * <p>只返回有效家庭（F 类型、未删除、启用），不含组织部门。</p>
+     */
+    @Operation(summary = "查询归属可选家庭", description = "返回有效家庭；权限 meal:dish:owner")
+    @PreAuthorize("@ss.hasPermi('meal:dish:owner')")
+    @GetMapping("/ownerOptions")
+    public AjaxResult ownerOptions(@Parameter(description = "家庭名称模糊搜索词")
+            @RequestParam(required = false) String keyword) {
+        return success(mealDishService.selectOwnerOptions(keyword));
+    }
+
+    /**
+     * 调整菜品归属
+     *
+     * <p>只允许平台管理员在「公共菜谱」与有效家庭之间迁移。带旧归属做并发校验。</p>
+     */
+    @Operation(summary = "调整菜品归属", description = "仅平台管理员；目标为 0（公共）或有效家庭 ID")
+    @PreAuthorize("@ss.hasPermi('meal:dish:owner') and @ss.isAdmin()")
+    @Log(title = "点餐菜品归属", businessType = BusinessType.UPDATE)
+    @PutMapping("/{dishId}/owner")
+    public AjaxResult changeOwner(@Parameter(description = "菜品ID", required = true) @PathVariable("dishId") Long dishId,
+            @Valid @RequestBody DishOwnerChangeRequest request) {
+        return toAjax(mealDishService.changeDishOwner(dishId, request));
     }
 }

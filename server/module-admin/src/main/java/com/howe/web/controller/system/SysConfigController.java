@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -43,13 +44,34 @@ public class SysConfigController extends BaseController
      * 获取参数配置列表
      */
     @PreAuthorize("@ss.hasPermi('system:config:list')")
-    @Operation(summary = "查询参数配置列表", description = "分页查询系统参数配置")
+    @Operation(summary = "查询参数配置列表", description = "分页查询系统参数配置；传 uncategorized=true 只查未分类")
     @GetMapping("/list")
-    public TableDataInfo list(SysConfig config)
+    public TableDataInfo list(SysConfig config,
+            @Parameter(description = "是否只查未分类（空 / NULL / 纯空白的 param_type）")
+            @RequestParam(required = false) Boolean uncategorized)
     {
+        // SysConfig 继承 BaseEntity，顶层查询参数不会自动落进 params，这里显式搬运
+        if (Boolean.TRUE.equals(uncategorized))
+        {
+            config.getParams().put("uncategorized", Boolean.TRUE);
+        }
         startPage();
         List<SysConfig> list = configService.selectConfigList(config);
         return getDataTable(list);
+    }
+
+    /**
+     * 查询全量参数分类
+     *
+     * <p>供参数管理页的分类下拉使用。结果独立于分页与搜索条件，
+     * 因此不会因为翻页而丢失其它页出现过的分类。</p>
+     */
+    @PreAuthorize("@ss.hasPermi('system:config:list')")
+    @Operation(summary = "查询全量参数分类", description = "返回全表出现过的分类；存在空 / NULL / 纯空白分类时末尾附带「未分类」")
+    @GetMapping("/paramTypes")
+    public AjaxResult paramTypes()
+    {
+        return success(configService.selectParamTypes());
     }
 
     @Log(title = "参数管理", businessType = BusinessType.EXPORT)

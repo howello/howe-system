@@ -61,7 +61,7 @@
 
     <!-- 新增 / 修改 -->
     <el-dialog :title="title" v-model="open" width="600px" append-to-body>
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+      <el-form ref="entityFormRef" :model="form" :rules="rules" label-width="100px">
         <el-form-item label="源名称" prop="name">
           <el-input v-model="form.name" placeholder="如：我的坚果云" />
         </el-form-item>
@@ -178,7 +178,7 @@ function reset() {
     status: '0',
     remark: undefined
   }
-  proxy.resetForm('formRef')
+  proxy.resetForm('entityFormRef')
 }
 
 function handleQuery() {
@@ -216,7 +216,7 @@ function handleUpdate(row?: ShareSource) {
 }
 
 function submitForm() {
-  formRef(proxy.$refs['formRef']).validate((valid: boolean) => {
+  formRef(proxy.$refs['entityFormRef']).validate((valid: boolean) => {
     if (!valid) return
     const payload = { ...form.value }
     if (payload.sourceId && !payload.password) {

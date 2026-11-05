@@ -94,6 +94,14 @@ public class SysLoginController
         ajax.put("pwdChrtype", getSysAccountChrtype());
         ajax.put("isDefaultModifyPwd", initPasswordIsModify(user.getPwdUpdateDate()));
         ajax.put("isPasswordExpired", passwordIsExpiration(user.getPwdUpdateDate()));
+        // 前端用「角色含 admin」判断管理员，与后端 SecurityUtils.isAdmin()（userId=1）不等价。
+        // 归属调整这类「必须平台管理员本人」的入口展示，统一由服务端下发，
+        // 前端不再自行组合角色与权限。
+        //
+        // 注意权限集合的两种形态：超级管理员拿到的是通配 "*:*:*"，
+        // 普通角色才是具体串。只做 contains 精确匹配会让 admin 恒为 false。
+        boolean ownerPermitted = permissions.contains("*:*:*") || permissions.contains("meal:dish:owner");
+        ajax.put("canChangeDishOwner", ownerPermitted && SecurityUtils.isAdmin());
         return ajax;
     }
 

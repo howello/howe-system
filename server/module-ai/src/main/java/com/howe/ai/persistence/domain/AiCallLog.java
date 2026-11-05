@@ -58,6 +58,15 @@ public class AiCallLog extends BaseEntity
     @Schema(description = "耗时（毫秒）")
     private Integer elapsedMs;
 
+    /**
+     * 首字延迟（毫秒）
+     *
+     * <p>定义为「从调用入口到第一个非空正文增量」的耗时。同步调用、历史记录、
+     * 以及未产出正文的失败调用为 null，前端显示「—」，不能用总耗时冒充。</p>
+     */
+    @Schema(description = "首字延迟（毫秒），仅产生正文的流式调用有值")
+    private Integer firstTokenMs;
+
     @Schema(description = "状态：SUCCESS / FAILED")
     private String status;
 

@@ -5,6 +5,8 @@ import type {
   ShareLinkCreateRequest,
   ShareLinkUpdateRequest,
   ShareAccessLog,
+  ShareUploadResult,
+  ShareRemoteCheckResult,
   AjaxResult,
   TableDataInfo
 } from '@/types'
@@ -74,5 +76,28 @@ export function listLinkLogs(linkId: number): Promise<AjaxResult<ShareAccessLog[
   return request({
     url: '/share/link/logs/' + linkId,
     method: 'get'
+  })
+}
+
+/** 本地上传暂存：返回一次性令牌，创建分享时用 uploadToken 认领 */
+export function uploadShareFile(file: File): Promise<AjaxResult<ShareUploadResult>> {
+  const data = new FormData()
+  data.append('file', file)
+  return request({
+    url: '/share/link/upload',
+    method: 'post',
+    data,
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000
+  })
+}
+
+/** 校验远程链接可达性；结果仅供即时反馈，创建时服务端会再校验 */
+export function checkShareRemote(url: string): Promise<AjaxResult<ShareRemoteCheckResult>> {
+  return request({
+    url: '/share/link/check-remote',
+    method: 'post',
+    data: { url },
+    timeout: 60000
   })
 }

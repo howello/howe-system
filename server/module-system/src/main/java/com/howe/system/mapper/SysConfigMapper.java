@@ -35,6 +35,22 @@ public interface SysConfigMapper
     public List<SysConfig> selectConfigList(SysConfig config);
 
     /**
+     * 查询全量参数分类
+     *
+     * <p>去掉首尾空白与空值后去重，按名称升序返回。</p>
+     *
+     * @return 分类值集合
+     */
+    public List<String> selectDistinctParamTypes();
+
+    /**
+     * 统计未分类的参数数量
+     *
+     * @return 空 / NULL / 纯空白分类的记录数
+     */
+    public int countUncategorized();
+
+    /**
      * 根据键名查询参数配置信息
      *
      * @param configKey 参数键名

@@ -57,6 +57,26 @@ export const constantRoutes = [
     component: () => import('@/views/error/401.vue'),
     hidden: true
   },
+  /**
+   * 旧日志地址兼容：日志管理已从「系统管理」迁到「系统监控」，
+   * 路由前缀由 /system/log/... 变为 /monitor/log/...
+   * 保留一轮重定向，避免旧书签 404。指向同一组件，不生成第二套业务菜单。
+   */
+  {
+    path: '/system/log',
+    redirect: '/monitor/log',
+    hidden: true
+  },
+  {
+    path: '/system/log/operlog',
+    redirect: '/monitor/log/operlog',
+    hidden: true
+  },
+  {
+    path: '/system/log/logininfor',
+    redirect: '/monitor/log/logininfor',
+    hidden: true
+  },
   {
     path: '',
     component: Layout,

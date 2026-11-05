@@ -42,6 +42,8 @@ export interface AiCallLog extends BaseEntity {
   imageCount?: number;
   /** 耗时（毫秒） */
   elapsedMs?: number;
+  /** 首字延迟（毫秒）；仅产生正文的流式调用有值，其余为 null */
+  firstTokenMs?: number;
   /** 状态：SUCCESS / FAILED */
   status?: string;
   /** 错误码 */
@@ -50,6 +52,34 @@ export interface AiCallLog extends BaseEntity {
   requestDigest?: string;
   /** 触发人 */
   operator?: string;
+  /** 场景展示名称（详情接口返回） */
+  sceneName?: string;
+  /** 服务商展示名（详情接口返回） */
+  providerName?: string;
+  /** 渠道名称；渠道已删除时为占位（详情接口返回） */
+  channelName?: string;
+  /** 模型名称；模型已删除时为占位（详情接口返回） */
+  modelName?: string;
+  /** 生成图资产（详情接口返回，无图时为空数组） */
+  images?: AiImageAsset[];
+}
+
+/** AI 生成图资产 */
+export interface AiImageAsset {
+  /** 主键ID */
+  id?: number;
+  /** 关联的调用记录ID */
+  callLogId?: number;
+  /** 对象存储键 */
+  objectKey?: string;
+  /** 永久访问地址 */
+  url: string;
+  /** 宽 */
+  width?: number;
+  /** 高 */
+  height?: number;
+  /** 字节数 */
+  sizeBytes?: number;
 }
 
 /** 用量统计查询参数 */

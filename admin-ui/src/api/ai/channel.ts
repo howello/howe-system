@@ -61,11 +61,13 @@ export function changeChannelStatus(id: number, enabled: number): Promise<AjaxRe
   })
 }
 
-// 测试渠道连通性
+// 测试渠道连通性；指定 modelId 时只测该模型（后端会校验模型是否属于此渠道）
 export function testChannel(id: number, modelId?: number): Promise<AjaxResult> {
   return request({
     url: '/ai/channel/' + id + '/test',
     method: 'post',
-    params: modelId ? { modelId } : {}
+    params: modelId ? { modelId } : {},
+    // 健康检查要发真实请求，默认 10s 不够
+    timeout: 60000
   })
 }

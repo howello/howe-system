@@ -36,6 +36,14 @@ public class AiChatResult
     @Schema(description = "本次调用耗时（毫秒）")
     private long elapsedMs;
 
+    /**
+     * 首字延迟（毫秒）
+     *
+     * <p>只有产生了正文的流式调用有值；同步调用与未产出正文的失败调用为 null。</p>
+     */
+    @Schema(description = "首字延迟（毫秒），仅流式且有正文时非空")
+    private Integer firstTokenMs;
+
     @Schema(description = "结束原因", example = "STOP")
     private String finishReason;
 

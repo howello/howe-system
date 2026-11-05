@@ -5,9 +5,11 @@ import cn.hutool.core.util.StrUtil;
 import com.howe.common.constant.ConfigConstants;
 import com.howe.common.exception.ServiceException;
 import com.howe.common.utils.ConfigUtils;
+import com.howe.common.utils.http.RemoteFileClient;
 import com.howe.share.config.ShareCacheExecutorConfig;
 import com.howe.share.constant.ShareConstants;
 import com.howe.share.domain.ShareLink;
+import com.howe.share.domain.ShareUpload;
 import com.howe.share.mapper.ShareLinkMapper;
 import com.howe.share.route.ShareRouteCache;
 import com.howe.share.storage.ShareStorageService;
@@ -21,6 +23,9 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 
 /**
@@ -53,6 +58,8 @@ public class ShareCacheService {
 
     private final ThreadPoolTaskExecutor executor;
 
+    private final ShareUploadService shareUploadService;
+
     /**
      * 构造缓存服务
      *
@@ -62,17 +69,20 @@ public class ShareCacheService {
      * @param storageService    存储门面
      * @param routeCache        路由缓存
      * @param executor          分享专用线程池（按 Bean 名注入，避开框架共享池）
+     * @param shareUploadService 上传暂存服务（本地来源取流与清理）
      */
     public ShareCacheService(ShareLinkMapper shareLinkMapper, IShareSourceService shareSourceService,
                              ShareWebDavClient webDavClient, ShareStorageService storageService,
                              ShareRouteCache routeCache,
-                             @Qualifier(ShareCacheExecutorConfig.EXECUTOR_BEAN) ThreadPoolTaskExecutor executor) {
+                             @Qualifier(ShareCacheExecutorConfig.EXECUTOR_BEAN) ThreadPoolTaskExecutor executor,
+                             ShareUploadService shareUploadService) {
         this.shareLinkMapper = shareLinkMapper;
         this.shareSourceService = shareSourceService;
         this.webDavClient = webDavClient;
         this.storageService = storageService;
         this.routeCache = routeCache;
         this.executor = executor;
+        this.shareUploadService = shareUploadService;
     }
 
     /**
@@ -112,21 +122,111 @@ public class ShareCacheService {
             return;
         }
         try {
-            WebDavAuth auth = shareSourceService.authOf(link.getSourceId());
             byte[] bytes;
-            try (InputStream in = webDavClient.open(auth, link.getFilePath())) {
-                bytes = readLimited(in, maxSize());
+            String sourceType = StrUtil.blankToDefault(link.getSourceType(), ShareConstants.SOURCE_WEBDAV);
+            if (ShareConstants.SOURCE_LOCAL.equals(sourceType)) {
+                bytes = readLocalUpload(link);
+            } else if (ShareConstants.SOURCE_REMOTE.equals(sourceType)) {
+                bytes = readRemote(link);
+            } else {
+                // WebDAV：既有路径不变
+                WebDavAuth auth = shareSourceService.authOf(link.getSourceId());
+                try (InputStream in = webDavClient.open(auth, link.getFilePath())) {
+                    bytes = readLimited(in, maxSize());
+                }
             }
             String location = storageService.store(link, bytes);
             shareLinkMapper.markCacheReady(linkId, link.getStorageType(), location, (long) bytes.length, link.getContentType());
             link.setStorageLocation(location);
             link.setFileSize((long) bytes.length);
             routeCache.put(link);
+            // 本地来源缓存成功后才删暂存，失败时保留以便重试
+            if (ShareConstants.SOURCE_LOCAL.equals(sourceType) && link.getLocalUploadId() != null) {
+                shareUploadService.markBound(link.getLocalUploadId());
+            }
             log.info("分享文件缓存就绪：linkId={}, storage={}, size={}", linkId, link.getStorageType(), bytes.length);
         } catch (Exception e) {
             log.warn("分享文件缓存失败：linkId={}，原因：{}", linkId, e.getMessage());
             shareLinkMapper.markCacheFailed(linkId, truncate(e.getMessage()));
         }
+    }
+
+    /**
+     * 读取本地上传的暂存字节
+     *
+     * @param link 分享记录
+     * @return 字节内容
+     * @throws IOException IO 异常
+     */
+    private byte[] readLocalUpload(ShareLink link) throws IOException {
+        if (link.getLocalUploadId() == null) {
+            throw new ServiceException("本地上传记录缺失");
+        }
+        ShareUpload upload = shareUploadService.selectById(link.getLocalUploadId());
+        if (upload == null || StrUtil.isBlank(upload.getStagingLocation())) {
+            throw new ServiceException("本地上传的暂存文件已清理，请重新创建分享");
+        }
+        Path path = Paths.get(stagingRoot(), upload.getStagingLocation()).normalize();
+        // 防路径穿越：解析后必须仍在暂存根目录内
+        if (!path.startsWith(Paths.get(stagingRoot()).normalize())) {
+            throw new ServiceException("暂存路径不合法");
+        }
+        if (!Files.exists(path)) {
+            throw new ServiceException("本地上传的暂存文件已清理，请重新创建分享");
+        }
+        try (InputStream in = Files.newInputStream(path)) {
+            return readLimited(in, maxSize());
+        }
+    }
+
+    /**
+     * 拉取远程链接字节
+     *
+     * <p>拉取时再做一次安全校验（防 DNS 重绑定）；有界读取，不信任响应头声明的大小。</p>
+     *
+     * @param link 分享记录
+     * @return 字节内容
+     */
+    private byte[] readRemote(ShareLink link) {
+        if (StrUtil.isBlank(link.getRemoteUrl())) {
+            throw new ServiceException("远程链接缺失");
+        }
+        Path temp = null;
+        try {
+            temp = Files.createTempFile("share-remote-", ".tmp");
+            RemoteFileClient.ProbeResult result = RemoteFileClient.download(link.getRemoteUrl(),
+                    maxSize(), 30000, 3, temp);
+            if (!result.reachable() || result.tempFile() == null) {
+                throw new ServiceException("远程链接拉取失败：" + result.reason());
+            }
+            return Files.readAllBytes(result.tempFile());
+        } catch (ServiceException e) {
+            throw e;
+        } catch (IOException e) {
+            throw new ServiceException("远程链接拉取失败：" + e.getMessage());
+        } finally {
+            if (temp != null) {
+                cn.hutool.core.io.FileUtil.del(temp.toFile());
+            }
+        }
+    }
+
+    /**
+     * 暂存根目录
+     *
+     * @return 暂存根目录路径
+     */
+    private String stagingRoot() {
+        return ConfigUtils.getString(ConfigConstants.SHARE_UPLOAD_DIR, uploadDefaultDir());
+    }
+
+    /**
+     * 暂存根目录默认值
+     *
+     * @return 默认路径
+     */
+    private String uploadDefaultDir() {
+        return cn.hutool.core.io.FileUtil.getTmpDirPath() + "share-upload";
     }
 
     /**

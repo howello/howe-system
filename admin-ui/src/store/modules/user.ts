@@ -15,6 +15,8 @@ interface UserState {
   avatar: string
   roles: string[]
   permissions: string[]
+  /** 服务端下发的平台管理员能力：调整菜品归属（userId=1 且持有 meal:dish:owner） */
+  canChangeDishOwner: boolean
 }
 
 const useUserStore = defineStore(
@@ -27,7 +29,8 @@ const useUserStore = defineStore(
       nickName: '',
       avatar: '',
       roles: [],
-      permissions: []
+      permissions: [],
+      canChangeDishOwner: false
     }),
     actions: {
       // 登录
@@ -68,6 +71,8 @@ const useUserStore = defineStore(
             this.name = user.userName || ''
             this.nickName = user.nickName || ''
             this.avatar = avatar
+            // 服务端下发的平台管理员能力（与「角色含 admin」不等价），见 /getInfo 后端注释
+            this.canChangeDishOwner = res.canChangeDishOwner === true
             cache.session.set('pwrChrtype', res.pwdChrtype ?? '')
             /* 初始密码提示 */
             if(res.isDefaultModifyPwd) {

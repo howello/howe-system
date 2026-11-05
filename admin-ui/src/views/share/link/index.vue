@@ -52,7 +52,20 @@
           <span v-else>-</span>
         </template>
       </el-table-column>
-      <el-table-column label="源" prop="sourceName" width="130" show-overflow-tooltip />
+      <el-table-column label="来源" width="110" align="center">
+        <template #default="scope">
+          <el-tag size="small" :type="sourceTypeTag(scope.row.sourceType)">
+            {{ sourceTypeText(scope.row.sourceType) }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="源" prop="sourceName" width="130" show-overflow-tooltip>
+        <template #default="scope">
+          <span v-if="scope.row.sourceType === 'REMOTE'">远程链接</span>
+          <span v-else-if="scope.row.sourceType === 'LOCAL'">本地上传</span>
+          <span v-else>{{ scope.row.sourceName || "-" }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="大小" width="100" align="right">
         <template #default="{ row }">{{ fmtSize(row.fileSize) }}</template>
       </el-table-column>
@@ -97,19 +110,57 @@
 
     <!-- 创建 / 修改 -->
     <el-dialog :title="title" v-model="open" width="640px" append-to-body>
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
-        <el-form-item label="WebDAV 源" prop="sourceId">
-          <el-select v-model="form.sourceId" placeholder="请选择源" style="width: 100%" :disabled="!!form.linkId">
-            <el-option v-for="s in sourceOptions" :key="s.sourceId" :label="s.name" :value="s.sourceId" />
-          </el-select>
+      <el-form ref="shareFormRef" :model="form" :rules="rules" label-width="110px">
+        <el-form-item label="来源" prop="sourceType">
+          <el-radio-group v-model="form.sourceType" :disabled="!!form.linkId" @change="handleSourceTypeChange">
+            <el-radio value="WEBDAV">WebDAV 源</el-radio>
+            <el-radio value="LOCAL">本地文件</el-radio>
+            <el-radio value="REMOTE">远程链接</el-radio>
+          </el-radio-group>
+          <div v-if="form.linkId" class="form-tip">创建后不允许更换来源，需要换文件请新建分享</div>
         </el-form-item>
-        <el-form-item label="文件" prop="filePath">
-          <el-input v-model="form.filePath" placeholder="点击选择文件" readonly class="file-pick-input" @click="openBrowser">
-            <template #prefix>
-              <el-icon><FolderOpened /></el-icon>
-            </template>
-          </el-input>
-        </el-form-item>
+
+        <template v-if="form.sourceType === 'WEBDAV'">
+          <el-form-item label="WebDAV 源" prop="sourceId">
+            <el-select v-model="form.sourceId" placeholder="请选择源" style="width: 100%" :disabled="!!form.linkId">
+              <el-option v-for="s in sourceOptions" :key="s.sourceId" :label="s.name" :value="s.sourceId" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="文件" prop="filePath">
+            <el-input v-model="form.filePath" placeholder="点击选择文件" readonly class="file-pick-input" @click="openBrowser">
+              <template #prefix>
+                <el-icon><FolderOpened /></el-icon>
+              </template>
+            </el-input>
+          </el-form-item>
+        </template>
+
+        <template v-else-if="form.sourceType === 'LOCAL'">
+          <el-form-item label="本地文件" prop="uploadToken">
+            <div class="upload-row">
+              <el-upload :show-file-list="false" :before-upload="beforeLocalUpload" :http-request="handleLocalUpload">
+                <el-button type="primary" :loading="uploading" :disabled="!!form.linkId">选择文件</el-button>
+              </el-upload>
+              <span v-if="localFileName" class="upload-name">{{ localFileName }}（{{ fmtSize(localFileSize) }}）</span>
+            </div>
+            <div class="form-tip">文件先上传到暂存区，创建分享时才绑定；未提交的上传 24 小时后自动清理</div>
+          </el-form-item>
+        </template>
+
+        <template v-else>
+          <el-form-item label="远程链接" prop="remoteUrl">
+            <div class="upload-row">
+              <el-input v-model="form.remoteUrl" placeholder="https://... 文件直链" style="width: 360px" @input="remoteChecked = null" />
+              <el-button :loading="checkingRemote" :disabled="!form.remoteUrl || !!form.linkId" @click="handleCheckRemote">校验</el-button>
+            </div>
+            <el-alert v-if="remoteChecked" :type="remoteChecked.reachable ? 'success' : 'error'" :closable="false" show-icon
+              :title="remoteChecked.reachable
+                ? `校验通过：${fmtSize(remoteChecked.fileSize)}，${remoteChecked.checkedAt}`
+                : `校验未通过：${remoteChecked.reason || '远程地址不可达'}`" />
+            <div class="form-tip">仅支持 https；服务端会先校验可达性，创建后再由后台拉取缓存</div>
+          </el-form-item>
+        </template>
+
         <el-form-item label="访问密码" prop="password">
           <el-input v-model="form.password" type="password" show-password
                     :placeholder="form.linkId ? '留空表示不修改密码' : '留空表示无密码'" />
@@ -182,10 +233,12 @@ import {
   delLink,
   changeLinkStatus,
   recacheLink,
-  listLinkLogs
+  listLinkLogs,
+  uploadShareFile,
+  checkShareRemote
 } from '@/api/share/link'
 import { listEnabledSource } from '@/api/share/source'
-import type { ShareLink, ShareLinkQueryParams, ShareSource, WebDavEntry, ShareAccessLog } from '@/types'
+import type { ShareLink, ShareLinkQueryParams, ShareSource, WebDavEntry, ShareAccessLog, ShareRemoteCheckResult } from '@/types'
 import FileBrowserDialog from '@/views/share/components/FileBrowserDialog.vue'
 import { Search, Refresh, Plus, Delete, Edit, CopyDocument, FolderOpened } from '@element-plus/icons-vue'
 
@@ -210,6 +263,16 @@ const logsLoading = ref(false)
 const logs = ref<ShareAccessLog[]>([])
 
 const clearPassword = ref(false)
+
+/** 本地上传：令牌、文件名、大小 */
+const uploading = ref(false)
+const uploadToken = ref<string | undefined>(undefined)
+const localFileName = ref<string>('')
+const localFileSize = ref<number>(0)
+
+/** 远程链接校验状态；改 URL 后立即失效 */
+const checkingRemote = ref(false)
+const remoteChecked = ref<ShareRemoteCheckResult | null>(null)
 
 /** 过期时间快捷项 */
 function hoursLater(h: number) {
@@ -255,12 +318,26 @@ const data = reactive({
     cacheStatus: undefined
   } as ShareLinkQueryParams,
   rules: {
-    sourceId: [{ required: true, message: '请选择 WebDAV 源', trigger: 'change' }],
-    filePath: [{ required: true, message: '请选择文件', trigger: 'change' }]
+    // 来源相关字段按类型在提交前单独校验（见 checkSourceFields），
+    // 不能在这里无条件 required，否则切到本地/远程后表单永远过不了
   }
 })
 
 const { queryParams, form, rules } = toRefs(data)
+
+/** 来源类型展示名 */
+function sourceTypeText(type?: string): string {
+  if (type === 'LOCAL') return '本地文件'
+  if (type === 'REMOTE') return '远程链接'
+  return 'WebDAV'
+}
+
+/** 来源类型标签样式 */
+function sourceTypeTag(type?: string): 'success' | 'warning' | 'info' {
+  if (type === 'LOCAL') return 'success'
+  if (type === 'REMOTE') return 'warning'
+  return 'info'
+}
 
 /** 查询分享列表 */
 function getList() {
@@ -289,17 +366,25 @@ function cancel() {
 
 function reset() {
   clearPassword.value = false
+  uploadToken.value = undefined
+  localFileName.value = ''
+  localFileSize.value = 0
+  remoteChecked.value = null
   form.value = {
     linkId: undefined,
+    sourceType: 'WEBDAV',
     sourceId: undefined,
     filePath: undefined,
+    // uploadToken 不在表单元对象里：它在独立的 uploadToken ref 中，
+    // 创建时才放进请求体，避免把一个上传凭据混进分享实体字段
+    remoteUrl: undefined,
     password: undefined,
     expireAt: undefined,
     maxViews: 1,
     burnAfterRead: '0',
     remark: undefined
   }
-  proxy.resetForm('formRef')
+  proxy.resetForm('shareFormRef')
 }
 
 function handleQuery() {
@@ -333,8 +418,10 @@ function handleUpdate(row: ShareLink) {
     }
     form.value = {
       linkId: detail.linkId,
+      sourceType: detail.sourceType || 'WEBDAV',
       sourceId: detail.sourceId,
       filePath: detail.filePath,
+      remoteUrl: detail.remoteUrl,
       password: undefined,
       expireAt: detail.expireAt,
       maxViews: detail.maxViews,
@@ -347,8 +434,9 @@ function handleUpdate(row: ShareLink) {
 }
 
 function submitForm() {
-  formRef(proxy.$refs['formRef']).validate((valid: boolean) => {
+  formRef(proxy.$refs['shareFormRef']).validate((valid: boolean) => {
     if (!valid) return
+    if (!checkSourceFields()) return
     if (form.value.linkId) {
       submitUpdate()
     } else {
@@ -357,16 +445,106 @@ function submitForm() {
   })
 }
 
+/** 按来源类型校验必填项：规则是条件性的，不能放进静态 rules */
+function checkSourceFields(): boolean {
+  if (form.value.linkId) return true
+  if (form.value.sourceType === 'WEBDAV') {
+    if (!form.value.sourceId) {
+      proxy.$modal.msgError('请选择 WebDAV 源')
+      return false
+    }
+    if (!form.value.filePath) {
+      proxy.$modal.msgError('请选择文件')
+      return false
+    }
+    return true
+  }
+  if (form.value.sourceType === 'LOCAL') {
+    if (!uploadToken.value) {
+      proxy.$modal.msgError('请先选择并上传本地文件')
+      return false
+    }
+    return true
+  }
+  if (!form.value.remoteUrl) {
+    proxy.$modal.msgError('请填写远程链接')
+    return false
+  }
+  return true
+}
+
+/** 切换来源时清掉不匹配的字段，避免把上一次的残留一起提交 */
+function handleSourceTypeChange() {
+  uploadToken.value = undefined
+  localFileName.value = ''
+  localFileSize.value = 0
+  remoteChecked.value = null
+  if (form.value.sourceType !== 'WEBDAV') {
+    form.value.sourceId = undefined
+    form.value.filePath = undefined
+  }
+  if (form.value.sourceType !== 'REMOTE') {
+    form.value.remoteUrl = undefined
+  }
+}
+
+/** 本地上传：成功后记住令牌，创建分享时才绑定 */
+function beforeLocalUpload(file: File): boolean {
+  if (file.size > 50 * 1024 * 1024) {
+    proxy.$modal.msgError('文件不能超过 50MB')
+    return false
+  }
+  return true
+}
+
+function handleLocalUpload(options: any) {
+  uploading.value = true
+  uploadShareFile(options.file)
+    .then((response: any) => {
+      const data = response.data
+      uploadToken.value = data?.uploadToken
+      localFileName.value = data?.fileName || ''
+      localFileSize.value = data?.fileSize || 0
+      uploading.value = false
+      proxy.$modal.msgSuccess('上传成功')
+    })
+    .catch(() => {
+      uploading.value = false
+    })
+}
+
+/** 远程链接即时校验；只作反馈，创建时服务端会再校验 */
+function handleCheckRemote() {
+  if (!form.value.remoteUrl) return
+  checkingRemote.value = true
+  checkShareRemote(form.value.remoteUrl)
+    .then((response: any) => {
+      remoteChecked.value = response.data as ShareRemoteCheckResult
+      checkingRemote.value = false
+    })
+    .catch(() => {
+      checkingRemote.value = false
+    })
+}
+
 function submitCreate() {
-  addLink({
-    sourceId: form.value.sourceId,
-    filePath: form.value.filePath,
+  const payload: any = {
+    sourceType: form.value.sourceType || 'WEBDAV',
     password: form.value.password || undefined,
     expireAt: form.value.expireAt || undefined,
     maxViews: form.value.maxViews,
     burnAfterRead: form.value.burnAfterRead,
     remark: form.value.remark
-  }).then((response) => {
+  }
+  if (form.value.sourceType === 'LOCAL') {
+    payload.uploadToken = uploadToken.value
+  } else if (form.value.sourceType === 'REMOTE') {
+    payload.remoteUrl = form.value.remoteUrl
+  } else {
+    payload.sourceId = form.value.sourceId
+    payload.filePath = form.value.filePath
+  }
+  addLink(payload).then((response) => {
     const url = response.data?.shortUrl
     proxy.$modal.msgSuccess('创建成功')
     open.value = false
@@ -506,5 +684,16 @@ getList()
 }
 .file-pick-input :deep(.el-input__wrapper) {
   cursor: pointer;
+}
+.upload-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.upload-name {
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+  word-break: break-all;
 }
 </style>

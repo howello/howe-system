@@ -8,6 +8,7 @@ import com.howe.share.domain.ShareLink;
 import com.howe.share.mapper.ShareAccessLogMapper;
 import com.howe.share.mapper.ShareLinkMapper;
 import com.howe.share.route.ShareRouteCache;
+import com.howe.share.service.ShareUploadService;
 import com.howe.share.storage.ShareStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,14 +48,30 @@ public class ShareCleanupTask {
 
     private final ShareStorageService storageService;
 
+    private final ShareUploadService shareUploadService;
+
     /**
      * 清理任务（每 10 分钟一次）
      */
     @Scheduled(fixedDelay = 600000, initialDelay = 60000)
     public void cleanup() {
         cleanupLinks();
+        cleanupUploads();
         cleanupOrphanFiles();
         cleanupLogs();
+    }
+
+    /**
+     * 清理过期与长期未完成的本地上传暂存
+     *
+     * <p>只回收已过期与认领后超时的记录；正在缓存中的文件不能被误删。</p>
+     */
+    private void cleanupUploads() {
+        try {
+            shareUploadService.cleanupExpired();
+        } catch (Exception e) {
+            log.warn("清理上传暂存失败", e);
+        }
     }
 
     /**

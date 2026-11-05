@@ -98,6 +98,7 @@ drop table if exists ai_scene_route;
 create table ai_scene_route (
   id                  bigint(20)    not null auto_increment    comment '主键ID',
   scene               varchar(128)  not null                   comment '场景标识，如 blog.recipe.cover',
+  scene_name          varchar(100)  not null                   comment '场景展示名称，如 菜品封面生成；与 scene 分开，改名不影响路由',
   capability          varchar(16)   not null                   comment '能力类型：CHAT / VISION / IMAGE / EMBEDDING',
   primary_model_id    bigint(20)    not null                   comment '主模型ID',
   fallback_model_ids  json          default null               comment '有序降级链，元素为模型ID，如 [3,7]',
@@ -129,6 +130,7 @@ create table ai_call_log (
   output_tokens     int(11)         default null               comment '输出 token 数',
   image_count       int(11)         default null               comment '生成图片张数',
   elapsed_ms        int(11)         default null               comment '耗时（毫秒）',
+  first_token_ms    int(11)         default null               comment '首字延迟（毫秒），仅产生正文的流式调用有值',
   status            varchar(16)     not null                   comment '状态：SUCCESS / FAILED',
   error_code        varchar(32)     default null               comment '错误码',
   request_digest    varchar(512)    default null               comment '脱敏后的入参摘要，不含完整 prompt 与密钥',
@@ -159,24 +161,27 @@ create table ai_image_asset (
 ) engine=innodb auto_increment=1 comment = 'AI 生成图资产表';
 
 -- ----------------------------------------------------------------------------
--- 7. 服务商基础数据（对应代码里的三个协议适配器，只初始化一次）
+-- 7. 服务商基础数据（配置入口只保留三项：阿里百炼 / OpenAI / Anthropic）
+--
+-- raw-http 不再种入：它是历史协议，存量渠道保留为停用状态供审计，
+-- 新库不需要它。已有库由增量脚本把对应渠道停用。
 -- ----------------------------------------------------------------------------
-delete from ai_provider where code in ('dashscope', 'openai-compatible', 'raw-http');
+delete from ai_provider where code in ('dashscope', 'openai-compatible', 'anthropic', 'raw-http');
 
 insert into ai_provider (code, name, protocol, default_base_url, supports, enabled, sort, remark, create_by, create_time)
-values ('dashscope', '阿里云百炼', 'dashscope', 'https://dashscope.aliyuncs.com',
+values ('dashscope', '阿里百炼', 'dashscope', 'https://dashscope.aliyuncs.com',
         '["chat","vision","image","embedding"]', 1, 1,
         '通义千问（对话/图片理解）、通义万相（文生图）、text-embedding', 'admin', sysdate());
 
 insert into ai_provider (code, name, protocol, default_base_url, supports, enabled, sort, remark, create_by, create_time)
-values ('openai-compatible', 'OpenAI 兼容端点', 'openai', 'https://api.openai.com',
+values ('openai-compatible', 'OpenAI', 'openai', 'https://api.openai.com',
         '["chat","vision","image","embedding"]', 1, 2,
-        '任何 OpenAI 兼容协议的服务：DeepSeek、月之暗面、智谱、火山方舟、自建 vLLM；接入点请在渠道上覆盖', 'admin', sysdate());
+        'OpenAI 及任何 OpenAI 兼容协议的服务：DeepSeek、月之暗面、智谱、火山方舟、自建 vLLM；接入点可在渠道上覆盖。保留 code openai-compatible 以兼容既有渠道', 'admin', sysdate());
 
 insert into ai_provider (code, name, protocol, default_base_url, supports, enabled, sort, remark, create_by, create_time)
-values ('raw-http', '原生异步文生图', 'raw-http', null,
-        '["image"]', 1, 3,
-        'Spring AI 未覆盖的异步文生图接口，自行实现提交与轮询；接入点必须在渠道上指定', 'admin', sysdate());
+values ('anthropic', 'Anthropic', 'anthropic', 'https://api.anthropic.com',
+        '["chat","vision"]', 1, 3,
+        'Anthropic Messages API；只支持对话与图片理解，不支持文生图与向量。API 版本 2026-10-21 起不再接受 temperature/top_p/top_k', 'admin', sysdate());
 
 -- ----------------------------------------------------------------------------
 -- 8. 业务场景路由种子（meal.* 一键 AI / 新菜审核）
@@ -189,48 +194,48 @@ values ('raw-http', '原生异步文生图', 'raw-http', null,
 delete from ai_scene_route where scene in ('meal.dish.generate', 'meal.dish.audit', 'meal.dish.update', 'meal.dish.search', 'meal.dish.cover', 'meal.app.version.log');
 
 -- 对话补齐：优先名为 deepseek-flash 的对话模型，否则取首个启用的对话模型
-insert into ai_scene_route (scene, capability, primary_model_id, params, enabled, remark, create_by, create_time)
-select 'meal.dish.generate', 'CHAT', m.id, '{"temperature":0.7}', 1, '菜品一键AI-文本补齐', 'admin', sysdate()
+insert into ai_scene_route (scene, scene_name, capability, primary_model_id, params, enabled, remark, create_by, create_time)
+select 'meal.dish.generate', '菜品文本补全', 'CHAT', m.id, '{"temperature":0.7}', 1, '菜品一键AI-文本补齐', 'admin', sysdate()
 from ai_model m
 where m.capability = 'CHAT' and m.enabled = 1
 order by (m.model_name = 'deepseek-flash') desc, m.id asc
 limit 1;
 
 -- 菜品搜索同义词识别：AI 只扩展查询词，最终菜品由 module-meal 按家庭范围查库
-insert into ai_scene_route (scene, capability, primary_model_id, params, enabled, remark, create_by, create_time)
-select 'meal.dish.search', 'CHAT', m.id, '{"temperature":0.1}', 1, '点餐菜品搜索-同义词识别', 'admin', sysdate()
+insert into ai_scene_route (scene, scene_name, capability, primary_model_id, params, enabled, remark, create_by, create_time)
+select 'meal.dish.search', '菜品智能搜索', 'CHAT', m.id, '{"temperature":0.1}', 1, '点餐菜品搜索-同义词识别', 'admin', sysdate()
 from ai_model m
 where m.capability = 'CHAT' and m.enabled = 1
 order by (m.model_name = 'deepseek-flash') desc, m.id asc
 limit 1;
 
 -- 新菜提案自动审核：默认与对话补齐同模型同参数，后台可单独改配
-insert into ai_scene_route (scene, capability, primary_model_id, params, enabled, remark, create_by, create_time)
-select 'meal.dish.audit', 'CHAT', m.id, '{"temperature":0.7}', 1, '新菜提案AI自动审核', 'admin', sysdate()
+insert into ai_scene_route (scene, scene_name, capability, primary_model_id, params, enabled, remark, create_by, create_time)
+select 'meal.dish.audit', '新菜提案自动审核', 'CHAT', m.id, '{"temperature":0.7}', 1, '新菜提案AI自动审核', 'admin', sysdate()
 from ai_model m
 where m.capability = 'CHAT' and m.enabled = 1
 order by (m.model_name = 'deepseek-flash') desc, m.id asc
 limit 1;
 
 -- 菜品 AI 更新（从完整做法提取字段）：默认与对话补齐同模型同参数，后台可单独改配
-insert into ai_scene_route (scene, capability, primary_model_id, params, enabled, remark, create_by, create_time)
-select 'meal.dish.update', 'CHAT', m.id, '{"temperature":0.5}', 1, '菜品AI更新-做法提取', 'admin', sysdate()
+insert into ai_scene_route (scene, scene_name, capability, primary_model_id, params, enabled, remark, create_by, create_time)
+select 'meal.dish.update', '菜品做法更新', 'CHAT', m.id, '{"temperature":0.5}', 1, '菜品AI更新-做法提取', 'admin', sysdate()
 from ai_model m
 where m.capability = 'CHAT' and m.enabled = 1
 order by (m.model_name = 'deepseek-flash') desc, m.id asc
 limit 1;
 
 -- App 发版日志润色：CI 发布前把提交摘要提炼成用户可读的更新说明
-insert into ai_scene_route (scene, capability, primary_model_id, params, enabled, remark, create_by, create_time)
-select 'meal.app.version.log', 'CHAT', m.id, '{"temperature":0.5}', 1, 'App发版日志AI润色', 'admin', sysdate()
+insert into ai_scene_route (scene, scene_name, capability, primary_model_id, params, enabled, remark, create_by, create_time)
+select 'meal.app.version.log', 'App 发版日志润色', 'CHAT', m.id, '{"temperature":0.5}', 1, 'App发版日志AI润色', 'admin', sysdate()
 from ai_model m
 where m.capability = 'CHAT' and m.enabled = 1
 order by (m.model_name = 'deepseek-flash') desc, m.id asc
 limit 1;
 
 -- 封面图：取首个启用的文生图模型；没有可用文生图模型时不写入（接口按未配置降级）
-insert into ai_scene_route (scene, capability, primary_model_id, params, enabled, remark, create_by, create_time)
-select 'meal.dish.cover', 'IMAGE', m.id, '{"size":"1024*1024","styleSuffixKey":"recipe.photo"}', 1, '菜品一键AI-封面图', 'admin', sysdate()
+insert into ai_scene_route (scene, scene_name, capability, primary_model_id, params, enabled, remark, create_by, create_time)
+select 'meal.dish.cover', '菜品封面生成', 'IMAGE', m.id, '{"size":"1024*1024","styleSuffixKey":"recipe.photo"}', 1, '菜品一键AI-封面图', 'admin', sysdate()
 from ai_model m
 where m.capability = 'IMAGE' and m.enabled = 1
 order by m.id asc

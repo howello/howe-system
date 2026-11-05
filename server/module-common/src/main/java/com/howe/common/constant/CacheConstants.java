@@ -19,8 +19,19 @@ public class CacheConstants
 
     /**
      * 参数管理 cache key
+     *
+     * <p>注意：{@code resetConfigCache()} 会按此前缀整段清理，因此参数分类选项缓存
+     * <b>不能</b>落在这个前缀下，必须使用独立的 {@link #SYS_CONFIG_PARAM_TYPES_KEY}。</p>
      */
     public static final String SYS_CONFIG_KEY = "sys_config:";
+
+    /**
+     * 参数分类选项缓存 key 前缀
+     *
+     * <p>独立命名空间，避开 {@link #SYS_CONFIG_KEY} 的整段清理，否则「刷新缓存」会把
+     * 代际标识一起删掉，导致并发下旧查询覆盖新结果。</p>
+     */
+    public static final String SYS_CONFIG_PARAM_TYPES_KEY = "sys_config_param_types:";
 
     /**
      * 字典管理 cache key

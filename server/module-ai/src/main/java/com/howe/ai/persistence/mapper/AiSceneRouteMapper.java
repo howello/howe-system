@@ -75,4 +75,25 @@ public interface AiSceneRouteMapper
      * @return 结果
      */
     int deleteAiSceneRouteByIds(@Param("ids") Long[] ids);
+
+    /**
+     * 按场景标识整组更新展示名称
+     *
+     * <p>同一 scene 可能挂在多个能力下，名称必须一致；逐条更新会导致无法改名。</p>
+     *
+     * @param scene     场景标识
+     * @param sceneName 新名称
+     * @param updateBy  更新人
+     * @return 影响行数
+     */
+    int updateSceneNameByScene(@Param("scene") String scene, @Param("sceneName") String sceneName,
+            @Param("updateBy") String updateBy);
+
+    /**
+     * 按场景标识查询该场景下的全部记录
+     *
+     * @param scene 场景标识
+     * @return 记录集合
+     */
+    List<AiSceneRoute> selectBySceneOnly(@Param("scene") String scene);
 }

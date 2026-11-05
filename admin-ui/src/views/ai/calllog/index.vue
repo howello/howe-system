@@ -92,28 +92,70 @@
          @pagination="getList"
       />
 
-      <!-- 详情对话框 -->
-      <el-dialog title="调用记录详情" v-model="open" width="640px" append-to-body>
-         <el-descriptions :column="2" border>
-            <el-descriptions-item label="调用时间">{{ detail.createTime }}</el-descriptions-item>
-            <el-descriptions-item label="链路ID">{{ detail.traceId || "-" }}</el-descriptions-item>
-            <el-descriptions-item label="场景">{{ detail.scene || "-" }}</el-descriptions-item>
-            <el-descriptions-item label="能力">{{ capabilityLabel(detail.capability) }}</el-descriptions-item>
-            <el-descriptions-item label="服务商">{{ detail.providerCode || "-" }}</el-descriptions-item>
-            <el-descriptions-item label="渠道ID">{{ detail.channelId || "-" }}</el-descriptions-item>
-            <el-descriptions-item label="模型ID">{{ detail.modelId || "-" }}</el-descriptions-item>
-            <el-descriptions-item label="第几次尝试">{{ detail.attempt }}</el-descriptions-item>
-            <el-descriptions-item label="输入 token">{{ detail.inputTokens || "-" }}</el-descriptions-item>
-            <el-descriptions-item label="输出 token">{{ detail.outputTokens || "-" }}</el-descriptions-item>
-            <el-descriptions-item label="图片张数">{{ detail.imageCount || "-" }}</el-descriptions-item>
-            <el-descriptions-item label="耗时">{{ detail.elapsedMs }} ms</el-descriptions-item>
-            <el-descriptions-item label="状态">{{ detail.status }}</el-descriptions-item>
-            <el-descriptions-item label="错误码">{{ detail.errorCode || "-" }}</el-descriptions-item>
-            <el-descriptions-item label="触发人">{{ detail.operator || "-" }}</el-descriptions-item>
-            <el-descriptions-item label="入参摘要" :span="2">
-               <span class="ai-mono">{{ detail.requestDigest || "-" }}</span>
-            </el-descriptions-item>
-         </el-descriptions>
+      <!-- 详情对话框：分「场景信息」与「调用信息」两块 -->
+      <el-dialog title="调用记录详情" v-model="open" :width="detailWidth" append-to-body top="6vh">
+         <div v-loading="detailLoading" class="detail-wrap">
+            <!-- 场景信息：这次调用对应的是哪个服务商的哪个模型 -->
+            <section class="detail-block">
+               <h4 class="detail-title">场景信息</h4>
+               <el-descriptions :column="detailColumns" border>
+                  <el-descriptions-item label="场景名称">{{ detail.sceneName || "-" }}</el-descriptions-item>
+                  <el-descriptions-item label="场景标识">
+                     <span class="ai-mono ai-break">{{ detail.scene || "-" }}</span>
+                  </el-descriptions-item>
+                  <el-descriptions-item label="能力">{{ capabilityLabel(detail.capability) }}</el-descriptions-item>
+                  <el-descriptions-item label="服务商">{{ detail.providerName || detail.providerCode || "-" }}</el-descriptions-item>
+                  <el-descriptions-item label="渠道名称">{{ detail.channelName || "-" }}</el-descriptions-item>
+                  <el-descriptions-item label="渠道 ID">{{ detail.channelId ?? "-" }}</el-descriptions-item>
+                  <el-descriptions-item label="模型名称">
+                     <span class="ai-break">{{ detail.modelName || "-" }}</span>
+                  </el-descriptions-item>
+                  <el-descriptions-item label="模型 ID">{{ detail.modelId ?? "-" }}</el-descriptions-item>
+               </el-descriptions>
+            </section>
+
+            <!-- 调用信息：这次调用本身的结果与开销 -->
+            <section class="detail-block">
+               <h4 class="detail-title">调用信息</h4>
+               <el-descriptions :column="detailColumns" border>
+                  <el-descriptions-item label="调用时间">{{ detail.createTime || "-" }}</el-descriptions-item>
+                  <el-descriptions-item label="链路 ID">
+                     <span class="ai-mono ai-break">{{ detail.traceId || "-" }}</span>
+                  </el-descriptions-item>
+                  <el-descriptions-item label="第几次尝试">{{ detail.attempt ?? "-" }}</el-descriptions-item>
+                  <el-descriptions-item label="触发人">{{ detail.operator || "-" }}</el-descriptions-item>
+                  <el-descriptions-item label="输入 token">{{ detail.inputTokens ?? "-" }}</el-descriptions-item>
+                  <el-descriptions-item label="输出 token">{{ detail.outputTokens ?? "-" }}</el-descriptions-item>
+                  <el-descriptions-item label="图片张数">{{ detail.imageCount ?? "-" }}</el-descriptions-item>
+                  <el-descriptions-item label="耗时">{{ detail.elapsedMs != null ? detail.elapsedMs + " ms" : "-" }}</el-descriptions-item>
+                  <el-descriptions-item label="首字延迟">
+                     <span>{{ detail.firstTokenMs != null ? detail.firstTokenMs + " ms" : "—" }}</span>
+                  </el-descriptions-item>
+                  <el-descriptions-item label="状态">
+                     <el-tag v-if="detail.status === 'SUCCESS'" type="success" size="small">成功</el-tag>
+                     <el-tag v-else type="danger" size="small">失败</el-tag>
+                  </el-descriptions-item>
+                  <el-descriptions-item label="错误码">{{ detail.errorCode || "-" }}</el-descriptions-item>
+               </el-descriptions>
+
+               <div class="detail-sub-title">入参摘要</div>
+               <pre class="ai-digest">{{ detail.requestDigest || "-" }}</pre>
+
+               <div class="detail-sub-title">生成图片</div>
+               <div v-if="detail.images && detail.images.length" class="detail-images">
+                  <el-image
+                     v-for="img in detail.images"
+                     :key="img.id || img.objectKey"
+                     :src="img.url"
+                     :preview-src-list="detail.images.map((i: AiImageAsset) => i.url)"
+                     fit="cover"
+                     class="detail-image"
+                     preview-teleported
+                  />
+               </div>
+               <span v-else class="ai-muted">无生成图片</span>
+            </section>
+         </div>
          <template #footer>
             <div class="dialog-footer">
                <el-button @click="open = false">关 闭</el-button>
@@ -122,7 +164,7 @@
       </el-dialog>
 
       <!-- 用量统计对话框 -->
-      <el-dialog title="用量统计" v-model="statsOpen" width="760px" append-to-body>
+      <el-dialog title="用量统计" v-model="statsOpen" width="820px" append-to-body>
          <el-form :inline="true" label-width="80px">
             <el-form-item label="聚合维度">
                <el-select v-model="statsParams.groupBy" style="width: 160px" @change="loadStats">
@@ -133,7 +175,14 @@
             </el-form-item>
          </el-form>
          <el-table v-loading="statsLoading" :data="statsList" max-height="400">
-            <el-table-column label="维度值" align="left" prop="groupKey" min-width="160" />
+            <el-table-column :label="groupLabelTitle" align="left" min-width="180" :show-overflow-tooltip="true">
+               <template #default="scope">
+                  <span>{{ scope.row.groupLabel || scope.row.groupKey }}</span>
+                  <span v-if="scope.row.groupLabel && scope.row.groupLabel !== scope.row.groupKey" class="ai-muted ai-key">
+                     {{ scope.row.groupKey }}
+                  </span>
+               </template>
+            </el-table-column>
             <el-table-column label="调用次数" align="center" prop="totalCount" width="100" />
             <el-table-column label="成功" align="center" prop="successCount" width="80" />
             <el-table-column label="失败" align="center" prop="failedCount" width="80" />
@@ -159,6 +208,7 @@
 import { useAppProxy } from '@/utils/appProxy'
 import { listCallLog, getCallLog, getCallLogStats } from "@/api/ai/calllog"
 import type { AiCallLog, AiCallLogQueryParams, AiCallLogStats } from "@/types/api/ai/calllog"
+import type { AiImageAsset } from "@/types/api/ai/calllog"
 
 const proxy = useAppProxy()
 
@@ -172,6 +222,25 @@ const showSearch = ref<boolean>(true)
 const total = ref<number>(0)
 const dateRange = ref<string[]>([])
 const detail = ref<AiCallLog>({})
+const detailLoading = ref<boolean>(false)
+
+/** 详情弹窗宽度与描述列数随视口自适应，避免窄屏撑破 */
+const viewportWidth = ref<number>(window.innerWidth)
+const detailWidth = computed(() => Math.min(960, Math.round(viewportWidth.value * 0.94)) + 'px')
+const detailColumns = computed(() => (viewportWidth.value < 900 ? 1 : 2))
+
+/** 统计维度对应的列标题 */
+const groupLabelTitle = computed(() => {
+  if (statsParams.value.groupBy === 'model') return '模型'
+  if (statsParams.value.groupBy === 'day') return '日期'
+  return '场景'
+})
+
+function syncViewport() {
+  viewportWidth.value = window.innerWidth
+}
+onMounted(() => window.addEventListener('resize', syncViewport))
+onUnmounted(() => window.removeEventListener('resize', syncViewport))
 
 const capabilityOptions = [
   { label: "文本对话", value: "CHAT" },
@@ -228,9 +297,15 @@ function resetQuery() {
 
 /** 查看详情 */
 function handleDetail(row: AiCallLog) {
+  detailLoading.value = true
+  open.value = true
   getCallLog(row.id as number).then(response => {
     detail.value = response.data as AiCallLog
-    open.value = true
+    detailLoading.value = false
+  }).catch(() => {
+    // 失败时不展示上一条的旧数据
+    detail.value = {}
+    detailLoading.value = false
   })
 }
 
@@ -266,6 +341,68 @@ getList()
 
 .ai-mono {
    font-family: Consolas, Monaco, monospace;
+   font-size: 12px;
+}
+
+/* 长 ID、模型名允许断行，否则会把描述表格撑破 */
+.ai-break {
+   word-break: break-all;
+   white-space: normal;
+}
+
+.detail-wrap {
+   min-height: 120px;
+}
+
+.detail-block + .detail-block {
+   margin-top: 18px;
+}
+
+.detail-title {
+   margin: 0 0 10px;
+   font-size: 14px;
+   font-weight: 600;
+   color: var(--el-text-color-primary);
+   padding-left: 8px;
+   border-left: 3px solid var(--el-color-primary);
+}
+
+.detail-sub-title {
+   margin: 14px 0 8px;
+   font-size: 13px;
+   font-weight: 600;
+   color: var(--el-text-color-regular);
+}
+
+/* 入参摘要可能很长：等宽、换行、限高滚动，且不用 v-html */
+.ai-digest {
+   margin: 0;
+   padding: 10px 12px;
+   max-height: 220px;
+   overflow: auto;
+   font-family: Consolas, Monaco, monospace;
+   font-size: 12px;
+   line-height: 1.6;
+   white-space: pre-wrap;
+   overflow-wrap: anywhere;
+   background: var(--el-fill-color-light);
+   border-radius: 6px;
+}
+
+.detail-images {
+   display: flex;
+   flex-wrap: wrap;
+   gap: 10px;
+}
+
+.detail-image {
+   width: 96px;
+   height: 96px;
+   border-radius: 6px;
+}
+
+.ai-key {
+   margin-left: 8px;
    font-size: 12px;
 }
 </style>

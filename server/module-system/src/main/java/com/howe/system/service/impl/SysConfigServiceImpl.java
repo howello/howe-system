@@ -1,7 +1,9 @@
 package com.howe.system.service.impl;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +18,7 @@ import com.howe.common.exception.ServiceException;
 import com.howe.common.utils.StringUtils;
 import com.howe.common.utils.crypto.SecretCipher;
 import com.howe.system.domain.SysConfig;
+import com.howe.system.domain.vo.ConfigParamTypeVO;
 import com.howe.system.mapper.SysConfigMapper;
 import com.howe.system.service.ISysConfigService;
 
@@ -54,6 +57,12 @@ public class SysConfigServiceImpl implements ISysConfigService, ConfigProvider
 
     /** 掩码保留的尾部字符数 */
     private static final int MASK_TAIL = 4;
+
+    /** 参数分类选项缓存有效期（分钟） */
+    private static final long PARAM_TYPES_CACHE_MINUTES = 10L;
+
+    /** 参数分类缓存代际初始值 */
+    private static final long PARAM_TYPES_INITIAL_REVISION = 1L;
 
     @Autowired
     private SysConfigMapper configMapper;
@@ -208,6 +217,8 @@ public class SysConfigServiceImpl implements ISysConfigService, ConfigProvider
         if (row > 0)
         {
             redisCache.setCacheObject(getCacheKey(config.getConfigKey()), stored);
+            // 新参数可能带来新分类，分类下拉立即刷新
+            invalidateParamTypesCache();
         }
         return row;
     }
@@ -259,6 +270,8 @@ public class SysConfigServiceImpl implements ISysConfigService, ConfigProvider
         if (row > 0)
         {
             redisCache.setCacheObject(getCacheKey(configKey), config.getConfigValue());
+            // 分类可能被新增或清空，分类选项缓存必须换代
+            invalidateParamTypesCache();
         }
         return row;
     }
@@ -285,6 +298,8 @@ public class SysConfigServiceImpl implements ISysConfigService, ConfigProvider
             }
             configMapper.deleteConfigById(configId);
             redisCache.deleteObject(getCacheKey(config.getConfigKey()));
+            // 删掉的可能是某分类的最后一条，分类下拉要跟着变
+            invalidateParamTypesCache();
         }
     }
 
@@ -307,6 +322,120 @@ public class SysConfigServiceImpl implements ISysConfigService, ConfigProvider
     }
 
     /**
+     * 查询全量参数分类
+     *
+     * <p>分类是 {@code sys_config.param_type} 的自由文本。选项必须独立于分页与搜索条件，
+     * 否则用户翻到第二页时下拉里就只剩当前页出现过的分类。</p>
+     *
+     * <p>缓存使用<b>独立命名空间</b> {@code sys_config_param_types:}，刻意避开
+     * {@code resetConfigCache()} 对 {@code sys_config:*} 的整段清理，否则代际标识会被一起删掉。</p>
+     *
+     * @return 分类选项集合
+     */
+    @Override
+    public List<ConfigParamTypeVO> selectParamTypes()
+    {
+        String revisionKey = CacheConstants.SYS_CONFIG_PARAM_TYPES_KEY + "revision";
+        String dataKey = CacheConstants.SYS_CONFIG_PARAM_TYPES_KEY + "v1:" + resolveRevision(revisionKey);
+        try
+        {
+            List<ConfigParamTypeVO> cached = redisCache.getCacheObject(dataKey);
+            if (cached != null)
+            {
+                return cached;
+            }
+        }
+        catch (Exception e)
+        {
+            // Redis 不可用时退回数据库，分类接口本身不能因此失败
+            log.warn("读取参数分类缓存失败，回源数据库：{}", e.getMessage());
+            return queryParamTypesFromDb();
+        }
+
+        List<ConfigParamTypeVO> result = queryParamTypesFromDb();
+        try
+        {
+            // 只写回本次读取到的版本键：并发下旧查询不会覆盖新版本结果
+            redisCache.setCacheObject(dataKey, result, (int) PARAM_TYPES_CACHE_MINUTES, TimeUnit.MINUTES);
+        }
+        catch (Exception e)
+        {
+            log.warn("写入参数分类缓存失败，不影响本次返回：{}", e.getMessage());
+        }
+        return result;
+    }
+
+    /**
+     * 从数据库读取分类选项
+     *
+     * @return 分类选项集合
+     */
+    private List<ConfigParamTypeVO> queryParamTypesFromDb()
+    {
+        List<String> types = configMapper.selectDistinctParamTypes();
+        List<ConfigParamTypeVO> result = new ArrayList<>();
+        for (String type : types)
+        {
+            if (StringUtils.isNotEmpty(type))
+            {
+                result.add(ConfigParamTypeVO.of(type));
+            }
+        }
+        boolean hasUncategorized = configMapper.countUncategorized() > 0;
+        if (hasUncategorized)
+        {
+            result.add(ConfigParamTypeVO.ofUncategorized());
+        }
+        return result;
+    }
+
+    /**
+     * 读取当前分类缓存代际标识
+     *
+     * @param revisionKey 代际键
+     * @return 代际标识；Redis 不可用或首次读取时返回初始值
+     */
+    private long resolveRevision(String revisionKey)
+    {
+        try
+        {
+            Long revision = redisCache.getCacheObject(revisionKey);
+            if (revision == null)
+            {
+                // 首次使用：写一个初始代际，后续失效靠递增
+                redisCache.setCacheObject(revisionKey, PARAM_TYPES_INITIAL_REVISION);
+                return PARAM_TYPES_INITIAL_REVISION;
+            }
+            return revision;
+        }
+        catch (Exception e)
+        {
+            log.warn("读取参数分类缓存代际失败，使用初始代际：{}", e.getMessage());
+            return PARAM_TYPES_INITIAL_REVISION;
+        }
+    }
+
+    /**
+     * 使参数分类缓存失效
+     *
+     * <p>递增代际而不是删除代际键，这样「刷新缓存」瞬间仍在执行的旧查询
+     * 只能写回旧版本键，不会覆盖新版本结果。</p>
+     */
+    private void invalidateParamTypesCache()
+    {
+        String revisionKey = CacheConstants.SYS_CONFIG_PARAM_TYPES_KEY + "revision";
+        try
+        {
+            Long revision = redisCache.getCacheObject(revisionKey);
+            redisCache.setCacheObject(revisionKey, (revision == null ? PARAM_TYPES_INITIAL_REVISION : revision) + 1);
+        }
+        catch (Exception e)
+        {
+            log.warn("失效参数分类缓存失败：{}", e.getMessage());
+        }
+    }
+
+    /**
      * 清空参数缓存数据
      */
     @Override
@@ -318,12 +447,16 @@ public class SysConfigServiceImpl implements ISysConfigService, ConfigProvider
 
     /**
      * 重置参数缓存数据
+     *
+     * <p>除了既有的键值缓存，还要让分类选项缓存换代，否则「刷新缓存」后
+     * 分类下拉仍可能是旧集合。</p>
      */
     @Override
     public void resetConfigCache()
     {
         clearConfigCache();
         loadingConfigCache();
+        invalidateParamTypesCache();
     }
 
     /**

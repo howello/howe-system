@@ -44,8 +44,11 @@ create table share_link (
   link_id           bigint(20)    not null auto_increment comment '分享ID',
   code              varchar(16)   not null                comment '短码（随机 Base62）',
   access_version bigint not null default 1 comment '访问策略版本，修改后旧票据失效',
-  source_id         bigint(20)    not null                comment '源ID',
-  file_path         varchar(1000) not null                comment 'WebDAV 源文件路径',
+  source_type       varchar(16)   not null default 'WEBDAV' comment '来源类型：WEBDAV / LOCAL / REMOTE',
+  source_id         bigint(20)    default null            comment 'WebDAV 源ID（仅 WEBDAV）',
+  file_path         varchar(1000) default null            comment 'WebDAV 源文件路径（仅 WEBDAV）',
+  remote_url        varchar(2048) default null            comment '远程链接（仅 REMOTE，匿名接口不返回）',
+  local_upload_id   bigint(20)    default null            comment '本地上传暂存ID（仅 LOCAL）',
   file_name         varchar(255)  not null                comment '文件名',
   file_ext          varchar(32)   default ''              comment '扩展名（小写，不含点）',
   file_size         bigint(20)    default 0               comment '字节数',
@@ -60,7 +63,7 @@ create table share_link (
   cache_status      char(1)       default '0'             comment '缓存状态（0待缓存 1缓存中 2就绪 3失败）',
   cache_error       varchar(500)  default ''              comment '缓存失败原因',
   cache_retry_count int(11)       default 0               comment '缓存重试次数',
-  status            char(1)       default '0'             comment '链接状态（0正常 1已失效 2已焚毁）',
+  status            char(1)       default '0'             comment '链接状态（0正常 1已失效 2已焚毁 3删除中待清理）',
   last_view_time    datetime      default null            comment '最近访问时间',
   create_by         varchar(64)   default ''              comment '创建者',
   create_time       datetime                              comment '创建时间',
@@ -69,8 +72,36 @@ create table share_link (
   remark            varchar(500)  default null            comment '备注',
   primary key (link_id),
   unique key uk_share_code (code),
-  key idx_share_cache (status, cache_status)
+  unique key uk_share_local_upload (local_upload_id),
+  key idx_share_cache (status, cache_status),
+  key idx_share_source (source_id)
 ) engine=innodb auto_increment=1 comment = '分享记录表';
+
+-- ----------------------------
+-- 2.1、本地上传暂存
+--
+-- 上传的字节先落暂存目录，创建分享时按令牌原子认领，缓存成功后才删除。
+-- 令牌明文只返回一次，库里只存 SHA-256；owner_user_id 保证别人的令牌用不了。
+-- ----------------------------
+drop table if exists share_upload;
+create table share_upload (
+  upload_id        bigint(20)    not null auto_increment comment '上传ID',
+  token_hash       char(64)      not null                comment '上传令牌 SHA-256',
+  owner_user_id    bigint(20)    not null                comment '上传者用户ID',
+  file_name        varchar(255)  default ''              comment '原始文件名',
+  file_size        bigint(20)    default 0               comment '字节数',
+  content_type     varchar(128)  default ''              comment 'MIME 类型',
+  file_ext         varchar(32)   default ''              comment '小写扩展名',
+  staging_location varchar(1000) default ''              comment '暂存相对路径',
+  state            varchar(16)   default 'TEMP'          comment '状态：TEMP待认领 / CLAIMED已认领 / BOUND已绑定 / EXPIRED已过期',
+  link_id          bigint(20)    default null            comment '绑定的分享ID',
+  expire_at        datetime      default null            comment '过期时间',
+  create_time      datetime                              comment '创建时间',
+  update_time      datetime                              comment '更新时间',
+  primary key (upload_id),
+  unique key uk_share_upload_token (token_hash),
+  key idx_share_upload_expire (state, expire_at)
+) engine=innodb auto_increment=1 comment = '分享本地上传暂存表';
 
 -- ----------------------------
 -- 3、分享访问日志
@@ -109,8 +140,10 @@ values ('WebDAV 源', @shareDirId, '1', 'source', 'share/source/index', 1, 0, 'C
 
 select @shareSourceMenuId := LAST_INSERT_ID();
 
-insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-values ('分享链接', @shareDirId, '2', 'link', 'share/link/index', 1, 0, 'C', '0', '0', 'share:link:list', 'clipboard', 'admin', sysdate(), '分享链接管理菜单');
+-- route_name 显式指定：与「博客管理 > 友链管理」的 path='link' 重名，
+-- 不指定时两者都生成路由名 Link，后者注册会覆盖前者，导致友链 404。
+insert into sys_menu (menu_name, parent_id, order_num, path, component, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+values ('分享链接', @shareDirId, '2', 'link', 'share/link/index', 'ShareLink', 1, 0, 'C', '0', '0', 'share:link:list', 'clipboard', 'admin', sysdate(), '分享链接管理菜单');
 
 select @shareLinkMenuId := LAST_INSERT_ID();
 
@@ -191,3 +224,7 @@ values ('文件分享-访问日志保留天数', 'share.access.log.retainDays', 
 insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('文件分享-短链基址', 'share.baseUrl', 'https://s.wyantao.com/s/', 'Y', 'admin', sysdate(),
         '拼短链展示用，末尾带 /，与后端 /s/{code} 路由一致；本地联调可临时改成 http://localhost:9527/s/', '文件分享');
+
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
+values ('文件分享-本地上传暂存目录', 'share.upload.dir', '', 'Y', 'admin', sysdate(),
+        '留空则用系统临时目录下的 share-upload；多实例部署必须指向共享卷，否则重试与清理在别的实例上读不到暂存字节', '文件分享');

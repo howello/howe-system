@@ -362,6 +362,10 @@ insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame
 values ('菜品修改', @mealDishMenuId, '3', '#', '', 1, 0, 'F', '0', '0', 'meal:dish:edit', '#', 'admin', sysdate(), '');
 insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 values ('菜品删除', @mealDishMenuId, '4', '#', '', 1, 0, 'F', '0', '0', 'meal:dish:remove', '#', 'admin', sysdate(), '');
+-- 归属调整：只授予平台管理员，默认不下发给家庭角色。
+-- 迁移会改变菜谱可见范围，所以用独立权限而不是复用 edit。
+insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+values ('菜品归属调整', @mealDishMenuId, '5', '#', '', 1, 0, 'F', '0', '0', 'meal:dish:owner', '#', 'admin', sysdate(), '仅平台管理员可见：在公共菜谱与家庭之间迁移菜品归属');
 
 -- 分类按钮
 insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
@@ -648,6 +652,15 @@ delete from sys_config where config_key = 'meal.app.publishToken';
 insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, `sensitive`, param_type)
 values ('点餐-App 版本发布令牌', 'meal.app.publishToken', '', 'N', 'admin', sysdate(),
         '打包脚本 publish:wgt 用：请求头 X-Publish-Token 与之匹配即可发布版本；留空=未配置（发布接口拒绝）', 'Y', '点餐');
+
+-- ----------------------------
+-- App 远程资源包大小上限（字节，默认 50 MiB）
+-- 版本管理录入远程 wgt 链接时，有界下载校验的上限。
+-- ----------------------------
+delete from sys_config where config_key = 'meal.app.packageMaxSize';
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
+values ('App 远程资源包大小上限（字节）', 'meal.app.packageMaxSize', '52428800', 'N', 'admin', sysdate(),
+        '版本管理录入远程 wgt 链接时，有界下载校验的上限；默认 50 MiB', '点餐');
 
 -- ----------------------------
 -- 14、参数配置（派单与抢单）

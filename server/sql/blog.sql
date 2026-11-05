@@ -331,8 +331,11 @@ select @blogDirId := menu_id from sys_menu where menu_name = '博客管理' and 
 delete from sys_menu where perms like 'blog:link:%' or perms like 'blog:feed:%' or perms like 'blog:talk:%';
 
 -- 友链管理菜单
-insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-values('友链管理', @blogDirId, '3', 'link', 'blog/link/index', 1, 0, 'C', '0', '0', 'blog:link:list', 'peoples', 'admin', sysdate(), '友链管理菜单');
+-- route_name 必须显式指定：本项目「分享管理 > 分享链接」也有 path='link'，
+-- 不指定时两者都会生成路由名 Link，Vue Router 后注册的会覆盖先注册的，
+-- 导致先打开的那个菜单 404。见 share.sql 的 ShareLink。
+insert into sys_menu (menu_name, parent_id, order_num, path, component, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+values('友链管理', @blogDirId, '3', 'link', 'blog/link/index', 'BlogLink', 1, 0, 'C', '0', '0', 'blog:link:list', 'peoples', 'admin', sysdate(), '友链管理菜单');
 
 select @linkMenuId := LAST_INSERT_ID();
 

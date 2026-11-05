@@ -98,7 +98,7 @@
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
 
     <el-dialog :title="title" v-model="open" width="640px" append-to-body :close-on-click-modal="false">
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
+      <el-form ref="entityFormRef" :model="form" :rules="rules" label-width="110px">
         <el-form-item label="家庭" prop="deptId">
           <el-tree-select
             v-if="isPlatformAdmin"
@@ -264,7 +264,7 @@ function reset() {
     notifyAi: "1",
     remark: undefined
   }
-  proxy.resetForm("formRef")
+  proxy.resetForm("entityFormRef")
 }
 
 /** 新增 */
@@ -314,7 +314,7 @@ function handleSwitchChange(row: MealWeComConfig, field: "enabled" | "notifyOrde
 
 /** 提交表单 */
 function submitForm() {
-  formRef(proxy.$refs["formRef"]).validate((valid: boolean) => {
+  formRef(proxy.$refs["entityFormRef"]).validate((valid: boolean) => {
     if (!valid) {
       return
     }

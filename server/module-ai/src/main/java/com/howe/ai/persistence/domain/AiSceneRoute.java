@@ -35,6 +35,18 @@ public class AiSceneRoute extends BaseEntity
     @Schema(description = "场景标识", example = "blog.recipe.cover")
     private String scene;
 
+    /**
+     * 场景展示名称
+     *
+     * <p>与 {@code scene} 分开：{@code scene} 是业务调用使用的稳定标识，改名会破坏路由；
+     * {@code scene_name} 只是管理端展示名，可随时调整。不复用 {@code remark}，
+     * 因为备注承载的是运维说明，混用会让筛选与展示互相干扰。</p>
+     */
+    @NotBlank(message = "场景名称不能为空")
+    @Size(max = 100, message = "场景名称长度不能超过100个字符")
+    @Schema(description = "场景展示名称", example = "菜品封面生成")
+    private String sceneName;
+
     @NotBlank(message = "能力类型不能为空")
     @Schema(description = "能力类型：CHAT / VISION / IMAGE / EMBEDDING", example = "IMAGE")
     private String capability;

@@ -40,6 +40,19 @@ public class PermissionService
     }
 
     /**
+     * 判断当前登录用户是否为平台管理员（userId=1）
+     *
+     * <p>注意与「角色含 admin」区分：角色是可以授予任何用户的，而这里要求的是
+     * 平台内置管理员账号本身。涉及全局影响的操作（如菜品归属迁移）用它。</p>
+     *
+     * @return 是否平台管理员
+     */
+    public boolean isAdmin()
+    {
+        return SecurityUtils.isAdmin();
+    }
+
+    /**
      * 验证用户是否不具备某权限，与 hasPermi逻辑相反
      *
      * @param permission 权限字符串

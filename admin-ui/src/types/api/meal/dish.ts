@@ -99,3 +99,13 @@ export interface MealDishAiCoverResult {
   /** 图片未生成时的可读原因 */
   imageError?: string;
 }
+
+/** 菜品归属可选家庭（仅平台管理员可见） */
+export interface DishOwnerOption {
+  /** 家庭部门 ID */
+  deptId: number;
+  /** 家庭名称 */
+  name: string;
+  /** 上级名称，用于同名家庭区分；顶级家庭为空 */
+  parentName?: string;
+}

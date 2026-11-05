@@ -67,7 +67,7 @@
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
 
     <el-dialog :title="title" v-model="open" width="640px" append-to-body>
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
+      <el-form ref="entityFormRef" :model="form" :rules="rules" label-width="90px">
         <el-form-item label="版本名称" prop="versionName">
           <el-input v-model="form.versionName" placeholder="如 1.0.4" maxlength="32" />
         </el-form-item>
@@ -76,13 +76,36 @@
           <span class="form-tip">整数递增，客户端按它判断版本先后</span>
         </el-form-item>
         <el-form-item label="资源包" prop="wgtUrl">
-          <el-upload :show-file-list="false" :before-upload="beforeWgtUpload" :http-request="handleWgtUpload" accept=".wgt">
-            <el-button type="primary" :loading="uploading" v-hasPermi="['meal:appVersion:upload']">选择 wgt 文件</el-button>
-          </el-upload>
+          <el-radio-group v-model="packageMode" @change="handlePackageModeChange">
+            <el-radio value="upload">本地上传</el-radio>
+            <el-radio value="remote">远程链接</el-radio>
+          </el-radio-group>
+          <div v-if="packageMode === 'upload'" class="package-actions">
+            <el-upload :show-file-list="false" :before-upload="beforeWgtUpload" :http-request="handleWgtUpload" accept=".wgt">
+              <el-button type="primary" :loading="uploading" v-hasPermi="['meal:appVersion:upload']">选择 wgt 文件</el-button>
+            </el-upload>
+          </div>
+          <div v-else class="package-actions">
+            <el-input
+              v-model="form.wgtUrl"
+              placeholder="https://... 资源包直链（仅 https）"
+              clearable
+              style="width: 360px"
+              @input="remoteChecked = null"
+            />
+            <el-button :loading="checking" :disabled="!form.wgtUrl" v-hasPermi="['meal:appVersion:upload']" @click="handleCheckPackage">校验</el-button>
+          </div>
           <div v-if="form.wgtUrl" class="wgt-file">
             <el-link :href="form.wgtUrl" target="_blank" type="primary">{{ form.fileName || form.wgtUrl }}</el-link>
             <span class="form-tip">{{ formatSize(form.wgtSize) }}</span>
           </div>
+          <template v-if="remoteChecked">
+            <el-alert v-if="remoteChecked.reachable" type="success" :closable="false" show-icon
+              :title="`校验通过：${formatSize(remoteChecked.size)}，${remoteChecked.checkedAt}`" />
+            <el-alert v-else type="error" :closable="false" show-icon
+              :title="`校验未通过：${remoteChecked.reason || '远程资源包不可达'}`" />
+          </template>
+          <div class="form-tip">远程链接需为 https 直链；保存时服务端会再次校验可达性与 wgt 结构。</div>
         </el-form-item>
         <el-form-item label="更新说明" prop="updateLog">
           <el-input v-model="form.updateLog" type="textarea" :rows="4" placeholder="每行一条，客户端弹窗按行展示" />
@@ -113,8 +136,8 @@
 
 <script setup lang="ts" name="MealAppVersion">
 import { useAppProxy, formRef } from '@/utils/appProxy'
-import { getAppVersion, listAppVersion, addAppVersion, updateAppVersion, delAppVersion, uploadAppVersionWgt } from "@/api/meal/appversion"
-import type { MealAppVersion, MealAppVersionQueryParams } from "@/types/api/meal/appversion"
+import { getAppVersion, listAppVersion, addAppVersion, updateAppVersion, delAppVersion, uploadAppVersionWgt, checkAppPackage } from "@/api/meal/appversion"
+import type { MealAppVersion, MealAppVersionQueryParams, AppPackageCheckResult } from "@/types/api/meal/appversion"
 
 const proxy = useAppProxy()
 
@@ -141,11 +164,17 @@ const data = reactive({
   rules: {
     versionName: [{ required: true, message: "版本名称不能为空", trigger: "blur" }],
     versionCode: [{ required: true, message: "版本序号不能为空", trigger: "blur" }],
-    wgtUrl: [{ required: true, message: "请先上传 wgt 资源包", trigger: "change" }]
+    wgtUrl: [{ required: true, message: "请上传 wgt 资源包或填写远程链接", trigger: "change" }]
   }
 })
 
 const { queryParams, form, rules } = toRefs(data)
+
+/** 资源包录入方式：上传 / 远程链接 */
+const packageMode = ref<'upload' | 'remote'>('upload')
+/** 远程链接即时校验结果；改 URL 后立即失效 */
+const remoteChecked = ref<AppPackageCheckResult | null>(null)
+const checking = ref<boolean>(false)
 
 /** 资源包大小展示：B / KB / MB */
 function formatSize(size?: number): string {
@@ -191,7 +220,7 @@ function reset() {
     status: "0",
     remark: undefined
   }
-  proxy.resetForm("formRef")
+  proxy.resetForm("entityFormRef")
 }
 
 function handleQuery() {
@@ -212,18 +241,44 @@ function handleSelectionChange(selection: MealAppVersion[]) {
 
 function handleAdd() {
   reset()
+  packageMode.value = 'upload'
+  remoteChecked.value = null
   open.value = true
   title.value = "新增 App 版本"
 }
 
 function handleUpdate(row?: MealAppVersion) {
   reset()
+  remoteChecked.value = null
   const versionId = row?.versionId || ids.value[0]
   getAppVersion(versionId).then((response: any) => {
     form.value = response.data
+    // 已有地址按「远程链接」回显更直观；上传的地址同样可以切换回上传重新传
+    packageMode.value = 'remote'
     open.value = true
     title.value = "修改 App 版本"
   })
+}
+
+/** 切换录入方式时清掉另一种方式的状态，避免残留校验结果 */
+function handlePackageModeChange() {
+  remoteChecked.value = null
+}
+
+/** 即时校验远程链接；结果只作反馈，保存时服务端会再校验 */
+function handleCheckPackage() {
+  if (!form.value.wgtUrl) {
+    return
+  }
+  checking.value = true
+  checkAppPackage(form.value.wgtUrl)
+    .then((response: any) => {
+      remoteChecked.value = response.data as AppPackageCheckResult
+      checking.value = false
+    })
+    .catch(() => {
+      checking.value = false
+    })
 }
 
 /** 上传前校验：只允许 .wgt，且不超过服务端 multipart 上限（10MB） */
@@ -260,7 +315,7 @@ function handleWgtUpload(options: { file: File }): Promise<void> {
 }
 
 function submitForm() {
-  formRef(proxy.$refs["formRef"]).validate((valid: boolean) => {
+  formRef(proxy.$refs["entityFormRef"]).validate((valid: boolean) => {
     if (!valid) {
       return
     }
@@ -306,5 +361,12 @@ getList()
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.package-actions {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 </style>

@@ -81,6 +81,9 @@ public class StreamCapability
 
         StringBuilder buffer = new StringBuilder();
         AtomicBoolean delivered = new AtomicBoolean(false);
+        // 首字延迟：从方法入口到第一个非空正文增量，只记一次。
+        // 连接建立、角色帧、心跳、思考增量都不算首字。
+        AtomicReference<Integer> firstTokenMs = new AtomicReference<>();
         AtomicReference<AiChatResult> upstreamResult = new AtomicReference<>();
 
         // 取分片交给适配器：默认实现走 Spring AI 的 ChatModel.stream()，
@@ -91,8 +94,13 @@ public class StreamCapability
                 {
                     if (StrUtil.isNotEmpty(chunk.getDelta()))
                     {
+                        // 只有第一次正文增量才记首字；compareAndSet 保证并发下也只写一次
+                        if (firstTokenMs.compareAndSet(null,
+                                (int) Math.min(System.currentTimeMillis() - start, Integer.MAX_VALUE)))
+                        {
+                            delivered.set(true);
+                        }
                         buffer.append(chunk.getDelta());
-                        delivered.set(true);
                     }
                     if (chunk.isDone() && chunk.getResult() != null)
                     {
@@ -104,7 +112,7 @@ public class StreamCapability
                 .filter(chunk -> !chunk.isDone())
                 .concatWith(Flux.defer(() -> Flux.just(
                         finish(traceId, request, target, operator, digest, buffer.toString(),
-                                upstreamResult.get(), start))))
+                                upstreamResult.get(), start, firstTokenMs.get()))))
                 .onErrorResume(error ->
                 {
                     // 已经推过增量：按文档约定直接以 PROVIDER_ERROR 收尾，不换模型续写
@@ -132,10 +140,11 @@ public class StreamCapability
      * @param text     完整文本
      * @param upstream 适配器给出的结束结果，只用到用量与结束原因，可为空
      * @param start    起始时间
+     * @param firstMs  首字延迟，未产生正文时为 null
      * @return 结束分片
      */
     private AiTextChunk finish(String traceId, AiChatRequest request, AiRouteTarget target, String operator,
-            String digest, String text, AiChatResult upstream, long start)
+            String digest, String text, AiChatResult upstream, long start, Integer firstMs)
     {
         long elapsed = System.currentTimeMillis() - start;
         AiUsage usage = upstream == null || upstream.getUsage() == null
@@ -144,6 +153,7 @@ public class StreamCapability
         callLog.setStatus("SUCCESS");
         callLog.setInputTokens(usage.getInputTokens());
         callLog.setOutputTokens(usage.getOutputTokens());
+        callLog.setFirstTokenMs(firstMs);
         Long callLogId = aiCallLogRecorder.record(callLog, null);
 
         AiChatResult result = AiChatResult.builder()
@@ -152,6 +162,7 @@ public class StreamCapability
                 .model(target.model().getModelName())
                 .usage(usage)
                 .elapsedMs(elapsed)
+                .firstTokenMs(firstMs)
                 .finishReason(upstream == null ? null : upstream.getFinishReason())
                 .callLogId(callLogId)
                 .build();

@@ -1,6 +1,8 @@
 package com.howe.meal.service;
 
 import com.howe.meal.domain.MealDish;
+import com.howe.meal.domain.dto.DishOwnerChangeRequest;
+import com.howe.meal.domain.vo.DishOwnerOptionVO;
 
 import java.util.List;
 
@@ -58,4 +60,26 @@ public interface IMealDishService {
      * @return 按份数倒序的招牌菜品
      */
     List<MealDish> selectSignatureDishes();
+
+    /**
+     * 查询「调整归属」可选的家庭
+     *
+     * <p>只返回 {@code dept_type='F'}、未删除、启用的家庭，最多 50 条。</p>
+     *
+     * @param keyword 家庭名称模糊搜索词，可空
+     * @return 家庭选项集合
+     */
+    List<DishOwnerOptionVO> selectOwnerOptions(String keyword);
+
+    /**
+     * 调整菜品归属（仅平台管理员）
+     *
+     * <p>目标只能是 {@code 0}（平台公共菜谱）或有效家庭。带旧归属做并发校验：
+     * 期间有其他人迁移过，本次请求按过期处理并提示刷新。</p>
+     *
+     * @param dishId  菜品 ID
+     * @param request 调整请求
+     * @return 影响行数
+     */
+    int changeDishOwner(Long dishId, DishOwnerChangeRequest request);
 }

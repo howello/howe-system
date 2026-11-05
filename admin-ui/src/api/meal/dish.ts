@@ -5,6 +5,7 @@ import type {
   MealDishAiCurrent,
   MealDishAiTextResult,
   MealDishAiCoverResult,
+  DishOwnerOption,
   AjaxResult,
   TableDataInfo
 } from '@/types'
@@ -15,6 +16,24 @@ export function listDish(query: MealDishQueryParams): Promise<TableDataInfo<Meal
     url: '/meal/dish/list',
     method: 'get',
     params: query
+  })
+}
+
+// 查询可调整归属的家庭（仅平台管理员）
+export function listDishOwnerOptions(keyword?: string): Promise<AjaxResult<DishOwnerOption[]>> {
+  return request({
+    url: '/meal/dish/ownerOptions',
+    method: 'get',
+    params: keyword ? { keyword } : {}
+  })
+}
+
+// 调整菜品归属（仅平台管理员；expectedDeptId 为旧归属，用于并发校验）
+export function changeDishOwner(dishId: number, data: { targetDeptId: number; expectedDeptId: number }): Promise<AjaxResult> {
+  return request({
+    url: '/meal/dish/' + dishId + '/owner',
+    method: 'put',
+    data
   })
 }
 
@@ -58,11 +77,15 @@ export function aiGenerateDishText(data: {
   })
 }
 
-// 一键 AI 生成菜品封面（已填封面时不生成）
+// 一键 AI 生成菜品封面（已填封面时不生成；传 forceRegenerate + imageDescription 时强制重建）
 export function aiGenerateDishCover(data: {
   name: string
   deptId?: number
   current?: MealDishAiCurrent
+  /** 画面描述，强制重建时后端要求必填 */
+  imageDescription?: string
+  /** 强制重新生成，忽略「已有封面就跳过」的默认行为 */
+  forceRegenerate?: boolean
 }): Promise<AjaxResult<MealDishAiCoverResult>> {
   return request({
     url: '/meal/dish/ai-generate/cover',

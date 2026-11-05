@@ -223,6 +223,21 @@ public class ConfigConstants {
     public static final String MEAL_APP_PUBLISH_TOKEN = "meal.app.publishToken";
 
     /**
+     * APP 远程资源包大小上限（字节）
+     *
+     * <p>版本管理录入远程 wgt 链接时，有界下载校验的上限；默认 50 MiB。</p>
+     */
+    public static final String MEAL_APP_PACKAGE_MAX_SIZE = "meal.app.packageMaxSize";
+
+    /**
+     * 分享本地上传暂存目录
+     *
+     * <p>未配置时落在系统临时目录下的 share-upload；多实例部署必须指向共享卷，
+     * 否则其他实例执行重试或清理时读不到暂存字节。</p>
+     */
+    public static final String SHARE_UPLOAD_DIR = "share.upload.dir";
+
+    /**
      * 点餐订单接单超时分钟数
      *
      * <p>订单进入待接单后，超过该时长仍无人接单则关闭为「无人接单」。

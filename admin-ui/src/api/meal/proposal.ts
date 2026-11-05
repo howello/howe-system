@@ -10,6 +10,14 @@ export function listProposal(query: MealProposalQueryParams): Promise<TableDataI
   })
 }
 
+// 查询提案详情（详情弹窗用，取服务端最新数据）
+export function getProposal(proposalId: number): Promise<AjaxResult<MealProposal>> {
+  return request({
+    url: '/meal/proposal/' + proposalId,
+    method: 'get'
+  })
+}
+
 // 审核提案（通过时自动生成菜品）
 export function auditProposal(data: MealProposalAuditBody): Promise<AjaxResult> {
   return request({

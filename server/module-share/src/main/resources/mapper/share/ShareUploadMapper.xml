@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.share.mapper.ShareUploadMapper">
+
+    <resultMap type="ShareUpload" id="ShareUploadResult">
+        <id     property="uploadId"        column="upload_id"        />
+        <result property="tokenHash"       column="token_hash"       />
+        <result property="ownerUserId"     column="owner_user_id"    />
+        <result property="fileName"        column="file_name"        />
+        <result property="fileSize"        column="file_size"        />
+        <result property="contentType"     column="content_type"     />
+        <result property="fileExt"         column="file_ext"         />
+        <result property="stagingLocation" column="staging_location" />
+        <result property="state"           column="state"            />
+        <result property="linkId"          column="link_id"          />
+        <result property="expireAt"        column="expire_at"        />
+        <result property="createTime"      column="create_time"      />
+        <result property="updateTime"      column="update_time"      />
+    </resultMap>
+
+    <sql id="selectShareUploadVo">
+        select upload_id, token_hash, owner_user_id, file_name, file_size, content_type, file_ext,
+               staging_location, state, link_id, expire_at, create_time, update_time
+        from share_upload
+    </sql>
+
+    <insert id="insertShareUpload" parameterType="ShareUpload" useGeneratedKeys="true" keyProperty="uploadId">
+        insert into share_upload (
+            token_hash, owner_user_id, file_name, file_size, content_type, file_ext,
+            staging_location, state, expire_at, create_time, update_time
+        ) values (
+            #{tokenHash}, #{ownerUserId}, #{fileName}, #{fileSize}, #{contentType}, #{fileExt},
+            #{stagingLocation}, #{state}, #{expireAt}, sysdate(), sysdate()
+        )
+    </insert>
+
+    <select id="selectByTokenHash" resultMap="ShareUploadResult">
+        <include refid="selectShareUploadVo"/>
+        where token_hash = #{tokenHash}
+    </select>
+
+    <select id="selectShareUploadById" resultMap="ShareUploadResult">
+        <include refid="selectShareUploadVo"/>
+        where upload_id = #{uploadId}
+    </select>
+
+    <!-- 认领必须条件更新：并发下只有一个请求能把 TEMP 改成 CLAIMED，
+         同时校验所有者，别人的令牌用不了。 -->
+    <update id="claim">
+        update share_upload
+        set state = 'CLAIMED', link_id = #{linkId}, update_time = sysdate()
+        where upload_id = #{uploadId}
+          and owner_user_id = #{ownerUserId}
+          and state = 'TEMP'
+          and expire_at &gt; #{now}
+    </update>
+
+    <update id="markBound">
+        update share_upload set state = 'BOUND', update_time = sysdate() where upload_id = #{uploadId}
+    </update>
+
+    <update id="markExpired">
+        update share_upload set state = 'EXPIRED', update_time = sysdate() where upload_id = #{uploadId}
+    </update>
+
+    <select id="selectExpiredTemps" resultMap="ShareUploadResult">
+        <include refid="selectShareUploadVo"/>
+        where state = 'TEMP' and expire_at &lt;= #{now}
+        order by upload_id asc
+        limit #{limit}
+    </select>
+
+    <!-- 认领后长期没有 BOUND：分享被删或缓存一直失败，回收暂存 -->
+    <select id="selectStaleClaimed" resultMap="ShareUploadResult">
+        <include refid="selectShareUploadVo"/>
+        where state = 'CLAIMED' and update_time &lt; #{before}
+        order by upload_id asc
+        limit #{limit}
+    </select>
+
+</mapper>

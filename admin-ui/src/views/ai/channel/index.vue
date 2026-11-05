@@ -82,7 +82,7 @@
          </el-table-column>
          <el-table-column label="操作" align="center" width="230" fixed="right" class-name="small-padding fixed-width">
             <template #default="scope">
-               <el-button link type="primary" icon="Connection" :loading="testingId === scope.row.id" @click="handleTest(scope.row)" v-hasPermi="['ai:channel:test']">测试</el-button>
+               <el-button link type="primary" icon="Connection" @click="handleTest(scope.row)" v-hasPermi="['ai:channel:test']">测试</el-button>
                <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['ai:channel:edit']">修改</el-button>
                <el-button link type="danger" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['ai:channel:remove']">删除</el-button>
             </template>
@@ -147,13 +147,72 @@
             </div>
          </template>
       </el-dialog>
+
+      <!-- 按模型测试对话框：逐行测试 + 右上角测试全部 -->
+      <el-dialog v-model="testOpen" title="测试渠道连通性" width="720px" append-to-body :close-on-click-modal="false">
+         <div class="test-head">
+            <span class="test-channel">{{ testChannelName }}</span>
+            <span class="test-actions">
+               <el-button link type="primary" :disabled="testing" @click="loadTestModels">刷新模型</el-button>
+               <el-button
+                  link
+                  type="primary"
+                  :loading="testing && testingId === null"
+                  :disabled="!testModels.length || testing"
+                  @click="runTestAll"
+               >测试全部</el-button>
+            </span>
+         </div>
+         <el-alert
+            v-if="!testModels.length"
+            type="warning"
+            :closable="false"
+            show-icon
+            title="该渠道下还没有启用的模型，请先在「AI 模型管理」中添加"
+         />
+         <el-table v-else v-loading="testModelLoading" :data="testModels" max-height="360">
+            <el-table-column label="模型名" prop="modelName" min-width="160" :show-overflow-tooltip="true" />
+            <el-table-column label="展示名" prop="displayName" min-width="120" :show-overflow-tooltip="true" />
+            <el-table-column label="能力" width="100">
+               <template #default="scope">
+                  <el-tag size="small">{{ capabilityLabel(scope.row.capability) }}</el-tag>
+               </template>
+            </el-table-column>
+            <el-table-column label="测试结果" min-width="180">
+               <template #default="scope">
+                  <el-tooltip v-if="testResults[scope.row.id!] && !testResults[scope.row.id!].success"
+                     :content="testResults[scope.row.id!].message" placement="top">
+                     <el-tag type="danger" size="small">失败</el-tag>
+                  </el-tooltip>
+                  <el-tag v-else-if="testResults[scope.row.id!]?.success" type="success" size="small">成功</el-tag>
+                  <span v-else-if="testingId === scope.row.id" class="ai-muted">测试中…</span>
+                  <span v-else class="ai-muted">未测试</span>
+               </template>
+            </el-table-column>
+            <el-table-column label="操作" align="center" width="90" fixed="right">
+               <template #default="scope">
+                  <el-button
+                     link
+                     type="primary"
+                     icon="Connection"
+                     :loading="testingId === scope.row.id"
+                     :disabled="testing && testingId !== scope.row.id"
+                     @click="runTest(scope.row)"
+                  >测试</el-button>
+               </template>
+            </el-table-column>
+         </el-table>
+         <div v-if="testSummary" class="test-summary">{{ testSummary }}</div>
+      </el-dialog>
    </div>
 </template>
 
 <script setup lang="ts" name="AiChannel">
 import { useAppProxy, formRef } from '@/utils/appProxy'
 import { listChannel, getChannel, addChannel, updateChannel, delChannel, changeChannelStatus, testChannel, listProviderOptions } from "@/api/ai/channel"
+import { listModel } from "@/api/ai/model"
 import type { AiChannel, AiChannelQueryParams, AiProvider } from "@/types/api/ai/channel"
+import type { AiModel } from "@/types/api/ai/model"
 
 const proxy = useAppProxy()
 
@@ -163,12 +222,30 @@ const open = ref<boolean>(false)
 const loading = ref<boolean>(true)
 const submitting = ref<boolean>(false)
 const showSearch = ref<boolean>(true)
-const testingId = ref<number | null>(null)
 const ids = ref<number[]>([])
 const single = ref<boolean>(true)
 const multiple = ref<boolean>(true)
 const total = ref<number>(0)
 const title = ref<string>("")
+
+/** 按模型测试弹窗状态 */
+const testOpen = ref<boolean>(false)
+const testChannelId = ref<number | null>(null)
+const testChannelName = ref<string>("")
+const testModels = ref<AiModel[]>([])
+const testModelLoading = ref<boolean>(false)
+const testing = ref<boolean>(false)
+/** 正在测试的模型ID；null 表示空闲，配合 testing 区分「测试全部」与单行测试 */
+const testingId = ref<number | null>(null)
+const testResults = ref<Record<number, { success: boolean; message: string }>>({})
+const testSummary = ref<string>("")
+
+const capabilityOptions = [
+  { label: "文本对话", value: "CHAT" },
+  { label: "图片理解", value: "VISION" },
+  { label: "文生图", value: "IMAGE" },
+  { label: "文本向量", value: "EMBEDDING" }
+]
 
 const data = reactive({
   form: {} as AiChannel,
@@ -311,15 +388,89 @@ function handleStatusChange(row: AiChannel) {
   })
 }
 
-/** 连通性测试 */
+/** 能力类型转展示名 */
+function capabilityLabel(capability?: string): string {
+  return capabilityOptions.find(item => item.value === capability)?.label || capability || "-"
+}
+
+/** 打开按模型测试弹窗 */
 function handleTest(row: AiChannel) {
-  testingId.value = row.id as number
-  testChannel(row.id as number).then(response => {
-    proxy.$modal.msgSuccess(response.msg || "连通性正常")
-    getList()
-  }).finally(() => {
-    testingId.value = null
+  testChannelId.value = row.id as number
+  testChannelName.value = row.name || ""
+  testResults.value = {}
+  testSummary.value = ""
+  testingId.value = null
+  testOpen.value = true
+  loadTestModels()
+}
+
+/** 加载该渠道下的启用模型 */
+function loadTestModels() {
+  if (!testChannelId.value) {
+    return
+  }
+  testModelLoading.value = true
+  listModel({ pageNum: 1, pageSize: 100, channelId: testChannelId.value, enabled: 1 }).then(response => {
+    testModels.value = (response.rows || []).filter((m: AiModel) => m.enabled === 1)
+    testModelLoading.value = false
+  }).catch(() => {
+    testModelLoading.value = false
   })
+}
+
+/** 测试全部：依次测试该渠道下所有启用模型，汇总成功/失败数 */
+async function runTestAll() {
+  if (!testChannelId.value || !testModels.value.length) {
+    return
+  }
+  testing.value = true
+  testingId.value = null
+  testResults.value = {}
+  testSummary.value = ""
+  let success = 0
+  for (const model of testModels.value) {
+    if (!model.id) {
+      continue
+    }
+    try {
+      const response = await testChannel(testChannelId.value, model.id)
+      testResults.value[model.id] = { success: true, message: response.msg || "连通性正常" }
+      success++
+    } catch (error: any) {
+      testResults.value[model.id] = {
+        success: false,
+        message: error?.message || error?.msg || "连通性检测失败"
+      }
+    }
+  }
+  testing.value = false
+  testSummary.value = `共 ${testModels.value.length} 个模型，成功 ${success} 个，失败 ${testModels.value.length - success} 个`
+  // 健康状态已回写，列表刷新一次
+  getList()
+}
+
+/** 单行测试：只测这一行的模型，失败原因留在该行的 tooltip 里 */
+async function runTest(model: AiModel) {
+  if (!testChannelId.value || !model.id || testing.value) {
+    return
+  }
+  testing.value = true
+  testingId.value = model.id
+  testSummary.value = ""
+  try {
+    const response = await testChannel(testChannelId.value, model.id)
+    testResults.value[model.id] = { success: true, message: response.msg || "连通性正常" }
+    proxy.$modal.msgSuccess(`${model.modelName || model.displayName || "该模型"} 连通性正常`)
+  } catch (error: any) {
+    const message = error?.message || error?.msg || "连通性检测失败"
+    testResults.value[model.id] = { success: false, message }
+    proxy.$modal.msgError(`${model.modelName || model.displayName || "该模型"} 测试失败：${message}`)
+  } finally {
+    testingId.value = null
+    testing.value = false
+    // 单行测试也会回写渠道健康状态
+    getList()
+  }
 }
 
 getProviderOptions()
@@ -340,5 +491,28 @@ getList()
    color: #909399;
    font-size: 12px;
    line-height: 1.5;
+}
+.test-head {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   margin-bottom: 12px;
+}
+
+.test-actions {
+   display: flex;
+   align-items: center;
+   gap: 12px;
+}
+
+.test-channel {
+   font-weight: 600;
+   color: var(--el-text-color-primary);
+}
+
+.test-summary {
+   margin-top: 12px;
+   font-size: 13px;
+   color: var(--el-text-color-secondary);
 }
 </style>

@@ -1,16 +1,20 @@
 package com.howe.meal.service.impl;
 
 import com.howe.common.exception.ServiceException;
+import com.howe.common.core.domain.entity.SysDept;
 import com.howe.common.utils.SecurityUtils;
 import com.howe.meal.constant.MealCategoryTaxonomy;
 import com.howe.meal.domain.MealCategory;
 import com.howe.meal.domain.MealCategoryRef;
 import com.howe.meal.domain.MealDish;
+import com.howe.meal.domain.dto.DishOwnerChangeRequest;
+import com.howe.meal.domain.vo.DishOwnerOptionVO;
 import com.howe.meal.mapper.MealCategoryMapper;
 import com.howe.meal.mapper.MealCategoryRefMapper;
 import com.howe.meal.mapper.MealDishMapper;
 import com.howe.meal.service.IMealDishService;
 import com.howe.meal.util.MealScopeGuard;
+import com.howe.system.mapper.SysDeptMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,12 +49,13 @@ public class MealDishServiceImpl implements IMealDishService {
     private final MealDishMapper mealDishMapper;
     private final MealCategoryRefMapper mealCategoryRefMapper;
     private final MealCategoryMapper mealCategoryMapper;
+    private final SysDeptMapper sysDeptMapper;
 
     @Override
     public List<MealDish> selectMealDishList(MealDish mealDish) {
         // 平台管理员不套用部门过滤：未显式指定部门时可看到所有家庭的菜品（含 AI 审核上架的菜）；
-        // 家庭账号仍只看「本家庭 + 公共」。
-        if (mealDish.getDeptId() == null && !SecurityUtils.isAdmin()) {
+        // 家庭账号无论传什么都强制只看「本家庭 + 公共」，防止显式传其他家庭 ID 越权。
+        if (!SecurityUtils.isAdmin()) {
             mealDish.setDeptId(SecurityUtils.getDeptId());
         }
         List<MealDish> list = mealDishMapper.selectMealDishList(mealDish);
@@ -80,8 +85,18 @@ public class MealDishServiceImpl implements IMealDishService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int insertMealDish(MealDish mealDish) {
+        // 归属校验：家庭账号只能建在本家庭；平台管理员可指定 0（公共）或默认。
+        // 之前未校验时，家庭账号可以伪造 deptId=0 或别人的家庭，把私有菜注入公共库。
         if (mealDish.getDeptId() == null) {
             mealDish.setDeptId(SecurityUtils.getDeptId());
+        } else if (!SecurityUtils.isAdmin()) {
+            if (mealDish.getDeptId().longValue() != SecurityUtils.getDeptId().longValue()) {
+                throw new ServiceException("家庭账号只能创建本家庭的菜品");
+            }
+        } else if (mealDish.getDeptId().longValue() != 0L
+                && mealDish.getDeptId().longValue() != SecurityUtils.getDeptId().longValue()) {
+            // 平台管理员指定其它家庭：合法（菜品归属调整的场景之一），但目标必须是有效家庭
+            assertValidFamily(mealDish.getDeptId());
         }
         if (mealDish.getStatus() == null) {
             mealDish.setStatus("0");
@@ -238,5 +253,63 @@ public class MealDishServiceImpl implements IMealDishService {
         ref.setBizId(dishId);
         ref.setCategoryId(categoryId);
         mealCategoryRefMapper.insertMealCategoryRef(ref);
+    }
+
+    @Override
+    public List<DishOwnerOptionVO> selectOwnerOptions(String keyword) {
+        List<SysDept> families = sysDeptMapper.selectActiveFamilyOptions(keyword);
+        List<DishOwnerOptionVO> options = new ArrayList<>(families.size());
+        for (SysDept family : families) {
+            DishOwnerOptionVO option = new DishOwnerOptionVO();
+            option.setDeptId(family.getDeptId());
+            option.setName(family.getDeptName());
+            option.setParentName(family.getParentName());
+            options.add(option);
+        }
+        return options;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int changeDishOwner(Long dishId, DishOwnerChangeRequest request) {
+        // 双重校验：权限注解管入口，这里管业务边界
+        if (!SecurityUtils.isAdmin()) {
+            throw new ServiceException("只有平台管理员可以调整菜品归属");
+        }
+        MealDish exist = mealDishMapper.selectMealDishById(dishId);
+        if (exist == null) {
+            throw new ServiceException("菜品不存在或已删除");
+        }
+        Long current = exist.getDeptId() == null ? 0L : exist.getDeptId();
+        // 并发校验：旧归属对不上说明期间有其他人迁移过，本次请求已过期
+        if (request.expectedDeptId() == null
+                || request.expectedDeptId().longValue() != current.longValue()) {
+            throw new ServiceException("菜品归属已被其他操作变更，请刷新后重试");
+        }
+        Long target = request.targetDeptId();
+        if (target.longValue() != 0L) {
+            assertValidFamily(target);
+        }
+        if (target.longValue() == current.longValue()) {
+            return 0;
+        }
+        mealDishMapper.updateDishOwner(dishId, current, target, SecurityUtils.getUsername());
+        return 1;
+    }
+
+    /**
+     * 校验目标部门是可作为归属的有效家庭
+     *
+     * <p>组织部门、停用家庭、已删除家庭都不能作为目标——把菜品挂到这些部门上，
+     * 没有任何家庭能看到它，等于把菜「藏起来」。</p>
+     *
+     * @param deptId 目标部门 ID
+     */
+    private void assertValidFamily(Long deptId) {
+        SysDept dept = sysDeptMapper.selectDeptById(deptId);
+        if (dept == null || !"0".equals(dept.getDelFlag()) || !"0".equals(dept.getStatus())
+                || !"F".equals(dept.getDeptType())) {
+            throw new ServiceException("目标不是有效的家庭部门：" + deptId);
+        }
     }
 }

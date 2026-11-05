@@ -117,7 +117,7 @@
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
 
     <el-dialog :title="title" v-model="open" width="760px" append-to-body>
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
+      <el-form ref="entityFormRef" :model="form" :rules="rules" label-width="90px">
         <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item label="菜名" prop="name">
@@ -136,20 +136,25 @@
         <el-form-item v-if="isAdmin && !form.dishId" label="归属">
           <el-checkbox v-model="asPublic">建为平台公共菜谱（所有家庭可见）</el-checkbox>
         </el-form-item>
-        <el-form-item label="封面地址" prop="cover">
-          <div class="cover-field">
-            <el-input v-model="form.cover" placeholder="选填，图片地址（/common/upload 返回的 URL）" />
-            <el-image
-              v-if="form.cover"
-              :src="form.cover"
-              :preview-src-list="[form.cover]"
-              fit="cover"
-              class="cover-thumb"
-              preview-teleported
-            />
-            <el-button v-if="pendingCover && pendingCover.cover === form.cover" link @click="checkCoverTransfer">查看图片保存状态</el-button>
+        <el-form-item v-if="isAdmin && form.dishId" label="归属">
+          <div class="owner-field">
+            <el-tag :type="form.deptId === 0 ? 'warning' : 'success'" size="small">
+              {{ form.deptId === 0 ? "公共菜谱" : `家庭 #${form.deptId}` }}
+            </el-tag>
+            <el-button v-if="canChangeOwner" link type="primary" icon="Switch" @click="openOwnerDialog">调整归属</el-button>
           </div>
+          <div class="form-tip">归属调整走独立入口；普通「修改」不会改变菜谱可见范围</div>
         </el-form-item>
+        <el-form-item label="封面" prop="cover">
+          <dish-cover-editor v-model="form.cover" :dish-name="form.name" @generated="onCoverGenerated" />
+          <el-button v-if="pendingCover && pendingCover.cover === form.cover" link @click="checkCoverTransfer">查看图片保存状态</el-button>
+        </el-form-item>
+        <dish-owner-dialog
+          ref="ownerDialogRef"
+          :dish-id="form.dishId"
+          :expected-dept-id="form.deptId"
+          @changed="onOwnerChanged"
+        />
         <el-form-item label="简介" prop="description">
           <el-input v-model="form.description" placeholder="一句话简介" maxlength="500" />
         </el-form-item>
@@ -270,7 +275,9 @@
 import { useAppProxy, formRef } from '@/utils/appProxy'
 import { getDish, listDish, addDish, updateDish, delDish, aiGenerateDishText, aiGenerateDishCover, getImageTransferTask } from "@/api/meal/dish"
 import { listCategory } from "@/api/meal/category"
-import type { MealDish, MealDishQueryParams, MealDishAiCurrent, MealDishAiTextResult } from "@/types/api/meal/dish"
+import DishCoverEditor from './components/DishCoverEditor.vue'
+import DishOwnerDialog from './components/DishOwnerDialog.vue'
+import type { MealDish, MealDishQueryParams, MealDishAiCurrent, MealDishAiTextResult, MealDishAiCoverResult } from "@/types/api/meal/dish"
 import type { MealCategory } from "@/types/api/meal/category"
 import useUserStore from "@/store/modules/user"
 
@@ -278,9 +285,15 @@ import useUserStore from "@/store/modules/user"
 type StepState = "idle" | "loading" | "done" | "error" | "skip"
 
 const proxy = useAppProxy()
+const route = useRoute()
 
 const userStore = useUserStore()
 const isAdmin = computed(() => userStore.roles.includes("admin"))
+/**
+ * 「调整归属」入口展示由服务端下发：后端 isAdmin()（userId=1）与「角色含 admin」不等价，
+ * 角色可授予任何用户，但归属迁移只允许平台管理员本人。
+ */
+const canChangeOwner = computed(() => userStore.canChangeDishOwner === true)
 
 const dishList = ref<MealDish[]>([])
 const categoryOptions = ref<MealCategory[]>([])
@@ -471,7 +484,7 @@ function reset() {
     sort: 0,
     remark: undefined
   }
-  proxy.resetForm("formRef")
+  proxy.resetForm("entityFormRef")
 }
 
 function handleQuery() {
@@ -757,6 +770,12 @@ async function runBatchAi(rows: MealDish[]) {
   }
 }
 
+/** 封面编辑器 AI 生成成功：登记待转存任务，提交前会先确认转存终态 */
+function onCoverGenerated(result: MealDishAiCoverResult) {
+  pendingCover.value = result.transferStatus === 'PENDING_TRANSFER' && result.transferTaskId
+    ? { taskId: result.transferTaskId, cover: result.cover as string } : null
+}
+
 /** 查询图片转存终态，失败时清除尚未保存的占位地址。 */
 async function checkCoverTransfer() {
   const pending = pendingCover.value
@@ -777,7 +796,7 @@ async function submitForm() {
     await checkCoverTransfer()
     if (pendingCover.value) return
   }
-  formRef(proxy.$refs["formRef"]).validate((valid: boolean) => {
+  formRef(proxy.$refs["entityFormRef"]).validate((valid: boolean) => {
     if (!valid) {
       return
     }
@@ -817,8 +836,52 @@ function handleDelete(row?: MealDish) {
     .catch(() => {})
 }
 
+/** 归属调整弹窗 */
+const ownerDialogRef = ref<InstanceType<typeof DishOwnerDialog> | null>(null)
+
+/** 打开归属调整弹窗 */
+function openOwnerDialog() {
+  if (!form.value.dishId) {
+    return
+  }
+  ownerDialogRef.value?.open()
+}
+
+/** 归属迁移成功后刷新列表与当前表单 */
+function onOwnerChanged() {
+  proxy.$modal.msgSuccess("归属已调整")
+  getList()
+  // 表单里还开着这条菜：重新拉详情回显新归属
+  if (form.value.dishId) {
+    getDish(form.value.dishId).then(response => {
+      const dish = response.data as MealDish
+      if (dish) {
+        form.value.deptId = dish.deptId
+      }
+    })
+  }
+}
+
+/** 路由带 query.name（新菜审核跳转）时预填菜名并查询 */
+function applyRouteName() {
+  const raw = route.query.name
+  const name = Array.isArray(raw) ? raw[0] : raw
+  queryParams.value.name = typeof name === "string" && name ? name : undefined
+  queryParams.value.pageNum = 1
+}
+
+applyRouteName()
 getList()
 loadCategories()
+
+// 已打开本页时再次跳转（带新 query）也要响应：直接 watch query.name
+watch(
+  () => route.query.name,
+  () => {
+    applyRouteName()
+    getList()
+  }
+)
 </script>
 
 <style scoped>
@@ -835,23 +898,11 @@ loadCategories()
   line-height: 1.5;
 }
 
-.cover-field {
+/* 归属展示与调整入口 */
+.owner-field {
   display: flex;
   align-items: center;
   gap: 10px;
-  width: 100%;
-}
-
-.cover-field .el-input {
-  flex: 1;
-}
-
-.cover-thumb {
-  width: 40px;
-  height: 40px;
-  border-radius: 6px;
-  flex-shrink: 0;
-  cursor: pointer;
 }
 
 /* 用料 / 做法 / 小贴士 可视化列表编辑器 */

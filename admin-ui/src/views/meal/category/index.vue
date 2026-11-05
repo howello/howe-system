@@ -67,7 +67,7 @@
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
 
     <el-dialog :title="title" v-model="open" width="680px" append-to-body>
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
+      <el-form ref="entityFormRef" :model="form" :rules="rules" label-width="90px">
         <el-form-item label="分类名称" prop="name">
           <el-input v-model="form.name" disabled />
           <div class="form-tip">分类名称是唯一主类的稳定标识，不支持修改</div>
@@ -172,7 +172,7 @@ function reset() {
     status: "0",
     remark: undefined
   }
-  proxy.resetForm("formRef")
+  proxy.resetForm("entityFormRef")
 }
 
 function handleQuery() {
@@ -201,7 +201,7 @@ function handleUpdate(row?: MealCategory) {
 }
 
 function submitForm() {
-  formRef(proxy.$refs["formRef"]).validate((valid: boolean) => {
+  formRef(proxy.$refs["entityFormRef"]).validate((valid: boolean) => {
     if (!valid) {
       return
     }

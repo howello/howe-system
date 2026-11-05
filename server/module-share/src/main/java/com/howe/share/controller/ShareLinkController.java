@@ -5,10 +5,14 @@ import com.howe.common.core.controller.BaseController;
 import com.howe.common.core.domain.AjaxResult;
 import com.howe.common.core.page.TableDataInfo;
 import com.howe.common.enums.BusinessType;
+import com.howe.common.utils.SecurityUtils;
 import com.howe.share.domain.ShareLink;
 import com.howe.share.domain.dto.ShareLinkCreateRequest;
 import com.howe.share.domain.dto.ShareLinkUpdateRequest;
+import com.howe.share.domain.dto.ShareRemoteCheckRequest;
+import com.howe.share.domain.vo.ShareRemoteCheckVO;
 import com.howe.share.service.IShareLinkService;
+import com.howe.share.service.ShareUploadService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -39,6 +44,8 @@ import java.util.List;
 public class ShareLinkController extends BaseController {
 
     private final IShareLinkService shareLinkService;
+
+    private final ShareUploadService shareUploadService;
 
     /**
      * 查询分享列表
@@ -66,12 +73,33 @@ public class ShareLinkController extends BaseController {
     /**
      * 创建分享
      */
-    @Operation(summary = "创建分享", description = "选文件 + 配参数，立即返回短链，字节异步缓存")
+    @Operation(summary = "创建分享", description = "三种来源（WebDAV / 本地上传 / 远程链接）+ 配参数，立即返回短链，字节异步缓存")
     @PreAuthorize("@ss.hasPermi('share:link:add')")
     @Log(title = "分享链接", businessType = BusinessType.INSERT)
     @PostMapping
     public AjaxResult add(@Valid @RequestBody ShareLinkCreateRequest request) {
         return success(shareLinkService.create(request, getUsername()));
+    }
+
+    /**
+     * 本地上传暂存
+     */
+    @Operation(summary = "本地上传暂存", description = "上传文件到暂存目录，返回一次性令牌；创建分享时用该令牌认领")
+    @PreAuthorize("@ss.hasPermi('share:link:add')")
+    @PostMapping("/upload")
+    public AjaxResult upload(MultipartFile file) {
+        return success(shareUploadService.upload(file, SecurityUtils.getUserId()));
+    }
+
+    /**
+     * 校验远程链接
+     */
+    @Operation(summary = "校验远程链接", description = "有界拉取并校验可达性与安全；结果仅供即时反馈，创建时会再次校验")
+    @PreAuthorize("@ss.hasPermi('share:link:add')")
+    @PostMapping("/check-remote")
+    public AjaxResult checkRemote(@Valid @RequestBody ShareRemoteCheckRequest request) {
+        ShareRemoteCheckVO vo = shareUploadService.checkRemote(request.url());
+        return success(vo);
     }
 
     /**

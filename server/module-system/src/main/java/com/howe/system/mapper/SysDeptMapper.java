@@ -20,6 +20,17 @@ public interface SysDeptMapper
     public List<SysDept> selectDeptList(SysDept dept);
 
     /**
+     * 查询可作为归属目标的有效家庭
+     *
+     * <p>限定 {@code dept_type='F'}、未删除、启用，用于「菜品调整归属」等
+     * 需要选择家庭的下拉。返回上级名称用于同名家庭区分。</p>
+     *
+     * @param keyword 家庭名称模糊搜索词，可空
+     * @return 家庭集合，最多 50 条
+     */
+    public List<SysDept> selectActiveFamilyOptions(@Param("keyword") String keyword);
+
+    /**
      * 根据角色ID查询部门树信息
      *
      * @param roleId 角色ID

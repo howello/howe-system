@@ -21,6 +21,13 @@ export interface UserInfoResult extends AjaxResult {
   isDefaultModifyPwd?: boolean
   /** 密码是否过期 */
   isPasswordExpired?: boolean
+  /**
+   * 是否可调整菜品归属
+   *
+   * 由服务端计算（平台管理员本人且持有 meal:dish:owner），
+   * 与「角色含 admin」不等价，前端直接用这个字段控制入口。
+   */
+  canChangeDishOwner?: boolean
 }
 
 /** 验证码响应 */

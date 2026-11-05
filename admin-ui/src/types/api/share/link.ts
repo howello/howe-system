@@ -24,7 +24,13 @@ export interface ShareLink extends BaseEntity {
   linkId?: number;
   /** 短码 */
   code?: string;
-  /** 源ID */
+  /** 来源类型：WEBDAV / LOCAL / REMOTE */
+  sourceType?: 'WEBDAV' | 'LOCAL' | 'REMOTE';
+  /** 远程链接（仅 REMOTE，管理端可见） */
+  remoteUrl?: string;
+  /** 本地上传暂存ID（仅 LOCAL） */
+  localUploadId?: number;
+  /** WebDAV 源ID（仅 WEBDAV） */
   sourceId?: number;
   /** 源名称（列表展示） */
   sourceName?: string;
@@ -70,10 +76,16 @@ export interface ShareLink extends BaseEntity {
 
 /** 创建分享请求 */
 export interface ShareLinkCreateRequest {
-  /** 源ID */
+  /** 来源类型：WEBDAV / LOCAL / REMOTE，为空按 WEBDAV 处理（兼容旧调用） */
+  sourceType?: 'WEBDAV' | 'LOCAL' | 'REMOTE';
+  /** 源ID（仅 WEBDAV） */
   sourceId?: number;
-  /** WebDAV 源文件路径 */
+  /** WebDAV 源文件路径（仅 WEBDAV） */
   filePath?: string;
+  /** 本地上传令牌（仅 LOCAL） */
+  uploadToken?: string;
+  /** 远程链接（仅 REMOTE） */
+  remoteUrl?: string;
   /** 访问密码，为空表示无密码 */
   password?: string;
   /** 过期时间，为空表示不过期 */
@@ -124,4 +136,32 @@ export interface ShareAccessLog {
   message?: string;
   /** 访问时间 */
   createTime?: string;
+}
+
+/** 本地上传暂存结果（令牌只返回一次） */
+export interface ShareUploadResult {
+  /** 一次性上传令牌，创建分享时带上 */
+  uploadToken: string;
+  /** 原始文件名 */
+  fileName: string;
+  /** 字节数 */
+  fileSize: number;
+  /** 小写扩展名 */
+  fileExt?: string;
+  /** 过期时间 */
+  expireAt?: string;
+}
+
+/** 远程链接校验结果 */
+export interface ShareRemoteCheckResult {
+  /** 是否可达 */
+  reachable: boolean;
+  /** 文件字节数 */
+  fileSize?: number;
+  /** 从地址推断的文件名 */
+  fileName?: string;
+  /** 校验时间 */
+  checkedAt?: string;
+  /** 失败原因 */
+  reason?: string;
 }

@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import type { ConfigQueryParams, SysConfig, AjaxResult, TableDataInfo } from '@/types'
+import type { ConfigQueryParams, ConfigParamTypeOption, SysConfig, AjaxResult, TableDataInfo } from '@/types'
 
 // 查询参数列表
 export function listConfig(query: ConfigQueryParams): Promise<TableDataInfo<SysConfig[]>> {
@@ -7,6 +7,18 @@ export function listConfig(query: ConfigQueryParams): Promise<TableDataInfo<SysC
     url: '/system/config/list',
     method: 'get',
     params: query
+  })
+}
+
+/**
+ * 查询全量参数分类
+ *
+ * 独立于分页与搜索条件；存在空 / NULL / 纯空白分类时末尾附带「未分类」选项。
+ */
+export function listParamTypes(): Promise<AjaxResult<ConfigParamTypeOption[]>> {
+  return request({
+    url: '/system/config/paramTypes',
+    method: 'get'
   })
 }
 

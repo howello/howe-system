@@ -89,4 +89,21 @@ public interface MealDishMapper {
                                          @Param("startDay") String startDay,
                                          @Param("endDay") String endDay,
                                          @Param("limit") int limit);
+
+    /**
+     * 条件更新菜品归属
+     *
+     * <p>where 里带旧归属：并发迁移时，先到先得，后到的请求因旧值不匹配而影响 0 行，
+     * 由调用方提示刷新，不会出现后到者无感知覆盖先到者。</p>
+     *
+     * @param dishId        菜品 ID
+     * @param expectedDeptId 旧归属（并发校验）
+     * @param targetDeptId  新归属；0 表示平台公共菜谱
+     * @param updateBy      更新人
+     * @return 影响行数
+     */
+    int updateDishOwner(@Param("dishId") Long dishId,
+                        @Param("expectedDeptId") Long expectedDeptId,
+                        @Param("targetDeptId") Long targetDeptId,
+                        @Param("updateBy") String updateBy);
 }

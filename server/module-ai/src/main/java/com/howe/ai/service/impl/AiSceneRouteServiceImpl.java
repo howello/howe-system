@@ -1,5 +1,6 @@
 package com.howe.ai.service.impl;
 
+import cn.hutool.core.util.StrUtil;
 import com.howe.ai.config.AiConfigService;
 import com.howe.ai.persistence.domain.AiModel;
 import com.howe.ai.persistence.domain.AiSceneRoute;
@@ -62,6 +63,13 @@ public class AiSceneRouteServiceImpl implements IAiSceneRouteService
         {
             aiSceneRoute.setId(existing.getId());
             rows = aiSceneRouteMapper.updateAiSceneRoute(aiSceneRoute);
+        }
+        // 同一 scene 可能挂在多个能力下，名称必须整组一致。
+        // 逐条更新会导致「要求彼此一致 → 永远改不了名」，所以按 scene 统一改写。
+        if (StrUtil.isNotBlank(aiSceneRoute.getSceneName()))
+        {
+            aiSceneRouteMapper.updateSceneNameByScene(aiSceneRoute.getScene(),
+                    aiSceneRoute.getSceneName(), SecurityUtils.getUsername());
         }
         aiConfigService.refresh();
         return rows;

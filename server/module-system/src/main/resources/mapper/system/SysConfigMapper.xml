@@ -50,7 +50,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 				AND config_type = #{configType}
 			</if>
 			<if test="paramType != null and paramType != ''">
-				AND param_type = #{paramType}
+				AND trim(param_type) = trim(#{paramType})
+			</if>
+			<!-- 未分类：选中「未分类」时前端传 uncategorized=true，而不是传中文字符串冒充分类值。
+			     paramType 优先：两者同时出现时以上面的等值条件为准。 -->
+			<if test="(paramType == null or paramType == '') and params != null and params.uncategorized != null and params.uncategorized == true">
+				AND (param_type is null or trim(param_type) = '')
 			</if>
 			<if test="configKey != null and configKey != ''">
 				AND config_key like concat('%', #{configKey}, '%')
@@ -105,7 +110,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="configKey != null and configKey != ''">config_key = #{configKey},</if>
             <if test="configValue != null and configValue != ''">config_value = #{configValue},</if>
             <if test="configType != null and configType != ''">config_type = #{configType},</if>
-            <if test="paramType != null and paramType != ''">param_type = #{paramType},</if>
+            <!-- 允许显式清空分类：paramType 为 null 表示「不改」，为空字符串表示「改成未分类」。
+                 因此这里只判断非 null，不再叠加非空判断，否则用户无法把分类清空。 -->
+            <if test="paramType != null">param_type = #{paramType},</if>
             <if test="sensitive != null and sensitive != ''">`sensitive` = #{sensitive},</if>
             <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
             <if test="remark != null">remark = #{remark},</if>
@@ -124,5 +131,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         	#{configId}
         </foreach>
     </delete>
+
+    <!-- 全量分类：去掉首尾空白与空值后去重，供分类下拉使用。
+         排序放在 SQL 里，保证不同调用方拿到的顺序一致。 -->
+    <select id="selectDistinctParamTypes" resultType="java.lang.String">
+        select distinct trim(param_type)
+        from sys_config
+        where param_type is not null and trim(param_type) &lt;&gt; ''
+        order by trim(param_type)
+    </select>
+
+    <!-- 是否存在空 / NULL / 纯空白的分类，用于决定要不要追加「未分类」选项 -->
+    <select id="countUncategorized" resultType="int">
+        select count(1) from sys_config where param_type is null or trim(param_type) = ''
+    </select>
 
 </mapper>

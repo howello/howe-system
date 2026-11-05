@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 
 /**
  * AI 渠道 服务层实现
@@ -57,10 +58,22 @@ public class AiChannelServiceImpl implements IAiChannelService
 
     private final AiConfigCache aiConfigCache;
 
+    /**
+     * 当前可配置的服务商协议
+     *
+     * <p>只有这三项进入配置入口。旧的 {@code raw-http} 不在此列：它的渠道可能还引用着
+     * 历史模型，直接删除会破坏审计链路，因此保留为停用状态，但不再允许新建或重新启用。</p>
+     */
+    private static final Set<String> CONFIGURABLE_PROTOCOLS = Set.of("dashscope", "openai", "anthropic");
+
     @Override
     public List<AiProvider> selectProviderOptions()
     {
-        return aiProviderMapper.selectEnabledList();
+        // 按协议过滤而不是按 code 过滤：OpenAI 的历史 code 是 openai-compatible，
+        // 不能因为改展示名就动已有渠道的外键引用
+        return aiProviderMapper.selectEnabledList().stream()
+                .filter(provider -> CONFIGURABLE_PROTOCOLS.contains(provider.getProtocol()))
+                .toList();
     }
 
     @Override
@@ -167,7 +180,21 @@ public class AiChannelServiceImpl implements IAiChannelService
         {
             throw new ServiceException("渠道不存在");
         }
-        AiModel model = modelId == null ? findFirstModel(id) : aiModelMapper.selectAiModelById(modelId);
+        AiModel model;
+        if (modelId == null)
+        {
+            model = findFirstModel(id);
+        }
+        else
+        {
+            model = aiModelMapper.selectAiModelById(modelId);
+            // 必须校验模型归属：否则可以拿别的渠道的模型测当前渠道，
+            // 测出来的健康状态会写到一个根本没有该模型的渠道上
+            if (model != null && !id.equals(model.getChannelId()))
+            {
+                return AiHealthResult.fail("模型不属于该渠道，请重新选择", AiErrorCode.BAD_REQUEST.name());
+            }
+        }
         AiHealthResult result;
         if (model == null)
         {

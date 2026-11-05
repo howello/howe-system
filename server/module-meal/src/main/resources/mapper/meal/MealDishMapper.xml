@@ -209,4 +209,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         limit #{limit}
     </select>
 
+    <!-- 归属条件更新：旧归属不匹配（被并发迁移）时影响 0 行，由 Service 提示刷新 -->
+    <update id="updateDishOwner">
+        update meal_dish
+        set dept_id = #{targetDeptId}, update_by = #{updateBy}, update_time = sysdate()
+        where dish_id = #{dishId} and del_flag = '0' and dept_id = #{expectedDeptId}
+    </update>
+
 </mapper>

@@ -12,8 +12,10 @@ import com.howe.ai.persistence.domain.dto.AiModelImportRequest;
 import com.howe.ai.persistence.domain.vo.AiRemoteModel;
 import com.howe.ai.persistence.mapper.AiChannelMapper;
 import com.howe.ai.persistence.mapper.AiModelMapper;
+import com.howe.ai.persistence.mapper.AiProviderMapper;
 import com.howe.ai.persistence.mapper.AiSceneRouteMapper;
 import com.howe.ai.provider.AiProviderAdapter;
+import com.howe.ai.provider.AnthropicAdapter;
 import com.howe.ai.service.IAiModelService;
 import com.howe.common.exception.ServiceException;
 import com.howe.common.utils.SecurityUtils;
@@ -42,6 +44,8 @@ public class AiModelServiceImpl implements IAiModelService
 
     private final AiChannelMapper aiChannelMapper;
 
+    private final AiProviderMapper aiProviderMapper;
+
     private final AiSceneRouteMapper aiSceneRouteMapper;
 
     private final AiConfigService aiConfigService;
@@ -68,7 +72,8 @@ public class AiModelServiceImpl implements IAiModelService
     @Override
     public int insertAiModel(AiModel aiModel)
     {
-        requireChannel(aiModel.getChannelId());
+        AiChannel channel = requireChannel(aiModel.getChannelId());
+        requireCapabilitySupported(channel, aiModel.getCapability());
         requireValidExtra(aiModel.getExtra());
         aiModel.setEnabled(aiModel.getEnabled() == null ? ENABLED : aiModel.getEnabled());
         aiModel.setCreateBy(SecurityUtils.getUsername());
@@ -82,7 +87,8 @@ public class AiModelServiceImpl implements IAiModelService
     @Override
     public int updateAiModel(AiModel aiModel)
     {
-        requireChannel(aiModel.getChannelId());
+        AiChannel channel = requireChannel(aiModel.getChannelId());
+        requireCapabilitySupported(channel, aiModel.getCapability());
         requireValidExtra(aiModel.getExtra());
         aiModel.setUpdateBy(SecurityUtils.getUsername());
         int rows = aiModelMapper.updateAiModel(aiModel);
@@ -94,6 +100,46 @@ public class AiModelServiceImpl implements IAiModelService
                 aiModel.getExtra(), rows);
         aiConfigService.refresh();
         return rows;
+    }
+
+    /**
+     * 校验渠道所属服务商是否支持该能力
+     *
+     * <p>Anthropic 只覆盖对话与图片理解；给它配文生图或向量模型，
+     * 只会在运行时才暴露为「协议不支持某能力」。这里提前拦住，
+     * 与 {@code ai_provider.supports} 和运行时异常三层保持一致。</p>
+     *
+     * @param channel    渠道
+     * @param capability 能力类型
+     */
+    private void requireCapabilitySupported(AiChannel channel, String capability)
+    {
+        if (!AnthropicAdapter.PROTOCOL.equals(providerProtocol(channel.getProviderCode())))
+        {
+            return;
+        }
+        String normalized = StrUtil.blankToDefault(capability, "").trim().toUpperCase();
+        if ("IMAGE".equals(normalized) || "EMBEDDING".equals(normalized))
+        {
+            throw new ServiceException("Anthropic 协议只支持对话（CHAT）与图片理解（VISION），"
+                    + "不支持 " + normalized);
+        }
+    }
+
+    /**
+     * 取渠道所属服务商的协议
+     *
+     * @param providerCode 服务商标识
+     * @return 协议标识，服务商不存在时返回 null
+     */
+    private String providerProtocol(String providerCode)
+    {
+        if (StrUtil.isBlank(providerCode))
+        {
+            return null;
+        }
+        AiProvider provider = aiProviderMapper.selectAiProviderByCode(providerCode);
+        return provider == null ? null : provider.getProtocol();
     }
 
     @Override

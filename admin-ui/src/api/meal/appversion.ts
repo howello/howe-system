@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import type { MealAppVersionQueryParams, MealAppVersion, WgtUploadResult, AjaxResult, TableDataInfo } from '@/types'
+import type { MealAppVersionQueryParams, MealAppVersion, WgtUploadResult, AppPackageCheckResult, AjaxResult, TableDataInfo } from '@/types'
 
 // 查询 App 版本列表
 export function listAppVersion(query: MealAppVersionQueryParams): Promise<TableDataInfo<MealAppVersion[]>> {
@@ -55,5 +55,15 @@ export function uploadAppVersionWgt(file: File): Promise<AjaxResult<WgtUploadRes
     headers: {
       'Content-Type': 'multipart/form-data'
     }
+  })
+}
+
+// 校验远程 wgt 链接（有界下载 + wgt 结构验证）；前端超时放宽到 60s 覆盖后端预算
+export function checkAppPackage(url: string): Promise<AjaxResult<AppPackageCheckResult>> {
+  return request({
+    url: '/meal/app/version/check-package',
+    method: 'post',
+    data: { url },
+    timeout: 60000
   })
 }

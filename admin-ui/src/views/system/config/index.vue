@@ -20,12 +20,12 @@
             />
          </el-form-item>
          <el-form-item label="参数分类" prop="paramType">
-            <el-select v-model="queryParams.paramType" placeholder="参数分类" clearable filterable allow-create style="width: 200px">
+            <el-select v-model="paramTypeSelection" placeholder="参数分类" clearable filterable style="width: 200px" @change="handleParamTypeChange">
                <el-option
                   v-for="item in paramTypeOptions"
-                  :key="item"
-                  :label="item"
-                  :value="item"
+                  :key="item.uncategorized ? '__uncategorized__' : item.value"
+                  :label="item.label"
+                  :value="item.uncategorized ? UNCategorized_VALUE : item.value"
                />
             </el-select>
          </el-form-item>
@@ -170,14 +170,14 @@
             <el-form-item label="参数分类" prop="paramType">
                <el-select v-model="form.paramType" placeholder="选择或输入分类" clearable filterable allow-create style="width: 100%">
                   <el-option
-                     v-for="item in paramTypeOptions"
-                     :key="item"
-                     :label="item"
-                     :value="item"
+                     v-for="item in paramTypeOptions.filter((t: ConfigParamTypeOption) => !t.uncategorized)"
+                     :key="item.value"
+                     :label="item.label"
+                     :value="item.value"
                   />
                </el-select>
                <div class="form-tip">
-                  自由文本，仅用于按业务域分组展示（如 存储 / 博客 / AI / 点餐）。
+                  自由文本，仅用于按业务域分组展示（如 存储 / 博客 / AI / 点餐）。清空表示归入「未分类」。
                </div>
             </el-form-item>
             <el-form-item label="参数键值" prop="configValue">
@@ -227,11 +227,14 @@
 
 <script setup lang="ts" name="Config">
 import { useAppProxy, formRef } from '@/utils/appProxy'
-import type { SysConfig, ConfigQueryParams } from '@/types/api/system/config'
-import { listConfig, getConfig, delConfig, addConfig, updateConfig, refreshCache } from "@/api/system/config"
+import type { SysConfig, ConfigQueryParams, ConfigParamTypeOption } from '@/types/api/system/config'
+import { listConfig, getConfig, delConfig, addConfig, updateConfig, refreshCache, listParamTypes } from "@/api/system/config"
 
 const proxy = useAppProxy()
 const { sys_yes_no } = useDict("sys_yes_no")
+
+/** 「未分类」在下拉里的占位值：不能与真实分类值冲突，也不能是空串（清空表示不限） */
+const UNCategorized_VALUE = "__UNCATEGORIZED__"
 
 const configList = ref<SysConfig[]>([])
 const open = ref<boolean>(false)
@@ -243,8 +246,13 @@ const multiple = ref<boolean>(true)
 const total = ref<number>(0)
 const title = ref<string>("")
 const dateRange = ref<string[]>([])
-// 分类下拉候选：来自当前列表里出现过的分类，配合 allow-create 支持新分类
-const paramTypeOptions = ref<string[]>([])
+/**
+ * 分类下拉候选：来自后端全量分类接口，独立于分页与搜索条件。
+ * 之前取自当前页数据，翻到第二页时下拉里只剩那一页的分类。
+ */
+const paramTypeOptions = ref<ConfigParamTypeOption[]>([])
+/** 筛选区分类下拉的选中值，需要把「未分类」映射成独立查询参数 */
+const paramTypeSelection = ref<string | undefined>(undefined)
 
 const data = reactive({
   form: {} as SysConfig,
@@ -278,10 +286,30 @@ function getList() {
     configList.value = response.rows
     total.value = response.total
     loading.value = false
-    // 分类候选取自当前页，去重后排序；跨页的新分类靠 allow-create 输入
-    const types = configList.value.map((item: SysConfig) => item.paramType).filter((t: string | undefined): t is string => !!t)
-    paramTypeOptions.value = Array.from(new Set<string>(types)).sort()
+  }).catch(() => {
+    loading.value = false
   })
+}
+
+/** 查询全量分类选项 */
+function loadParamTypes() {
+  listParamTypes().then(response => {
+    paramTypeOptions.value = (response.data || []) as ConfigParamTypeOption[]
+  }).catch(() => {
+    // 分类接口失败不阻塞主列表；保留上一次结果
+  })
+}
+
+/** 筛选区分类变化：把「未分类」映射成独立查询参数 */
+function handleParamTypeChange(value?: string) {
+  if (value === UNCategorized_VALUE) {
+    queryParams.value.paramType = undefined
+    queryParams.value.uncategorized = true
+  } else {
+    queryParams.value.paramType = value || undefined
+    queryParams.value.uncategorized = undefined
+  }
+  handleQuery()
 }
 
 /** 取消按钮 */
@@ -314,7 +342,11 @@ function handleQuery() {
 /** 重置按钮操作 */
 function resetQuery() {
   dateRange.value = []
+  // 分类选中值与 queryParams 里的派生字段要一起复位，否则「未分类」会残留
+  paramTypeSelection.value = undefined
   proxy.resetForm("queryRef")
+  queryParams.value.paramType = undefined
+  queryParams.value.uncategorized = undefined
   handleQuery()
 }
 
@@ -358,12 +390,15 @@ function submitForm() {
           proxy.$modal.msgSuccess("修改成功")
           open.value = false
           getList()
+          // 分类可能被新增或清空，下拉要立即跟上
+          loadParamTypes()
         })
       } else {
         addConfig(form.value).then(() => {
           proxy.$modal.msgSuccess("新增成功")
           open.value = false
           getList()
+          loadParamTypes()
         })
       }
     }
@@ -377,6 +412,7 @@ function handleDelete(row: SysConfig) {
     return delConfig(configIds)
   }).then(() => {
     getList()
+    loadParamTypes()
     proxy.$modal.msgSuccess("删除成功")
   }).catch(() => {})
 }
@@ -392,9 +428,12 @@ function handleExport() {
 function handleRefreshCache() {
   refreshCache().then(() => {
     proxy.$modal.msgSuccess("刷新缓存成功")
+    // 后端同时让分类缓存换代，这里重新拉一次
+    loadParamTypes()
   })
 }
 
+loadParamTypes()
 getList()
 </script>
 

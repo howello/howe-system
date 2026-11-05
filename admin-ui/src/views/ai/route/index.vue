@@ -30,9 +30,14 @@
 
       <el-table v-loading="loading" :data="routeList" @selection-change="handleSelectionChange">
          <el-table-column type="selection" width="55" align="center" />
+         <el-table-column label="场景名称" align="left" :show-overflow-tooltip="true" min-width="160">
+            <template #default="scope">
+               <a class="link-type" style="cursor: pointer" @click="handleUpdate(scope.row)">{{ scope.row.sceneName || scope.row.scene }}</a>
+            </template>
+         </el-table-column>
          <el-table-column label="场景标识" align="left" :show-overflow-tooltip="true" min-width="200">
             <template #default="scope">
-               <a class="link-type" style="cursor: pointer" @click="handleUpdate(scope.row)">{{ scope.row.scene }}</a>
+               <span class="ai-mono">{{ scope.row.scene }}</span>
             </template>
          </el-table-column>
          <el-table-column label="能力类型" align="center" width="110">
@@ -82,6 +87,10 @@
       <!-- 新增/修改对话框 -->
       <el-dialog :title="title" v-model="open" width="680px" append-to-body :close-on-click-modal="false">
          <el-form ref="routeRef" :model="form" :rules="rules" label-width="110px">
+            <el-form-item label="场景名称" prop="sceneName">
+               <el-input v-model="form.sceneName" placeholder="如 菜品封面生成" maxlength="100" />
+               <div class="ai-hint">给管理员看的名称，可随时改，不影响业务调用；同一场景标识下的多条能力记录会一起改名。</div>
+            </el-form-item>
             <el-form-item label="场景标识" prop="scene">
                <el-input v-model="form.scene" placeholder="如 blog.recipe.cover" maxlength="128" />
                <div class="ai-hint">业务方调用时传的就是这个值，改这里等于换掉整条链路。</div>
@@ -165,10 +174,12 @@ const data = reactive({
   queryParams: {
     pageNum: 1,
     pageSize: 10,
+    sceneName: undefined,
     scene: undefined,
     capability: undefined
   } as AiSceneRouteQueryParams,
   rules: {
+    sceneName: [{ required: true, message: "场景名称不能为空", trigger: "blur" }],
     scene: [{ required: true, message: "场景标识不能为空", trigger: "blur" }],
     capability: [{ required: true, message: "请选择能力类型", trigger: "change" }],
     primaryModelId: [{ required: true, message: "请选择主模型", trigger: "change" }]

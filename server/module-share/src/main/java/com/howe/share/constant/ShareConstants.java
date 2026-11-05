@@ -37,6 +37,30 @@ public final class ShareConstants {
     /** 链接状态：已焚毁 */
     public static final String STATUS_BURNED = "2";
 
+    /** 链接状态：删除中（待清理存储对象，公开访问一律 410） */
+    public static final String STATUS_DELETING = "3";
+
+    /** 来源类型：WebDAV 源 */
+    public static final String SOURCE_WEBDAV = "WEBDAV";
+
+    /** 来源类型：本地上传 */
+    public static final String SOURCE_LOCAL = "LOCAL";
+
+    /** 来源类型：远程链接 */
+    public static final String SOURCE_REMOTE = "REMOTE";
+
+    /** 上传暂存状态：待认领 */
+    public static final String UPLOAD_TEMP = "TEMP";
+
+    /** 上传暂存状态：已认领，缓存中 */
+    public static final String UPLOAD_CLAIMED = "CLAIMED";
+
+    /** 上传暂存状态：已绑定且缓存成功 */
+    public static final String UPLOAD_BOUND = "BOUND";
+
+    /** 上传暂存状态：已过期 */
+    public static final String UPLOAD_EXPIRED = "EXPIRED";
+
     /** 阅后即焚：是 */
     public static final String BURN_YES = "1";
 

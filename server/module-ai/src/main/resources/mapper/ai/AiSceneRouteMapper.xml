@@ -6,6 +6,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <resultMap type="AiSceneRoute" id="AiSceneRouteResult">
         <result property="id"                   column="id"                      />
         <result property="scene"                column="scene"                   />
+        <result property="sceneName"            column="scene_name"              />
         <result property="capability"           column="capability"              />
         <result property="primaryModelId"       column="primary_model_id"        />
         <result property="fallbackModelIds"     column="fallback_model_ids"      />
@@ -21,7 +22,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectAiSceneRouteVo">
-        select r.id, r.scene, r.capability, r.primary_model_id, r.fallback_model_ids, r.params,
+        select r.id, r.scene, r.scene_name, r.capability, r.primary_model_id, r.fallback_model_ids, r.params,
                r.enabled, r.remark, r.create_by, r.create_time, r.update_by, r.update_time,
                m.model_name as primary_model_name, m.display_name as primary_model_display_name
         from ai_scene_route r
@@ -68,10 +69,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertAiSceneRoute" parameterType="AiSceneRoute" useGeneratedKeys="true" keyProperty="id">
         insert into ai_scene_route (
-            scene, capability, primary_model_id, fallback_model_ids, params, enabled,
+            scene, scene_name, capability, primary_model_id, fallback_model_ids, params, enabled,
             remark, create_by, create_time
         ) values (
-            #{scene}, #{capability}, #{primaryModelId}, #{fallbackModelIds}, #{routeParams}, #{enabled},
+            #{scene}, #{sceneName}, #{capability}, #{primaryModelId}, #{fallbackModelIds}, #{routeParams}, #{enabled},
             #{remark}, #{createBy}, sysdate()
         )
     </insert>
@@ -80,6 +81,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         update ai_scene_route
         <set>
             <if test="scene != null and scene != ''">scene = #{scene},</if>
+            <if test="sceneName != null and sceneName != ''">scene_name = #{sceneName},</if>
             <if test="capability != null and capability != ''">capability = #{capability},</if>
             <if test="primaryModelId != null">primary_model_id = #{primaryModelId},</if>
             fallback_model_ids = #{fallbackModelIds},
@@ -91,6 +93,20 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </set>
         where id = #{id}
     </update>
+
+    <!-- 同一 scene 下所有能力记录共用同一个展示名称。
+         改名时按 scene 整组更新，避免「只能逐条改、却要求彼此一致」的死锁。 -->
+    <update id="updateSceneNameByScene">
+        update ai_scene_route
+        set scene_name = #{sceneName}, update_by = #{updateBy}, update_time = sysdate()
+        where scene = #{scene}
+    </update>
+
+    <select id="selectBySceneOnly" resultMap="AiSceneRouteResult">
+        select id, scene, scene_name, capability
+        from ai_scene_route
+        where scene = #{scene}
+    </select>
 
     <delete id="deleteAiSceneRouteByIds" parameterType="Long">
         delete from ai_scene_route where id in

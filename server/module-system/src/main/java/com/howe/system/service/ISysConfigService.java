@@ -2,6 +2,7 @@ package com.howe.system.service;
 
 import java.util.List;
 import com.howe.system.domain.SysConfig;
+import com.howe.system.domain.vo.ConfigParamTypeVO;
 
 /**
  * 参数配置 服务层
@@ -58,6 +59,16 @@ public interface ISysConfigService
      * @return 参数配置集合
      */
     public List<SysConfig> selectConfigList(SysConfig config);
+
+    /**
+     * 查询全量参数分类
+     *
+     * <p>独立于分页与搜索条件，返回全表出现过的分类；若存在空 / NULL / 纯空白的
+     * {@code param_type}，在末尾追加一个「未分类」选项。</p>
+     *
+     * @return 分类选项集合，按名称升序，「未分类」恒在最后
+     */
+    public List<ConfigParamTypeVO> selectParamTypes();
 
     /**
      * 新增参数配置

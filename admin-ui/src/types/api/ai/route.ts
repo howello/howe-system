@@ -19,8 +19,10 @@ export interface AiSceneRouteQueryParams extends PageDomain {
 export interface AiSceneRoute extends BaseEntity {
   /** 主键ID */
   id?: number;
-  /** 场景标识，如 blog.recipe.cover */
+  /** 场景标识，如 blog.recipe.cover；业务调用使用的稳定值，改名会破坏路由 */
   scene?: string;
+  /** 场景展示名称，如 菜品封面生成；与 scene 分开，改名不影响路由 */
+  sceneName?: string;
   /** 能力类型：CHAT / VISION / IMAGE / EMBEDDING */
   capability?: string;
   /** 主模型ID */

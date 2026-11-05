@@ -51,3 +51,21 @@ export interface WgtUploadResult {
   /** 原始文件名 */
   fileName: string;
 }
+
+/**
+ * 远程资源包校验结果
+ *
+ * 仅供表单即时反馈；保存时服务端会按需重新校验，不信任前端结论。
+ */
+export interface AppPackageCheckResult {
+  /** 是否可达且为有效 wgt */
+  reachable: boolean;
+  /** 文件字节数 */
+  size?: number;
+  /** 从地址推断的文件名 */
+  fileName?: string;
+  /** 校验时间 */
+  checkedAt?: string;
+  /** 失败原因，成功时为空 */
+  reason?: string;
+}

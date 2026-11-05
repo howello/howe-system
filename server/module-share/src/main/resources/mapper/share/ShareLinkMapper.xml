@@ -8,7 +8,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="linkId"          column="link_id"          />
         <result property="accessVersion" column="access_version" />
         <result property="code"            column="code"             />
+        <result property="sourceType"      column="source_type"      />
         <result property="sourceId"        column="source_id"        />
+        <result property="remoteUrl"       column="remote_url"       />
+        <result property="localUploadId"   column="local_upload_id"  />
         <result property="filePath"        column="file_path"        />
         <result property="fileName"        column="file_name"        />
         <result property="fileExt"         column="file_ext"         />
@@ -35,7 +38,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectShareLinkVo">
-        select l.link_id, l.access_version, l.code, l.source_id, l.file_path, l.file_name, l.file_ext, l.file_size,
+        select l.link_id, l.access_version, l.code, l.source_type, l.source_id, l.remote_url, l.local_upload_id,
+               l.file_path, l.file_name, l.file_ext, l.file_size,
                l.content_type, l.storage_type, l.storage_location, l.password_hash, l.expire_at,
                l.max_views, l.view_count, l.burn_after_read, l.cache_status, l.cache_error,
                l.cache_retry_count, l.status, l.last_view_time,
@@ -44,7 +48,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </sql>
 
     <select id="selectShareLinkList" parameterType="ShareLink" resultMap="ShareLinkResult">
-        select l.link_id, l.access_version, l.code, l.source_id, l.file_path, l.file_name, l.file_ext, l.file_size,
+        select l.link_id, l.access_version, l.code, l.source_type, l.source_id, l.remote_url, l.local_upload_id,
+               l.file_path, l.file_name, l.file_ext, l.file_size,
                l.content_type, l.storage_type, l.storage_location, l.password_hash, l.expire_at,
                l.max_views, l.view_count, l.burn_after_read, l.cache_status, l.cache_error,
                l.cache_retry_count, l.status, l.last_view_time,
@@ -61,6 +66,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             </if>
             <if test="sourceId != null">
                 AND l.source_id = #{sourceId}
+            </if>
+            <if test="sourceType != null and sourceType != ''">
+                AND l.source_type = #{sourceType}
             </if>
             <if test="status != null and status != ''">
                 AND l.status = #{status}
@@ -84,12 +92,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertShareLink" parameterType="ShareLink" useGeneratedKeys="true" keyProperty="linkId">
         insert into share_link (
-            code, source_id, file_path, file_name, file_ext, file_size, content_type,
+            code, source_type, source_id, remote_url, local_upload_id, file_path,
+            file_name, file_ext, file_size, content_type,
             storage_type, storage_location, password_hash, expire_at, max_views, view_count,
             burn_after_read, cache_status, cache_error, cache_retry_count, status,
             create_by, create_time, remark
         ) values (
-            #{code}, #{sourceId}, #{filePath}, #{fileName}, #{fileExt}, #{fileSize}, #{contentType},
+            #{code}, #{sourceType}, #{sourceId}, #{remoteUrl}, #{localUploadId}, #{filePath},
+            #{fileName}, #{fileExt}, #{fileSize}, #{contentType},
             #{storageType}, #{storageLocation}, #{passwordHash}, #{expireAt}, #{maxViews}, #{viewCount},
             #{burnAfterRead}, #{cacheStatus}, #{cacheError}, #{cacheRetryCount}, #{status},
             #{createBy}, sysdate(), #{remark}

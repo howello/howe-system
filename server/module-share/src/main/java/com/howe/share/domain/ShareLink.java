@@ -37,6 +37,28 @@ public class ShareLink extends BaseEntity {
     @Schema(description = "源ID", example = "1")
     private Long sourceId;
 
+    /**
+     * 来源类型
+     *
+     * <p>{@code WEBDAV} 走既有选源 + 浏览文件；{@code LOCAL} 是管理端上传的暂存文件；
+     * {@code REMOTE} 是后端拉取的远程链接。三者最终都进入同一套缓存与存储链路。</p>
+     */
+    private String sourceType;
+
+    /**
+     * 远程链接地址
+     *
+     * <p>仅 {@code REMOTE} 使用；匿名接口不返回该字段。</p>
+     */
+    private String remoteUrl;
+
+    /**
+     * 本地上传暂存 ID
+     *
+     * <p>仅 {@code LOCAL} 使用，关联 {@code share_upload.upload_id}；唯一索引保证一个上传只能被一个分享认领。</p>
+     */
+    private Long localUploadId;
+
     @Schema(description = "WebDAV 源文件路径", example = "/文档/季度报表.pdf")
     private String filePath;
 

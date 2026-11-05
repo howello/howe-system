@@ -13,8 +13,10 @@ import com.howe.common.enums.LimitType;
 import com.howe.common.utils.ConfigUtils;
 import com.howe.common.utils.StringUtils;
 import com.howe.meal.domain.MealAppVersion;
+import com.howe.meal.domain.dto.AppPackageCheckRequest;
 import com.howe.meal.domain.dto.AppVersionLogPolishBody;
 import com.howe.meal.service.IMealAppVersionService;
+import com.howe.meal.service.MealAppPackageService;
 import com.howe.meal.service.MealAppVersionLogService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -55,6 +57,8 @@ import java.util.Map;
 public class MealAppVersionController extends BaseController {
 
     private final IMealAppVersionService mealAppVersionService;
+
+    private final MealAppPackageService mealAppPackageService;
 
     private final MealAppVersionLogService mealAppVersionLogService;
 
@@ -106,11 +110,20 @@ public class MealAppVersionController extends BaseController {
         }
     }
 
+    @Operation(summary = "校验远程资源包链接", description = "有界下载并验证 wgt 结构；结果仅供即时反馈，保存时会按需重新校验")
+    @PreAuthorize("@ss.hasPermi('meal:appVersion:upload')")
+    @PostMapping("/check-package")
+    public AjaxResult checkPackage(@Valid @RequestBody AppPackageCheckRequest request) {
+        return success(mealAppPackageService.check(request));
+    }
+
     @Operation(summary = "新增版本")
     @PreAuthorize("@ss.hasPermi('meal:appVersion:add')")
     @Log(title = "点餐App版本", businessType = BusinessType.INSERT)
     @PostMapping
     public AjaxResult add(@Valid @RequestBody MealAppVersion mealAppVersion) {
+        // 远程链接（非上传地址）在保存前必须通过校验
+        mealAppPackageService.assertVerified(mealAppVersion, null);
         return toAjax(mealAppVersionService.insertMealAppVersion(mealAppVersion));
     }
 
@@ -119,6 +132,8 @@ public class MealAppVersionController extends BaseController {
     @Log(title = "点餐App版本", businessType = BusinessType.UPDATE)
     @PutMapping
     public AjaxResult edit(@Valid @RequestBody MealAppVersion mealAppVersion) {
+        MealAppVersion exist = mealAppVersionService.selectMealAppVersionById(mealAppVersion.getVersionId());
+        mealAppPackageService.assertVerified(mealAppVersion, exist == null ? null : exist.getStatus());
         return toAjax(mealAppVersionService.updateMealAppVersion(mealAppVersion));
     }
 
