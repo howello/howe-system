@@ -22,6 +22,10 @@
 #   profile: /app/uploadPath
 #   # 是否开启获取真实 ip 地址
 #   addressEnabled: false
+#   # MCP 默认不安装；两个公共地址和运行开关在参数配置表维护。
+#   mcp:
+#     installed: false # 或通过 HOWE_MCP_INSTALLED 设置
+#     allow-local-http: false # 仅明确允许本机 HTTP 联调时启用
 
 # server:
 #   tomcat:

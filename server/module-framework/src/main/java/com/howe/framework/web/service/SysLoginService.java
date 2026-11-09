@@ -90,53 +90,59 @@ public class SysLoginService
     }
 
     /**
-     * 走完 Spring Security 的认证流程并发 token
+     * 完成通用账号认证并返回身份，不执行管理端准入或签发 JWT。
+     * 验证码、人机校验、密码限制、账号状态与登录审计均沿用原认证流程。
      *
-     * @param username 用户名
-     * @param password 密码
-     * @param client   登录客户端，决定本次会话的有效期
+     * @param loginBody 登录参数；client 不决定是否允许该账号认证
+     * @return 当前已认证身份，仅供服务端建立独立会话
      */
-    private String doLogin(String username, String password, String client)
-    {
+    public LoginUser authenticateAccount(LoginBody loginBody) {
+        validateTurnstile(loginBody.getUsername(), loginBody.getTurnstileToken());
+        validateCaptcha(loginBody.getUsername(), loginBody.getCode(), loginBody.getUuid());
+        LoginUser loginUser = authenticateCredentials(loginBody.getUsername(), loginBody.getPassword());
+        recordLoginInfo(loginUser.getUserId());
+        return loginUser;
+    }
+
+    /** 保留原后台和点餐端的准入、登录信息更新及 JWT 有效期策略。 */
+    private String doLogin(String username, String password, String client) {
+        LoginUser loginUser = authenticateCredentials(username, password);
+        assertAdminConsoleAllowed(loginUser, client);
+        recordLoginInfo(loginUser.getUserId());
+        loginUser.setExpireMinutes(Constants.CLIENT_MEAL.equals(client)
+                ? tokenService.getMealExpireTime() : tokenService.getExpireTime());
+        return tokenService.createToken(loginUser);
+    }
+
+    /** 校验凭据并记录原有认证审计；调用方独立决定客户端准入和会话类型。 */
+    private LoginUser authenticateCredentials(String username, String password) {
         // 登录前置校验
         loginPreCheck(username, password);
         // 用户验证
         Authentication authentication = null;
-        try
-        {
+        try {
             UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(username, password);
             AuthenticationContextHolder.setContext(authenticationToken);
             // 该方法会去调用UserDetailsServiceImpl.loadUserByUsername
             authentication = authenticationManager.authenticate(authenticationToken);
-        }
-        catch (Exception e)
-        {
-            if (e instanceof BadCredentialsException)
-            {
-                AsyncManager.me().execute(AsyncFactory.recordLogininfor(username, Constants.LOGIN_FAIL, MessageUtils.message("user.password.not.match")));
+        } catch (Exception e) {
+            if (e instanceof BadCredentialsException) {
+                recordAuthenticationOutcome(username, Constants.LOGIN_FAIL, MessageUtils.message("user.password.not.match"));
                 throw new UserPasswordNotMatchException();
-            }
-            else
-            {
-                AsyncManager.me().execute(AsyncFactory.recordLogininfor(username, Constants.LOGIN_FAIL, e.getMessage()));
+            } else {
+                recordAuthenticationOutcome(username, Constants.LOGIN_FAIL, e.getMessage());
                 throw new ServiceException(e.getMessage());
             }
-        }
-        finally
-        {
+        } finally {
             AuthenticationContextHolder.clearContext();
         }
-        AsyncManager.me().execute(AsyncFactory.recordLogininfor(username, Constants.LOGIN_SUCCESS, MessageUtils.message("user.login.success")));
-        LoginUser loginUser = (LoginUser) authentication.getPrincipal();
-        // 管理端只允许管理员与家庭管理员登录，点餐员/厨师等普通角色一律拒绝
-        assertAdminConsoleAllowed(loginUser, client);
-        recordLoginInfo(loginUser.getUserId());
-        // 按客户端决定本次会话的有效期：点餐端 30 天，管理端 30 分钟
-        loginUser.setExpireMinutes(Constants.CLIENT_MEAL.equals(client)
-                ? tokenService.getMealExpireTime()
-                : tokenService.getExpireTime());
-        // 生成token
-        return tokenService.createToken(loginUser);
+        recordAuthenticationOutcome(username, Constants.LOGIN_SUCCESS, MessageUtils.message("user.login.success"));
+        return (LoginUser) authentication.getPrincipal();
+    }
+
+    /** 统一提交认证结果审计；复用原有异步登录审计实现。 */
+    protected void recordAuthenticationOutcome(String username, String status, String message) {
+        AsyncManager.me().execute(AsyncFactory.recordLogininfor(username, status, message));
     }
 
     /**
@@ -272,8 +278,7 @@ public class SysLoginService
                 .anyMatch(role -> FamilyRoleConstants.canAccessAdminConsole(role.getRoleKey()));
         if (!allowed)
         {
-            AsyncManager.me().execute(AsyncFactory.recordLogininfor(user == null ? "" : user.getUserName(),
-                    Constants.LOGIN_FAIL, "无管理端登录权限"));
+            recordAuthenticationOutcome(user == null ? "" : user.getUserName(), Constants.LOGIN_FAIL, "无管理端登录权限");
             throw new ServiceException("该账号无权登录管理端，请使用点餐端");
         }
     }

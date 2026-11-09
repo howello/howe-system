@@ -54,3 +54,7 @@ export * from "./home/cards";
 // 文件分享短链
 export * from "./share/source";
 export * from "./share/link";
+
+// MCP 独立授权与自助页面
+export * from "./mcp"
+export * from "./mcp-management"

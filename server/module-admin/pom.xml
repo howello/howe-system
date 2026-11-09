@@ -16,7 +16,6 @@
     </description>
 
     <dependencies>
-
         <!-- spring-boot-devtools -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -58,6 +57,12 @@
         <dependency>
             <groupId>com.howe</groupId>
             <artifactId>module-meal</artifactId>
+        </dependency>
+
+        <!-- 外部 MCP 与独立 OAuth 授权，默认不安装装配。 -->
+        <dependency>
+            <groupId>com.howe</groupId>
+            <artifactId>module-mcp</artifactId>
         </dependency>
 
         <!-- 文件分享短链-->

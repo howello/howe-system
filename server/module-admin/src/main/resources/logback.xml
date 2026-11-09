@@ -75,6 +75,9 @@
 	<logger name="com.howe" level="info" />
 	<!-- Spring日志级别控制  -->
 	<logger name="org.springframework" level="warn" />
+	<!-- SDK 初始化 INFO 会输出原始客户端 capabilities，生产日志只保留安全级别的摘要。 -->
+	<logger name="io.modelcontextprotocol.server.McpAsyncServer" level="warn" />
+	<logger name="io.modelcontextprotocol.spec.McpStreamableServerSession" level="warn" />
 
 	<root level="${LOGGING_LEVEL_ROOT:-info}">
 		<appender-ref ref="console" />

@@ -26,6 +26,142 @@ server {
         proxy_read_timeout 60s;
     }
 
+    # 精确匹配协议入口；不能用 location /mcp/，否则会吞掉独立 SPA 页面。
+    location = /mcp {
+        client_max_body_size 64k;
+        error_page 413 = @mcp_payload_too_large;
+        proxy_pass http://${APP_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+        proxy_intercept_errors off;
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 60s;
+        proxy_set_header Authorization $http_authorization;
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 3600s;
+        gzip off;
+        access_log /var/log/nginx/mcp-access.log mcp_safe;
+        # Nginx 错误日志可能包含完整请求行；OAuth/协议入口不写此类日志，错误状态保留在安全访问日志。
+        error_log /dev/null;
+    }
+
+    # OAuth 路径原样转发，保留服务端 JSON 错误和浏览器授权重定向。
+    location ^~ /oauth2/ {
+        client_max_body_size 64k;
+        error_page 413 = @mcp_oauth_payload_too_large;
+        proxy_pass http://${APP_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+        proxy_intercept_errors off;
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        proxy_cache off;
+        add_header Referrer-Policy no-referrer always;
+        access_log /var/log/nginx/mcp-access.log mcp_safe;
+        # Nginx 错误日志可能包含完整请求行；OAuth/协议入口不写此类日志，错误状态保留在安全访问日志。
+        error_log /dev/null;
+    }
+
+    location = /.well-known/oauth-authorization-server {
+        proxy_pass http://${APP_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+        proxy_intercept_errors off;
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        proxy_cache off;
+        access_log /var/log/nginx/mcp-access.log mcp_safe;
+        # Nginx 错误日志可能包含完整请求行；OAuth/协议入口不写此类日志，错误状态保留在安全访问日志。
+        error_log /dev/null;
+    }
+
+    location = /.well-known/oauth-protected-resource/mcp {
+        proxy_pass http://${APP_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+        proxy_intercept_errors off;
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        proxy_cache off;
+        access_log /var/log/nginx/mcp-access.log mcp_safe;
+        # Nginx 错误日志可能包含完整请求行；OAuth/协议入口不写此类日志，错误状态保留在安全访问日志。
+        error_log /dev/null;
+    }
+
+    # 入口自身拒绝超大请求时也不返回 Nginx HTML 错误页。
+    location @mcp_payload_too_large {
+        default_type application/json;
+        return 413 '{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"Request too large"}}';
+        access_log /var/log/nginx/mcp-access.log mcp_safe;
+        error_log /dev/null;
+    }
+
+    location @mcp_oauth_payload_too_large {
+        default_type application/json;
+        return 413 '{"error":"invalid_request"}';
+        access_log /var/log/nginx/mcp-access.log mcp_safe;
+        error_log /dev/null;
+    }
+
+    # 未发布的发现路径明确返回 JSON 404，避免落到 SPA 产生 HTML 假成功。
+    location ^~ /.well-known/ {
+        default_type application/json;
+        return 404 '{"error":"not_found"}';
+        access_log /var/log/nginx/mcp-access.log mcp_safe;
+        error_log /dev/null;
+    }
+
+    # 仅发送来源，阻止 state 进入 Referer，同时保留原生跨域授权表单的 Origin。
+    location = /mcp/login {
+        try_files /index.html =404;
+        add_header Referrer-Policy strict-origin always;
+        add_header Cache-Control "no-store" always;
+        access_log /var/log/nginx/mcp-access.log mcp_safe;
+        # Nginx 错误日志可能包含完整请求行；OAuth/协议入口不写此类日志，错误状态保留在安全访问日志。
+        error_log /dev/null;
+    }
+
+    # 仅发送来源，阻止 state 进入 Referer，同时保留原生跨域授权表单的 Origin。
+    location = /mcp/consent {
+        try_files /index.html =404;
+        add_header Referrer-Policy strict-origin always;
+        add_header Cache-Control "no-store" always;
+        access_log /var/log/nginx/mcp-access.log mcp_safe;
+        # Nginx 错误日志可能包含完整请求行；OAuth/协议入口不写此类日志，错误状态保留在安全访问日志。
+        error_log /dev/null;
+    }
+
+    # 仅发送来源，阻止 state 进入 Referer，同时保留原生跨域授权表单的 Origin。
+    location = /mcp/connections {
+        try_files /index.html =404;
+        add_header Referrer-Policy strict-origin always;
+        add_header Cache-Control "no-store" always;
+        access_log /var/log/nginx/mcp-access.log mcp_safe;
+        # Nginx 错误日志可能包含完整请求行；OAuth/协议入口不写此类日志，错误状态保留在安全访问日志。
+        error_log /dev/null;
+    }
+
     # 数据源监控页（仍走后端，前缀需保留，故 proxy_pass 带同名路径）
     location /druid/ {
         proxy_pass http://${APP_UPSTREAM}/druid/;

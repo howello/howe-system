@@ -40,6 +40,7 @@
              三者必须成对升级：SAA extensions 1.1.2.1 内部依赖 Spring AI 1.1.2，
              错配会出现 ChatModel 接口不兼容。 -->
         <spring-ai.version>1.1.2</spring-ai.version>
+        <mcp-sdk.version>0.17.0</mcp-sdk.version>
         <spring-ai-alibaba.version>1.1.2.0</spring-ai-alibaba.version>
         <spring-ai-alibaba-extensions.version>1.1.2.1</spring-ai-alibaba-extensions.version>
     </properties>
@@ -233,6 +234,13 @@
                 <version>${howe.version}</version>
             </dependency>
 
+            <!-- 面向外部客户端的 MCP 与 OAuth 平台 -->
+            <dependency>
+                <groupId>com.howe</groupId>
+                <artifactId>module-mcp</artifactId>
+                <version>${howe.version}</version>
+            </dependency>
+
             <!-- 通用工具-->
             <dependency>
                 <groupId>com.howe</groupId>
@@ -290,6 +298,7 @@
         <module>module-ai</module>
         <module>module-meal</module>
         <module>module-share</module>
+        <module>module-mcp</module>
         <module>module-common</module>
     </modules>
     <packaging>pom</packaging>
