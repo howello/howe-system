@@ -106,7 +106,14 @@
          <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
       </el-row>
 
-      <el-table v-loading="loading" :data="configList" @selection-change="handleSelectionChange">
+      <!-- border 是 Element Plus 列宽拖拽的必需属性；allow-drag-last-column 让最后的操作列也能拖动 -->
+      <el-table
+         v-loading="loading"
+         :data="configList"
+         border
+         allow-drag-last-column
+         @selection-change="handleSelectionChange"
+      >
          <el-table-column type="selection" width="55" align="center" />
          <el-table-column label="参数主键" align="center" prop="configId" />
          <el-table-column label="参数名称" align="center" prop="configName" :show-overflow-tooltip="true" />
@@ -184,6 +191,7 @@
                <el-input
                   v-model="form.configValue"
                   type="textarea"
+                  :rows="6"
                   :placeholder="form.sensitive === 'Y' ? '留空表示不修改；重新输入则覆盖原密钥' : '请输入参数键值'"
                />
                <div v-if="form.sensitive === 'Y'" class="form-tip">
