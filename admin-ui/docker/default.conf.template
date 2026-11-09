@@ -1,3 +1,8 @@
+# MCP/OAuth/发现/用户页面使用的安全访问日志格式：只记录方法、不含查询串的 URI、状态与耗时，
+# 不包含 Referer、Authorization、Cookie、请求体或响应体，避免 OAuth 的 code/state 泄漏到日志。
+# log_format 属 http 上下文，conf.d 下的文件由 nginx.conf 的 http 块 include，故放在 server 之前合法。
+log_format mcp_safe '$remote_addr - [$time_local] "$request_method $uri" $status $request_time';
+
 server {
     listen ${WEB_PORT};
     server_name _;
