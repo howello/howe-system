@@ -1,35 +1,99 @@
 <template>
-  <main class="mcp-page"><section class="mcp-card narrow" aria-labelledby="consent-title">
-    <h1 id="consent-title">授权 AI 客户端</h1>
-    <el-alert v-if="error" :title="error" type="error" :closable="false" class="mcp-error" role="alert" />
-    <template v-if="context">
-      <p><strong>{{ context.clientName }}</strong> 请求使用你的账号连接 MCP。</p>
-      <dl class="mcp-detail"><dt>客户端标识</dt><dd>{{ context.clientId }}</dd><dt>返回地址</dt><dd>{{ context.redirectUri }}</dd></dl>
-      <p>请确认这是你刚刚发起连接的客户端。实际操作始终受你当前的业务权限限制。</p>
-      <el-checkbox-group v-model="selected" aria-label="授权范围">
-        <p v-for="scope in context.scopes" :key="scope"><el-checkbox :value="scope">{{ scopeLabel(scope) }}</el-checkbox></p>
-      </el-checkbox-group>
-      <p>允许离线访问后，客户端可以在你关闭此页面后继续连接；你可以随时在“我的连接”中撤销。</p>
-      <div class="mcp-actions">
-        <el-button type="primary" :loading="busy" :disabled="!selected.includes('mcp:connect')" @click="submit(true)">同意授权</el-button>
-        <el-button :disabled="busy" @click="submit(false)">拒绝</el-button>
-      </div>
-    </template>
-    <router-link to="/mcp/connections">我的连接</router-link>
-    <p v-if="!context && !error" role="status">正在读取授权请求…</p>
-  </section></main>
+  <main class="mcp-page">
+    <section class="mcp-card" aria-labelledby="consent-title">
+      <McpBrand badge="授权确认" />
+
+      <h1 id="consent-title">授权 AI 客户端</h1>
+      <p class="mcp-intro">确认下方客户端确实是你刚刚发起连接的那个，再选择允许它使用的能力。</p>
+
+      <el-alert v-if="error" :title="error" type="error" :closable="false" class="mcp-error" role="alert" show-icon />
+
+      <template v-if="context">
+        <div class="mcp-client-box">
+          <span class="mcp-client-box__icon"><el-icon><Connection /></el-icon></span>
+          <div>
+            <div class="mcp-client-box__name">{{ context.clientName }}</div>
+            <div class="mcp-client-box__desc">请求使用你的系统账号连接 MCP</div>
+          </div>
+        </div>
+
+        <dl class="mcp-detail">
+          <div class="mcp-detail__row">
+            <dt>客户端标识</dt>
+            <dd><code>{{ context.clientId }}</code></dd>
+          </div>
+          <div class="mcp-detail__row">
+            <dt>返回地址</dt>
+            <dd><code>{{ context.redirectUri }}</code></dd>
+          </div>
+        </dl>
+
+        <h2>请求的访问范围</h2>
+        <el-checkbox-group v-model="selected" class="mcp-scope-list" aria-label="授权范围">
+          <div
+            v-for="scope in context.scopes"
+            :key="scope"
+            class="mcp-scope"
+            :class="{ 'is-checked': selected.includes(scope) }"
+          >
+            <el-checkbox :value="scope">
+              {{ scopeLabel(scope) }}
+              <span v-if="scope === 'mcp:connect'" class="mcp-required">必需</span>
+            </el-checkbox>
+            <p class="mcp-scope__desc">{{ scopeDesc(scope) }}</p>
+          </div>
+        </el-checkbox-group>
+
+        <div class="mcp-notice">
+          <strong>权限边界：</strong>授权后，客户端仍只能调用你当前账号有权使用的工具；实际操作始终受你的业务权限限制。允许离线访问后，客户端可以在你关闭此页面后继续连接，你可以随时在「我的连接」中撤销。
+        </div>
+
+        <div class="mcp-actions mcp-actions--split">
+          <el-button size="large" :disabled="busy" @click="submit(false)">拒绝</el-button>
+          <el-button
+            size="large"
+            type="primary"
+            :loading="busy"
+            :disabled="!selected.includes('mcp:connect')"
+            @click="submit(true)"
+          >同意授权</el-button>
+        </div>
+      </template>
+
+      <p v-else-if="!error" class="mcp-loading" role="status">正在读取授权请求…</p>
+
+      <router-link class="mcp-back" to="/mcp/connections">
+        <el-icon><ArrowLeft /></el-icon> 查看我的连接
+      </router-link>
+    </section>
+    <p class="mcp-page__foot">授权请求由服务端校验并只属于当前登录账号。</p>
+  </main>
 </template>
+
 <script setup lang="ts" name="McpConsent">
 import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ArrowLeft, Connection } from '@element-plus/icons-vue'
 import { createMcpBrowserClient, mcpErrorMessage, McpBrowserError, type McpBrowserClient } from '@/api/mcp/browser'
 import type { McpConsent } from '@/types'
+import McpBrand from './components/McpBrand.vue'
 import './style.css'
+
 const route = useRoute(), router = useRouter()
 const context = ref<McpConsent>(), selected = ref<string[]>([]), busy = ref(false), error = ref('')
 let client: McpBrowserClient | undefined
 /** 已知范围使用中文含义，未知范围保留明确标识。 */
-function scopeLabel(scope: string): string { return scope === 'mcp:connect' ? '连接 MCP 并使用已开放的工具' : scope === 'offline_access' ? '离线访问（允许刷新连接）' : scope }
+function scopeLabel(scope: string): string {
+  return scope === 'mcp:connect' ? '连接 MCP 并使用已开放的工具' : scope === 'offline_access' ? '离线访问' : scope
+}
+/** 每个范围的用途说明，帮助用户判断是否同意。 */
+function scopeDesc(scope: string): string {
+  return scope === 'mcp:connect'
+    ? '允许客户端在本次会话中调用工具目录里已开放的工具。'
+    : scope === 'offline_access'
+      ? '允许刷新令牌，使客户端在页面关闭后仍能保持连接。'
+      : '该范围暂未提供说明。'
+}
 /** 同意只提交勾选范围；拒绝提交空范围，由服务端终结原请求。 */
 async function submit(accepted: boolean): Promise<void> {
   if (!client || !context.value || busy.value) return

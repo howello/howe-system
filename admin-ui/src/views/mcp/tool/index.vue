@@ -1,30 +1,86 @@
 <template>
-  <div class="app-container">
-    <el-alert title="目录来自实际注册的工具代码。此处只能控制开放状态；首期仅提供连接检查。" type="info" :closable="false" class="mb8" />
-    <el-button @click="load" :loading="loading" class="mb8">刷新目录</el-button>
-    <el-table :data="rows" v-loading="loading" row-key="schema.name" empty-text="暂无工具">
-      <el-table-column prop="schema.name" label="工具名称" min-width="230" />
-      <el-table-column prop="schema.title" label="标题" min-width="160" />
-      <el-table-column prop="version" label="版本" width="80" />
-      <el-table-column prop="scope" label="授权范围" min-width="130" />
-      <el-table-column label="开放状态" width="100"><template #default="{ row }"><el-tag :type="row.enabled === 'Y' ? 'success' : 'info'">{{ row.enabled === 'Y' ? '开放' : '关闭' }}</el-tag></template></el-table-column>
-      <el-table-column prop="timeoutMs" label="超时（毫秒）" width="130" />
-      <el-table-column label="操作" width="170"><template #default="{ row }">
-        <el-button link type="primary" v-hasPermi="['mcp:tool:query']" @click="detail(row)">契约详情</el-button>
-        <el-button link :type="row.enabled === 'Y' ? 'danger' : 'primary'" :disabled="changing" v-hasPermi="['mcp:tool:edit']" @click="changeStatus(row)">{{ row.enabled === 'Y' ? '关闭' : '开放' }}</el-button>
-      </template></el-table-column>
-    </el-table>
+  <div class="app-container mcp-admin">
+    <McpPageHeader
+      title="工具目录"
+      eyebrow="实际注册的工具契约"
+      description="目录来自实际注册的工具代码，此处只能控制开放状态；首期仅提供连接检查。"
+    >
+      <template #icon><el-icon><Tools /></el-icon></template>
+      <template #actions>
+        <el-button :icon="Refresh" :loading="loading" @click="load">刷新目录</el-button>
+      </template>
+    </McpPageHeader>
+
+    <section class="mcp-panel mcp-table">
+      <div class="mcp-panel__head">
+        <div>
+          <h2 class="mcp-panel__title">工具清单</h2>
+          <p class="mcp-panel__desc">共 {{ rows.length }} 个工具；关闭后客户端会收到「工具不可用」，不会执行任何业务逻辑。</p>
+        </div>
+        <div class="mcp-panel__toolbar">
+          <span class="mcp-chip">开放 {{ enabledCount }} / {{ rows.length }}</span>
+        </div>
+      </div>
+      <div class="mcp-panel__body mcp-panel__body--flush">
+        <el-table :data="rows" v-loading="loading" row-key="schema.name" empty-text="暂无工具">
+          <el-table-column label="工具" min-width="260">
+            <template #default="{ row }">
+              <div class="mcp-tool-name">
+                <el-icon class="mcp-tool-name__icon"><Connection /></el-icon>
+                <div>
+                  <div class="mcp-mono">{{ row.schema.name }}</div>
+                  <div class="mcp-muted mcp-tool-title">{{ row.schema.title || '未提供标题' }}</div>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="version" label="版本" width="80" align="center" />
+          <el-table-column label="授权范围" min-width="140">
+            <template #default="{ row }"><span class="mcp-chip">{{ row.scope }}</span></template>
+          </el-table-column>
+          <el-table-column label="开放状态" width="100">
+            <template #default="{ row }">
+              <el-tag :type="row.enabled === 'Y' ? 'success' : 'info'" effect="light" round>{{ row.enabled === 'Y' ? '开放' : '关闭' }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="超时" width="100" align="right">
+            <template #default="{ row }"><span class="mcp-mono">{{ row.timeoutMs }} ms</span></template>
+          </el-table-column>
+          <el-table-column label="操作" width="170" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" :icon="Document" v-hasPermi="['mcp:tool:query']" @click="detail(row)">契约详情</el-button>
+              <el-button
+                link
+                :type="row.enabled === 'Y' ? 'danger' : 'primary'"
+                :icon="row.enabled === 'Y' ? CircleClose : CircleCheck"
+                :disabled="changing"
+                v-hasPermi="['mcp:tool:edit']"
+                @click="changeStatus(row)"
+              >{{ row.enabled === 'Y' ? '关闭' : '开放' }}</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </section>
+
     <AdminDetail v-model="open" title="工具契约" :fields="fields" />
   </div>
 </template>
+
 <script setup lang="ts" name="McpTool">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { CircleCheck, CircleClose, Connection, Document, Refresh, Tools } from '@element-plus/icons-vue'
 import { listMcpTools, getMcpTool, setMcpToolStatus } from '@/api/mcp/management'
 import type { McpAdminTool } from '@/types'
 import AdminDetail from '../components/AdminDetail.vue'
+import McpPageHeader from '../components/McpPageHeader.vue'
+import '../admin.css'
+
 const rows = ref<McpAdminTool[]>([]), loading = ref(false), changing = ref(false), open = ref(false)
 const fields = ref<Record<string, unknown>>({})
+/** 顶部展示当前开放数量，便于一眼确认总开关状态。 */
+const enabledCount = computed(() => rows.value.filter((row: McpAdminTool) => row.enabled === 'Y').length)
 /** 读取代码目录及实时状态。 */
 async function load(): Promise<void> {
   loading.value = true
@@ -55,3 +111,24 @@ async function changeStatus(row: McpAdminTool): Promise<void> {
 }
 void load()
 </script>
+
+<style scoped>
+.mcp-tool-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.mcp-tool-name__icon {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+}
+.mcp-tool-title {
+  margin-top: 2px;
+  font-size: 12px;
+}
+</style>
