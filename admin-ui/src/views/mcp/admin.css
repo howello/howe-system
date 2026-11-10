@@ -1,0 +1,486 @@
+/*
+ * MCP 管理页共用视觉
+ * 仅作用于 MCP 管理页面，颜色全部引用 Element Plus 变量，自动跟随明暗主题。
+ */
+
+.mcp-admin {
+  --mcp-line: var(--el-border-color-lighter);
+  --mcp-soft: var(--el-fill-color-lighter);
+}
+
+/* ---------- 页头 ---------- */
+.mcp-hero {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  padding: 22px 24px;
+  border: 1px solid var(--mcp-line, var(--el-border-color-lighter));
+  border-radius: 16px;
+  background:
+    radial-gradient(560px 220px at 0% 0%, var(--el-color-primary-light-8), transparent 70%),
+    linear-gradient(135deg, var(--el-bg-color), var(--el-fill-color-lighter));
+}
+
+.mcp-hero::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  content: '';
+  background: linear-gradient(180deg, var(--el-color-primary), #6250d6);
+}
+
+html.dark .mcp-hero {
+  background:
+    radial-gradient(560px 220px at 0% 0%, rgba(64, 158, 255, 0.16), transparent 70%),
+    linear-gradient(135deg, var(--el-bg-color-overlay), var(--el-fill-color-dark));
+}
+
+.mcp-hero__main {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  min-width: 0;
+}
+
+.mcp-hero__icon {
+  display: grid;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 13px;
+  background: linear-gradient(135deg, var(--el-color-primary), #6250d6);
+  box-shadow: 0 8px 20px rgba(64, 158, 255, 0.25);
+  color: #fff;
+  font-size: 22px;
+}
+
+.mcp-hero__text {
+  min-width: 0;
+}
+
+.mcp-hero__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.mcp-hero__badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.mcp-hero__title {
+  margin: 0;
+  color: var(--el-text-color-primary);
+  font-size: 22px;
+  line-height: 1.3;
+}
+
+.mcp-hero__desc {
+  margin: 8px 0 0;
+  max-width: 780px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.mcp-hero__actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ---------- 面板 ---------- */
+.mcp-panel {
+  overflow: hidden;
+  margin-bottom: 16px;
+  border: 1px solid var(--mcp-line, var(--el-border-color-lighter));
+  border-radius: 14px;
+  background: var(--el-bg-color);
+  box-shadow: 0 1px 2px rgba(11, 11, 11, 0.03), 0 8px 24px rgba(11, 11, 11, 0.04);
+}
+
+html.dark .mcp-panel {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+.mcp-panel__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--mcp-line, var(--el-border-color-lighter));
+}
+
+.mcp-panel__title {
+  margin: 0;
+  color: var(--el-text-color-primary);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.mcp-panel__desc {
+  margin: 4px 0 0;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.mcp-panel__body {
+  padding: 18px 20px;
+}
+
+.mcp-panel__body--flush {
+  padding: 0;
+}
+
+.mcp-panel__foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 20px;
+  border-top: 1px solid var(--mcp-line, var(--el-border-color-lighter));
+}
+
+.mcp-panel__toolbar {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---------- 筛选区 ---------- */
+.mcp-filter {
+  margin-bottom: 16px;
+  padding: 16px 20px 4px;
+  border: 1px solid var(--mcp-line, var(--el-border-color-lighter));
+  border-radius: 14px;
+  background: var(--el-bg-color);
+  box-shadow: 0 1px 2px rgba(11, 11, 11, 0.03);
+}
+
+html.dark .mcp-filter {
+  box-shadow: none;
+}
+
+.mcp-filter .el-form-item {
+  margin-right: 18px;
+  margin-bottom: 12px;
+}
+
+.mcp-filter .el-form-item__label {
+  color: var(--el-text-color-secondary);
+  font-weight: 500;
+}
+
+/* ---------- 配置与统计卡片 ---------- */
+.mcp-config {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+.mcp-meta {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--mcp-line, var(--el-border-color-lighter));
+  border-radius: 11px;
+  background: var(--mcp-soft, var(--el-fill-color-lighter));
+}
+
+.mcp-meta--wide {
+  grid-column: 1 / -1;
+}
+
+.mcp-meta__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 7px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.mcp-meta__value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--el-text-color-primary);
+  font-size: 13px;
+}
+
+.mcp-meta__value code,
+.mcp-mono {
+  font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
+}
+
+.mcp-meta__value code {
+  overflow-wrap: anywhere;
+}
+
+.mcp-meta__links {
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.mcp-pending {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px dashed var(--el-color-warning-light-5);
+  border-radius: 10px;
+  background: var(--el-color-warning-light-9);
+}
+
+.mcp-pending__title {
+  margin: 0 0 8px;
+  color: var(--el-color-warning-dark-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mcp-pending__line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 6px;
+  color: var(--el-text-color-regular);
+  font-size: 12px;
+}
+
+.mcp-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.mcp-stat {
+  padding: 14px 16px;
+  border: 1px solid var(--mcp-line, var(--el-border-color-lighter));
+  border-radius: 12px;
+  background: var(--el-bg-color);
+}
+
+.mcp-stat__label {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.mcp-stat__value {
+  margin-top: 6px;
+  color: var(--el-text-color-primary);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.mcp-stat__hint {
+  margin-top: 4px;
+  color: var(--el-text-color-secondary);
+  font-size: 11px;
+}
+
+.mcp-stat--warn .mcp-stat__value {
+  color: var(--el-color-danger);
+}
+
+.mcp-stat--ok .mcp-stat__value {
+  color: var(--el-color-success);
+}
+
+/* ---------- 状态与表格 ---------- */
+.mcp-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--el-color-success);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mcp-status::before {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px var(--el-color-success-light-9);
+  content: '';
+}
+
+.mcp-status--off {
+  color: var(--el-color-info);
+}
+
+.mcp-status--off::before {
+  box-shadow: 0 0 0 3px var(--el-fill-color);
+}
+
+.mcp-table .el-table {
+  --el-table-border-color: var(--mcp-line, var(--el-border-color-lighter));
+}
+
+.mcp-table .el-table th.el-table__cell {
+  background: var(--el-fill-color-light) !important;
+  color: var(--el-text-color-secondary);
+  font-weight: 600;
+}
+
+.mcp-table .el-table td.el-table__cell {
+  padding: 12px 0;
+}
+
+.mcp-table .el-table__inner-wrapper::before {
+  display: none;
+}
+
+.mcp-table .el-table__empty-block {
+  min-height: 180px;
+}
+
+.mcp-muted {
+  color: var(--el-text-color-secondary);
+}
+
+.mcp-break {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.mcp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--el-fill-color);
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.mcp-empty {
+  padding: 28px 16px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  text-align: center;
+}
+
+.mcp-loading {
+  padding: 24px 16px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  text-align: center;
+}
+
+.mcp-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ---------- 详情弹窗 ---------- */
+.mcp-detail-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.mcp-detail-row {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 16px;
+  padding: 11px 4px;
+  border-bottom: 1px dashed var(--el-border-color-lighter);
+}
+
+.mcp-detail-row:last-child {
+  border-bottom: none;
+}
+
+.mcp-detail-row--block {
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.mcp-detail-label {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+.mcp-detail-value {
+  min-width: 0;
+  color: var(--el-text-color-primary);
+  font-size: 13px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.mcp-code {
+  position: relative;
+  margin: 0;
+  padding: 12px 44px 12px 14px;
+  max-height: 300px;
+  overflow: auto;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 10px;
+  background: var(--el-fill-color-light);
+  color: var(--el-text-color-primary);
+  font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.mcp-code__copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+.mcp-detail-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 768px) {
+  .mcp-hero {
+    flex-direction: column;
+    padding: 18px;
+  }
+
+  .mcp-hero__actions {
+    width: 100%;
+  }
+
+  .mcp-panel__head {
+    flex-direction: column;
+  }
+
+  .mcp-panel__toolbar {
+    width: 100%;
+  }
+
+  .mcp-detail-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+}
