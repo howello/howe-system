@@ -191,7 +191,7 @@ values ('anthropic', 'Anthropic', 'anthropic', 'https://api.anthropic.com',
 -- 「AI 管理 > 场景路由」里手工维护。
 -- 场景标识与 module-meal 代码里写死的常量一致，不要改名。
 -- ----------------------------------------------------------------------------
-delete from ai_scene_route where scene in ('meal.dish.generate', 'meal.dish.audit', 'meal.dish.update', 'meal.dish.search', 'meal.dish.cover', 'meal.app.version.log');
+delete from ai_scene_route where scene in ('meal.dish.generate', 'meal.dish.audit', 'meal.dish.update', 'meal.dish.search', 'meal.dish.cover', 'meal.app.version.log', 'meal.category.review');
 
 -- 对话补齐：优先名为 deepseek-flash 的对话模型，否则取首个启用的对话模型
 insert into ai_scene_route (scene, scene_name, capability, primary_model_id, params, enabled, remark, create_by, create_time)
@@ -228,6 +228,14 @@ limit 1;
 -- App 发版日志润色：CI 发布前把提交摘要提炼成用户可读的更新说明
 insert into ai_scene_route (scene, scene_name, capability, primary_model_id, params, enabled, remark, create_by, create_time)
 select 'meal.app.version.log', 'App 发版日志润色', 'CHAT', m.id, '{"temperature":0.5}', 1, 'App发版日志AI润色', 'admin', sysdate()
+from ai_model m
+where m.capability = 'CHAT' and m.enabled = 1
+order by (m.model_name = 'deepseek-flash') desc, m.id asc
+limit 1;
+
+-- 分类审阅与润色：新增/修改点餐分类时审阅名称、说明与依据；温度低以保证判定稳定
+insert into ai_scene_route (scene, scene_name, capability, primary_model_id, params, enabled, remark, create_by, create_time)
+select 'meal.category.review', '点餐分类审阅与润色', 'CHAT', m.id, '{"temperature":0.2,"maxTokens":900,"timeoutMs":8000}', 1, '点餐分类AI审阅', 'admin', sysdate()
 from ai_model m
 where m.capability = 'CHAT' and m.enabled = 1
 order by (m.model_name = 'deepseek-flash') desc, m.id asc
@@ -270,7 +278,8 @@ delete from sys_config where config_key in (
   'ai.prompt.meal.dish.auditSuffix',
   'ai.prompt.meal.dish.updateSystem',
   'ai.prompt.meal.dish.searchSystem',
-  'ai.prompt.meal.app.versionLog'
+  'ai.prompt.meal.app.versionLog',
+  'ai.prompt.meal.category.reviewSystem'
 );
 
 insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
@@ -385,6 +394,11 @@ insert into sys_config (config_name, config_key, config_value, config_type, crea
 values ('AI-App发版日志润色提示词', 'ai.prompt.meal.app.versionLog',
         '你是家庭点餐 App 的版本公告编辑。用户会把本次发版的代码提交标题交给你，请把它们改写成家庭成员能看懂的更新说明。要求：只使用给定提交里明确提到的内容，不编造、不夸大、不写技术术语（如 commit、分支、重构、依赖）；每条一行，最多 3 行，整段不超过 100 个汉字；不使用序号、Markdown、emoji；语气自然平实，例如「新增菜品编辑页，可以直接修改做法」「修复下架的菜仍显示在点餐区的问题」。',
         'Y', 'admin', sysdate(), 'CI 发版前「日志润色」使用的 system 提示词；留空则用代码内缺省值', 'AI');
+
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
+values ('AI-点餐分类审阅提示词', 'ai.prompt.meal.category.reviewSystem',
+        '你是家庭点餐分类编辑。请审阅用户提交的分类名称、分类说明和分类依据，并在合格时做克制的中文润色。分类用于帮助家庭成员判断一道菜应放在哪里。说明用一句话说明定位；依据清楚写出「放什么、不放什么、示例」。保持用户表达的地域、食材和范围，不添加用户未给出的菜名、菜品、地域事实或排除条件。只返回符合指定 JSON Schema 的对象，不要输出 Markdown。',
+        'Y', 'admin', sysdate(), '点餐分类新增/修改时的 AI 审阅提示词；留空则用代码内缺省值。固定规则由代码追加，不随本配置改变', 'AI');
 
 -- ----------------------------------------------------------------------------
 -- 10. 菜单与按钮权限

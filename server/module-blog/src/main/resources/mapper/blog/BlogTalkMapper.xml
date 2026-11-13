@@ -11,6 +11,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="pubDate"     column="pub_date"     />
         <result property="isTop"       column="is_top"       />
         <result property="status"      column="status"       />
+        <result property="dataVersion" column="data_version" />
         <result property="createBy"    column="create_by"    />
         <result property="createTime"  column="create_time"  />
         <result property="updateBy"    column="update_by"    />
@@ -19,7 +20,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectBlogTalkVo">
-        select talk_id, content, tags, pub_date, is_top, status,
+        select talk_id, content, tags, pub_date, is_top, status, data_version,
                create_by, create_time, update_by, update_time, remark
         from blog_talk
     </sql>
@@ -51,8 +52,44 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by is_top desc, pub_date desc, talk_id desc
     </select>
 
+    <!--
+      工具专用列表：正文只取 maxChars + 1 个字符，其余筛选与排序保持管理端一致。
+      参数名为 query，避免与 resultMap 的属性名混淆。
+    -->
+    <select id="selectBlogTalkListForTool" resultMap="BlogTalkResult">
+        select talk_id, left(content, #{maxChars}) as content, tags, pub_date, is_top, status, data_version,
+               create_by, create_time, update_by, update_time, remark
+        from blog_talk
+        <where>
+            <if test="query.content != null and query.content != ''">
+                AND content like concat('%', #{query.content}, '%')
+            </if>
+            <if test="query.tags != null and query.tags != ''">
+                AND tags like concat('%', #{query.tags}, '%')
+            </if>
+            <if test="query.isTop != null and query.isTop != ''">
+                AND is_top = #{query.isTop}
+            </if>
+            <if test="query.status != null and query.status != ''">
+                AND status = #{query.status}
+            </if>
+        </where>
+        order by is_top desc, pub_date desc, talk_id desc
+    </select>
+
     <select id="selectBlogTalkById" resultMap="BlogTalkResult">
         <include refid="selectBlogTalkVo"/>
+        where talk_id = #{talkId}
+    </select>
+
+    <!--
+      工具只读视图：正文只取 maxChars + 1 个字符，供调用方判断是否需要截断。
+      列表主查询仍在 Java 侧对已截取正文再做一次上限校验。
+    -->
+    <select id="selectBlogTalkForTool" resultMap="BlogTalkResult">
+        select talk_id, left(content, #{maxChars}) as content, tags, pub_date, is_top, status,
+               create_by, create_time, update_by, update_time, remark
+        from blog_talk
         where talk_id = #{talkId}
     </select>
 
@@ -65,6 +102,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="status != null and status != ''">status,</if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null and createBy != ''">create_by,</if>
+            data_version,
             create_time
         )values(
             #{content},
@@ -74,6 +112,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="status != null and status != ''">#{status},</if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null and createBy != ''">#{createBy},</if>
+            0,
             sysdate()
         )
     </insert>
@@ -89,9 +128,28 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="status != null and status != ''">status = #{status},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            data_version = data_version + 1,
             update_time = sysdate()
         </set>
         where talk_id = #{talkId}
+    </update>
+
+    <!-- 工具专用 CAS：版本不匹配时返回 0，由 Service 区分可见性 -->
+    <update id="updateBlogTalkCas">
+        update blog_talk
+        <set>
+            <if test="talk.content != null and talk.content != ''">content = #{talk.content},</if>
+            <if test="talk.tags != null">tags = #{talk.tags},</if>
+            <if test="talk.pubDate != null">pub_date = #{talk.pubDate},</if>
+            <if test="talk.isTop != null and talk.isTop != ''">is_top = #{talk.isTop},</if>
+            <if test="talk.status != null and talk.status != ''">status = #{talk.status},</if>
+            <if test="talk.remark != null">remark = #{talk.remark},</if>
+            <if test="talk.updateBy != null and talk.updateBy != ''">update_by = #{talk.updateBy},</if>
+            data_version = data_version + 1,
+            update_time = sysdate()
+        </set>
+        where talk_id = #{talk.talkId}
+          and data_version = #{expectedVersion}
     </update>
 
     <delete id="deleteBlogTalkByIds">

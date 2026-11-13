@@ -387,6 +387,164 @@ html.dark .mcp-card {
   margin: 10px 0 4px;
 }
 
+/* ---------- 授权范围卡片与模块 tab ---------- */
+.mcp-scope-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.mcp-scope-head h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.mcp-scope-head__hint {
+  margin: 4px 0 0;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.mcp-scope-head__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mcp-scope-tabs {
+  margin-top: 6px;
+}
+
+.mcp-scope-tabs .el-tabs__header {
+  margin-bottom: 14px;
+}
+
+.mcp-tab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mcp-tab-count {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--el-fill-color);
+  color: var(--el-text-color-secondary);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mcp-scope-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.mcp-scope-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 13px 14px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  background: var(--el-bg-color);
+  transition: border-color 0.16s, background 0.16s, box-shadow 0.16s;
+}
+
+.mcp-scope-card:hover {
+  border-color: var(--el-color-primary-light-5);
+}
+
+.mcp-scope-card.is-checked {
+  border-color: var(--el-color-primary-light-5);
+  background: var(--el-color-primary-light-9);
+  box-shadow: inset 3px 0 0 var(--el-color-primary);
+}
+
+.mcp-scope-card.is-required {
+  cursor: default;
+}
+
+.mcp-scope-card .el-checkbox {
+  height: auto;
+  align-items: flex-start;
+}
+
+.mcp-scope-card .el-checkbox__label {
+  color: var(--el-text-color-primary);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: normal;
+  line-height: 1.5;
+}
+
+.mcp-scope-card__id {
+  color: var(--el-text-color-secondary);
+  font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.mcp-scope-card__desc {
+  margin: 0;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.mcp-scope-card__tools {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 2px 0 0;
+  padding: 8px 0 0;
+  border-top: 1px dashed var(--el-border-color-lighter);
+  list-style: none;
+}
+
+.mcp-scope-card__tools li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.mcp-scope-card__tool-name {
+  color: var(--el-text-color-regular);
+}
+
+.mcp-scope-card__tools code {
+  color: var(--el-text-color-secondary);
+  font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+  font-size: 10.5px;
+  overflow-wrap: anywhere;
+}
+
+.mcp-scope-card__empty {
+  margin: 2px 0 0;
+  padding-top: 8px;
+  border-top: 1px dashed var(--el-border-color-lighter);
+  color: var(--el-text-color-secondary);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.mcp-banner-link {
+  display: inline-block;
+  margin-top: 6px;
+  color: var(--el-color-primary);
+  font-weight: 600;
+}
+
+.mcp-failed {
+  color: var(--el-color-danger);
+}
+
 .mcp-scope {
   padding: 12px 14px;
   border: 1px solid var(--el-border-color-lighter);

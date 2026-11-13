@@ -42,47 +42,57 @@ public interface MealOrderCandidateMapper {
     MealOrderCandidate selectByOrderAndUser(@Param("orderId") Long orderId, @Param("userId") Long userId);
 
     /**
-     * 接单：把自己的待响应候选人置为已接单
+     * 接单：把自己的当前轮次待响应候选人置为已接单
      *
-     * @param orderId 订单ID
-     * @param userId  用户ID
-     * @return 影响行数，0 表示已不是待响应候选人
+     * @param orderId        订单ID
+     * @param userId         用户ID
+     * @param candidateRound 订单当前候选轮次
+     * @param expectedVersion 期望的候选数据版本，为 {@code null} 时不限制
+     * @return 影响行数，0 表示已不是当前轮次的待响应候选人
      */
-    int acceptCandidate(@Param("orderId") Long orderId, @Param("userId") Long userId);
+    int acceptCandidate(@Param("orderId") Long orderId, @Param("userId") Long userId,
+            @Param("candidateRound") Long candidateRound, @Param("expectedVersion") Long expectedVersion);
 
     /**
-     * 拒绝：把自己的待响应候选人置为已拒绝
+     * 拒绝：把自己的当前轮次待响应候选人置为已拒绝
      *
-     * @param orderId 订单ID
-     * @param userId  用户ID
-     * @return 影响行数，0 表示已不是待响应候选人
+     * @param orderId        订单ID
+     * @param userId         用户ID
+     * @param candidateRound 订单当前候选轮次
+     * @param expectedVersion 期望的候选数据版本，为 {@code null} 时不限制
+     * @return 影响行数，0 表示已不是当前轮次的待响应候选人
      */
-    int refuseCandidate(@Param("orderId") Long orderId, @Param("userId") Long userId);
+    int refuseCandidate(@Param("orderId") Long orderId, @Param("userId") Long userId,
+            @Param("candidateRound") Long candidateRound, @Param("expectedVersion") Long expectedVersion);
 
     /**
-     * 统计某订单仍待响应的候选人数
+     * 统计某订单当前轮次仍待响应的候选人数
      *
-     * @param orderId 订单ID
+     * @param orderId        订单ID
+     * @param candidateRound 当前候选轮次
      * @return 待响应人数
      */
-    int countPending(@Param("orderId") Long orderId);
+    int countPending(@Param("orderId") Long orderId, @Param("candidateRound") Long candidateRound);
 
     /**
-     * 把某订单除指定用户外的待响应候选人全部置为已失效
+     * 把某订单当前轮次除指定用户外的待响应候选人全部置为已失效
      *
      * @param orderId        订单ID
      * @param acceptedUserId 已接单用户ID
+     * @param candidateRound 当前候选轮次
      * @return 影响行数
      */
-    int invalidateOthers(@Param("orderId") Long orderId, @Param("acceptedUserId") Long acceptedUserId);
+    int invalidateOthers(@Param("orderId") Long orderId, @Param("acceptedUserId") Long acceptedUserId,
+            @Param("candidateRound") Long candidateRound);
 
     /**
-     * 把某订单全部待响应候选人置为已失效
+     * 把某订单当前轮次全部待响应候选人置为已失效
      *
-     * @param orderId 订单ID
+     * @param orderId        订单ID
+     * @param candidateRound 当前候选轮次
      * @return 影响行数
      */
-    int invalidatePending(@Param("orderId") Long orderId);
+    int invalidatePending(@Param("orderId") Long orderId, @Param("candidateRound") Long candidateRound);
 
     /**
      * 把某订单全部候选人置为已失效（不论当前状态），用于订单关闭后的收尾
@@ -93,13 +103,29 @@ public interface MealOrderCandidateMapper {
     int invalidateAll(@Param("orderId") Long orderId);
 
     /**
-     * 把某订单指定用户的待响应候选人置为已超时未响应
+     * 把某订单指定用户的当前轮次待响应候选人置为已超时未响应
      *
-     * @param orderId 订单ID
-     * @param userId  用户ID
+     * @param orderId        订单ID
+     * @param userId         用户ID
+     * @param candidateRound 当前候选轮次
      * @return 影响行数
      */
-    int expireCandidate(@Param("orderId") Long orderId, @Param("userId") Long userId);
+    int expireCandidate(@Param("orderId") Long orderId, @Param("userId") Long userId,
+            @Param("candidateRound") Long candidateRound);
+
+    /**
+     * 指派转公开：把原指派人迁入新轮次，保留其拒绝/超时状态并更新有效期
+     *
+     * @param orderId    订单ID
+     * @param userId     被指派人用户ID
+     * @param oldRound   原候选轮次
+     * @param newRound   新候选轮次
+     * @param expireTime 新截止时间
+     * @return 影响行数
+     */
+    int promoteCandidateRound(@Param("orderId") Long orderId, @Param("userId") Long userId,
+            @Param("oldRound") Long oldRound, @Param("newRound") Long newRound,
+            @Param("expireTime") Date expireTime);
 
     /**
      * 筛选出当前用户已不再是待响应候选人的订单ID
@@ -131,13 +157,14 @@ public interface MealOrderCandidateMapper {
     List<Long> selectCandidateUserIds(@Param("orderId") Long orderId);
 
     /**
-     * 延长某订单指定候选人的响应截止时间（指派转公开后截止时间重置）
+     * 延长某订单指定候选人在当前轮次的响应截止时间（指派转公开后截止时间重置）
      *
-     * @param orderId    订单ID
-     * @param userId     用户ID
-     * @param expireTime 新的截止时间
+     * @param orderId        订单ID
+     * @param userId         用户ID
+     * @param candidateRound 当前候选轮次
+     * @param expireTime     新的截止时间
      * @return 影响行数
      */
     int updateCandidateExpireTime(@Param("orderId") Long orderId, @Param("userId") Long userId,
-            @Param("expireTime") Date expireTime);
+            @Param("candidateRound") Long candidateRound, @Param("expireTime") Date expireTime);
 }

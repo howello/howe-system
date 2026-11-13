@@ -3,16 +3,14 @@ package com.howe.meal.service.impl;
 import com.howe.common.exception.ServiceException;
 import com.howe.common.core.domain.entity.SysDept;
 import com.howe.common.utils.SecurityUtils;
-import com.howe.meal.constant.MealCategoryTaxonomy;
-import com.howe.meal.domain.MealCategory;
-import com.howe.meal.domain.MealCategoryRef;
 import com.howe.meal.domain.MealDish;
+import com.howe.meal.domain.MealCategoryRef;
 import com.howe.meal.domain.dto.DishOwnerChangeRequest;
 import com.howe.meal.domain.vo.DishOwnerOptionVO;
-import com.howe.meal.mapper.MealCategoryMapper;
 import com.howe.meal.mapper.MealCategoryRefMapper;
 import com.howe.meal.mapper.MealDishMapper;
 import com.howe.meal.service.IMealDishService;
+import com.howe.meal.util.MealCategoryGuard;
 import com.howe.meal.util.MealScopeGuard;
 import com.howe.system.mapper.SysDeptMapper;
 import lombok.RequiredArgsConstructor;
@@ -48,7 +46,7 @@ public class MealDishServiceImpl implements IMealDishService {
 
     private final MealDishMapper mealDishMapper;
     private final MealCategoryRefMapper mealCategoryRefMapper;
-    private final MealCategoryMapper mealCategoryMapper;
+    private final MealCategoryGuard mealCategoryGuard;
     private final SysDeptMapper sysDeptMapper;
 
     @Override
@@ -58,6 +56,8 @@ public class MealDishServiceImpl implements IMealDishService {
         if (!SecurityUtils.isAdmin()) {
             mealDish.setDeptId(SecurityUtils.getDeptId());
         }
+        // 点餐端显式传 menuVisible=true 时，隐藏所属分类已停用/已删除的菜；
+        // 后台列表不传该参数，仍能看到并做提示。
         List<MealDish> list = mealDishMapper.selectMealDishList(mealDish);
         fillCategoryIds(list);
         return list;
@@ -79,6 +79,8 @@ public class MealDishServiceImpl implements IMealDishService {
         }
         // 回填关联分类，供管理端编辑表单回显
         dish.setCategoryIds(singleCategoryList(dishId));
+        // 详情直达允许查看停用分类下的菜，但点餐端据此禁用加购
+        dish.setMenuVisible(mealDishMapper.isDishMenuVisible(dishId));
         return dish;
     }
 
@@ -107,7 +109,7 @@ public class MealDishServiceImpl implements IMealDishService {
         if (mealDish.getSource() == null) {
             mealDish.setSource("0");
         }
-        Long categoryId = resolveSingleCategoryId(mealDish.getCategoryIds());
+        Long categoryId = resolveSingleCategoryId(mealDish.getCategoryIds(), mealDish.getDeptId());
         mealDish.setCreateBy(SecurityUtils.getUsername());
         int rows = mealDishMapper.insertMealDish(mealDish);
         saveDishCategory(mealDish.getDishId(), categoryId);
@@ -124,7 +126,7 @@ public class MealDishServiceImpl implements IMealDishService {
         MealScopeGuard.assertDishWritable(exist.getDeptId(), "菜品");
         // 归属不允许通过修改接口迁移
         mealDish.setDeptId(null);
-        Long categoryId = resolveSingleCategoryId(mealDish.getCategoryIds());
+        Long categoryId = resolveSingleCategoryId(mealDish.getCategoryIds(), exist.getDeptId());
         mealDish.setUpdateBy(SecurityUtils.getUsername());
         int rows = mealDishMapper.updateMealDish(mealDish);
         // categoryIds 非空才视为「本次要改分类」；为 null 表示不动分类
@@ -176,33 +178,15 @@ public class MealDishServiceImpl implements IMealDishService {
     /**
      * 校验并解析唯一主类 ID
      *
-     * <p>null 或空列表表示不绑定主类；多于一个直接拒绝；分类必须存在、未删除且为平台公共主类。</p>
+     * <p>规则统一由 {@link MealCategoryGuard} 提供：最多一个分类、分类须启用且未删除，
+     * 公共菜只能选公共分类，家庭私有菜可选公共分类或本家庭分类。</p>
      *
      * @param categoryIds 入参分类列表
+     * @param ownerDeptId 菜品归属家庭 ID
      * @return 唯一分类 ID；未选择返回 null
      */
-    private Long resolveSingleCategoryId(List<Long> categoryIds) {
-        if (categoryIds == null || categoryIds.isEmpty()) {
-            return null;
-        }
-        if (categoryIds.size() > 1) {
-            throw new ServiceException("一道菜只能归一个主类");
-        }
-        Long categoryId = categoryIds.get(0);
-        if (categoryId == null) {
-            return null;
-        }
-        MealCategory category = mealCategoryMapper.selectMealCategoryById(categoryId);
-        if (category == null) {
-            throw new ServiceException("分类不存在或已删除");
-        }
-        if (category.getDeptId() == null || category.getDeptId() != MealCategoryTaxonomy.PUBLIC_DEPT_ID) {
-            throw new ServiceException("只能选择平台公共主类");
-        }
-        if (!MealCategoryTaxonomy.isPrimaryCategory(category.getName())) {
-            throw new ServiceException("只能选择 9 个唯一主类之一");
-        }
-        return categoryId;
+    private Long resolveSingleCategoryId(List<Long> categoryIds, Long ownerDeptId) {
+        return mealCategoryGuard.resolveWritableCategoryId(categoryIds, ownerDeptId, "菜品");
     }
 
     /** 列表接口批量回填 categoryIds：一次查全部关联，避免逐条查询 */

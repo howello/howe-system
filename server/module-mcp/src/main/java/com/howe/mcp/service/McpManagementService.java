@@ -16,13 +16,27 @@ public interface McpManagementService {
     void clientStatus(String id, String value);
 
     /** 目录仅来自实际注册代码；数据库遗留或任意新增名称不会成为可调用工具。 */
-    List<ToolView> tools();
+    Page<ToolView> tools(ToolQuery query);
+
+    /** 返回代码目录的全量统计与筛选选项，不受分页和查询条件影响。 */
+    ToolSummary toolsSummary();
 
     /** 单个工具详情采用代码目录，未知名称直接拒绝。 */
     ToolView tool(String name);
 
     /** 只允许切换代码中已有工具，不接受 schema、权限、实现或回调的编辑。 */
     void toolStatus(String name, String enabled, String operator);
+
+    /**
+     * 全局切换代码目录中的全部工具开放状态。
+     *
+     * <p>范围固定为当前代码目录，不受筛选、分页或请求参数影响；配置缺失时整批失败。</p>
+     *
+     * @param enabled 目标状态，仅接受 Y 或 N
+     * @param operator 后台当前账号
+     * @return 本次切换统计
+     */
+    ToolStatusResult toolStatusAll(String enabled, String operator);
 
     /** 全站授权查询明确要求后台方法权限，服务不从请求推定操作者身份。 */
     Page<GrantView> grants(Query query);
@@ -42,6 +56,43 @@ public interface McpManagementService {
     /** 管理查询仅支持明确条件，排序固定在服务端。 */
     public record Query(Integer pageNum, Integer pageSize, String keyword, String status, Long userId, String toolName, String resultCode) { }
 
+    /**
+     * 工具目录查询条件。
+     *
+     * <p>只接受明确的分页、字面关键字、模块、能力分组与开放状态；
+     * 模块为能力分组第一段，{@code mcp} 表示平台工具。</p>
+     *
+     * @param pageNum 页码，从 1 开始
+     * @param pageSize 每页条数
+     * @param keyword 工具名称或标题的字面子串
+     * @param module 模块前缀，可选
+     * @param capabilityGroup 精确能力分组，可选
+     * @param enabled 开放状态 Y/N，可选
+     */
+    public record ToolQuery(Integer pageNum, Integer pageSize, String keyword, String module, String capabilityGroup,
+            String enabled) { }
+
+    /**
+     * 工具目录全量统计与筛选选项。
+     *
+     * @param catalogTotal 代码目录工具总数
+     * @param enabledTotal 当前开放总数
+     * @param modules 目录中出现的模块标识
+     * @param capabilityGroups 目录中出现的精确能力分组
+     */
+    public record ToolSummary(long catalogTotal, long enabledTotal, List<String> modules,
+            List<String> capabilityGroups) { }
+
+    /**
+     * 全局工具状态切换结果。
+     *
+     * @param enabled 目标状态
+     * @param total 代码目录工具总数
+     * @param changed 实际发生变化的条数
+     * @param unchanged 已处于目标状态的条数
+     */
+    public record ToolStatusResult(String enabled, long total, long changed, long unchanged) { }
+
     /** 供 Controller 转换为统一后台分页。 */
     public record Page<T>(List<T> rows, long total) { }
 
@@ -53,7 +104,8 @@ public interface McpManagementService {
     public record ClientDetail(ClientView client, Set<String> redirectUris, List<String> authenticationMethods, List<String> grantTypes, List<String> scopes) { }
 
     /** 工具配置与实际代码契约一起展示，未配置时默认关闭。 */
-    public record ToolView(McpSchema.Tool schema, String version, String scope, Set<String> permissions, long timeoutMs, int maxResultBytes,
+    public record ToolView(McpSchema.Tool schema, String version, String capabilityGroup, String scope,
+            Set<String> permissions, long timeoutMs, int maxResultBytes,
             String enabled, String updateBy, String updatedAt, String remark) { }
 
     /** 最小授权详情。 */

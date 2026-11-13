@@ -12,7 +12,10 @@ public interface McpAuditService extends AutoCloseable {
     public enum Result {
         OK, ACCEPTED, PENDING, ACCESS_DENIED, INVALID_REQUEST, INVALID_ARGUMENTS, INVALID_TOKEN, INVALID_CLIENT,
         INVALID_GRANT, INVALID_SCOPE, RATE_LIMITED, UNAVAILABLE, TOOL_UNAVAILABLE, SERVER_BUSY, USER_BUSY, TOOL_TIMEOUT,
-        REQUEST_CANCELLED, RESULT_TOO_LARGE, INVALID_RESULT, EXECUTION_DENIED, TOOL_ERROR, INTERNAL_ERROR;
+        REQUEST_CANCELLED, RESULT_TOO_LARGE, INVALID_RESULT, EXECUTION_DENIED, TOOL_ERROR, INTERNAL_ERROR,
+        CONFIRMATION_REQUIRED, CONFIRMATION_EXPIRED, IDEMPOTENCY_KEY_REUSED, AUTHORIZATION_CHANGED,
+        OPERATION_EXPIRED, OPERATION_OUTCOME_UNKNOWN, STATE_CONFLICT, VERSION_CONFLICT, NOT_FOUND_OR_FORBIDDEN,
+        FILE_REFERENCE_EXPIRED, FILE_REFERENCE_CONFLICT, UPSTREAM_UNAVAILABLE;
 
         /** 仅保留代码白名单，未知错误归入固定类别。 */
         public static Result fromCode(String code) {
@@ -37,6 +40,19 @@ public interface McpAuditService extends AutoCloseable {
                 case "result_too_large" -> RESULT_TOO_LARGE;
                 case "invalid_result" -> INVALID_RESULT;
                 case "execution_denied", "identity_missing" -> EXECUTION_DENIED;
+                case "internal_error" -> INTERNAL_ERROR;
+                case "confirmation_required" -> CONFIRMATION_REQUIRED;
+                case "confirmation_expired" -> CONFIRMATION_EXPIRED;
+                case "idempotency_key_reused" -> IDEMPOTENCY_KEY_REUSED;
+                case "authorization_changed" -> AUTHORIZATION_CHANGED;
+                case "operation_expired" -> OPERATION_EXPIRED;
+                case "operation_outcome_unknown" -> OPERATION_OUTCOME_UNKNOWN;
+                case "state_conflict" -> STATE_CONFLICT;
+                case "version_conflict", "source_version_conflict" -> VERSION_CONFLICT;
+                case "not_found_or_forbidden" -> NOT_FOUND_OR_FORBIDDEN;
+                case "file_reference_expired" -> FILE_REFERENCE_EXPIRED;
+                case "file_reference_conflict" -> FILE_REFERENCE_CONFLICT;
+                case "upstream_unavailable" -> UPSTREAM_UNAVAILABLE;
                 default -> TOOL_ERROR;
             };
         }

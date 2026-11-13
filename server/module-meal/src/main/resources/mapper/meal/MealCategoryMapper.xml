@@ -30,14 +30,22 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <!--
       公共分类（dept_id = 0）与当前家庭的私有分类一起返回。
       这里刻意不用 @DataScope：数据权限只会拼出「dept_id = 本部门」，
-      会把公共分类一并过滤掉。迁移后库中只剩 9 条公共主类。
+      会把公共分类一并过滤掉。传 deptId 时返回「公共 + 该家庭」；
+      不传 deptId 时不过滤（仅平台管理员的全量查询会走到）。
     -->
     <select id="selectMealCategoryList" parameterType="MealCategory" resultMap="MealCategoryResult">
         <include refid="selectMealCategoryVo"/>
         <where>
             del_flag = '0'
             <if test="deptId != null">
-                AND (dept_id = #{deptId} or dept_id = 0)
+                <choose>
+                    <when test="deptId == 0">
+                        AND dept_id = 0
+                    </when>
+                    <otherwise>
+                        AND (dept_id = #{deptId} or dept_id = 0)
+                    </otherwise>
+                </choose>
             </if>
             <if test="name != null and name != ''">
                 AND name like concat('%', #{name}, '%')
@@ -71,9 +79,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         )
     </insert>
 
+    <!--
+      修改分类：名称是否可改由 Service 判断（公共分类禁止改名），
+      这里只按非空字段更新；dept_id 永不更新，归属不允许迁移。
+    -->
     <update id="updateMealCategory" parameterType="MealCategory">
         update meal_category
         <set>
+            <if test="name != null and name != ''">name = #{name},</if>
             <if test="description != null">description = #{description},</if>
             <if test="basis != null">basis = #{basis},</if>
             <if test="icon != null">icon = #{icon},</if>

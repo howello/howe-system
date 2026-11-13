@@ -1,17 +1,21 @@
 import request from '@/utils/request'
-import type { AjaxResult, TableDataInfo, McpAdminQuery, McpAdminClient, McpAdminClientDetail, McpAdminTool, McpAdminGrant, McpAdminCall, McpAdminConfiguration, McpAdminStatistics } from '@/types'
+import type { AjaxResult, TableDataInfo, McpAdminQuery, McpAdminClient, McpAdminClientDetail, McpAdminTool, McpAdminToolQuery, McpAdminToolSummary, McpAdminToolStatusResult, McpAdminGrant, McpAdminCall, McpAdminConfiguration, McpAdminStatistics } from '@/types'
 /** 客户端登记列表使用现有后台 JWT 请求层。 */
 export function listMcpClients(params: McpAdminQuery): Promise<TableDataInfo<McpAdminClient[]>> { return request({ url: '/mcp/manage/client/list', params }) }
 /** 客户端详情仅返回公开元数据。 */
 export function getMcpClient(id: string): Promise<AjaxResult<McpAdminClientDetail>> { return request({ url: '/mcp/manage/client/' + encodeURIComponent(id) }) }
 /** 停用客户端需要独立 edit 权限。 */
 export function setMcpClientStatus(id: string, status: string): Promise<AjaxResult> { return request({ url: `/mcp/manage/client/${encodeURIComponent(id)}/status`, method: 'put', data: { status } }) }
-/** 获取代码定义的工具目录。 */
-export function listMcpTools(): Promise<TableDataInfo<McpAdminTool[]>> { return request({ url: '/mcp/manage/tool/list' }) }
+/** 分页获取代码定义的工具目录；查询与分页由服务端内存目录执行。 */
+export function listMcpTools(params: McpAdminToolQuery): Promise<TableDataInfo<McpAdminTool[]>> { return request({ url: '/mcp/manage/tool/list', params }) }
+/** 获取代码目录全量统计与筛选选项。 */
+export function getMcpToolSummary(): Promise<AjaxResult<McpAdminToolSummary>> { return request({ url: '/mcp/manage/tool/summary' }) }
 /** 获取工具契约详情。 */
 export function getMcpTool(name: string): Promise<AjaxResult<McpAdminTool>> { return request({ url: '/mcp/manage/tool/' + encodeURIComponent(name) }) }
 /** 只修改工具开关，不接受动态实现或权限修改。 */
 export function setMcpToolStatus(name: string, enabled: string): Promise<AjaxResult> { return request({ url: `/mcp/manage/tool/${encodeURIComponent(name)}/status`, method: 'put', data: { enabled } }) }
+/** 全局切换代码目录全部工具，范围不受当前筛选与分页影响。 */
+export function setAllMcpToolStatus(enabled: string): Promise<AjaxResult<McpAdminToolStatusResult>> { return request({ url: '/mcp/manage/tool/status', method: 'put', data: { enabled } }) }
 /** 全站授权列表与本人 self 接口分开。 */
 export function listMcpGrants(params: McpAdminQuery): Promise<TableDataInfo<McpAdminGrant[]>> { return request({ url: '/mcp/manage/grant/list', params }) }
 /** 查询授权详情不包含凭据。 */

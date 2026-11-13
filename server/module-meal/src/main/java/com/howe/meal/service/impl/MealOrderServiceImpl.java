@@ -25,6 +25,7 @@ import com.howe.meal.service.IMealOrderService;
 import com.howe.meal.service.IMealNotifyService;
 import com.howe.meal.service.IMealWeComNotifyService;
 import com.howe.meal.service.ITransactionCommitExecutor;
+import com.howe.meal.util.MealFamilyGuard;
 import com.howe.meal.util.MealScopeGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -67,6 +68,7 @@ public class MealOrderServiceImpl implements IMealOrderService {
     private final ITransactionCommitExecutor transactionCommitExecutor;
     private final IMealOrderCandidateService mealOrderCandidateService;
     private final MealOrderCandidateMapper mealOrderCandidateMapper;
+    private final com.howe.system.mapper.SysDeptMapper sysDeptMapper;
     @DataScope(deptAlias = "d")
     public List<MealOrder> selectMealOrderList(MealOrder mealOrder) {
         return mealOrderMapper.selectMealOrderList(mealOrder);
@@ -88,9 +90,30 @@ public class MealOrderServiceImpl implements IMealOrderService {
     }
 
     /**
-     * 厨师工作台角标：待接单统计家庭全部，制作中只统计本人接单。
+     * 工具专用的厨师工作台分页主查询。
+     *
+     * <p>分页由调用方启动；本方法在主查询后立即清理 PageHelper，只补时长，
+     * 不调用无界的 {@link #fillItems(List)}，明细由调用方按每单固定上限读取。</p>
      */
     @Override
+    @DataScope(deptAlias = "d")
+    public List<MealOrder> selectKitchenOrderPageForTool(MealOrder mealOrder) {
+        applyKitchenVisibility(mealOrder);
+        List<MealOrder> orders;
+        try {
+            orders = mealOrderMapper.selectMealOrderList(mealOrder);
+        } finally {
+            com.github.pagehelper.PageHelper.clearPage();
+        }
+        if (orders != null) {
+            orders.forEach(this::fillDuration);
+        }
+        return orders;
+    }
+
+    /**
+     * 厨师工作台角标：待接单统计家庭全部，制作中只统计本人接单。
+     */    @Override
     @DataScope(deptAlias = "d")
     public MealKitchenOrderSummary countKitchenOrderSummary(MealOrder mealOrder) {
         long pendingCount = countKitchenStatus(MealOrder.STATUS_WAITING, false, mealOrder);
@@ -167,6 +190,30 @@ public class MealOrderServiceImpl implements IMealOrderService {
     }
 
     /**
+     * 工具专用的本人订单分页主查询。
+     *
+     * <p>分页由调用方启动；本方法在主查询后立即清理 PageHelper，随后只补已评价标记与时长，
+     * 不调用 {@link #fillItems(List)}。工具列表明细由 Provider 经 Mapper 窗口查询按每单限量读取，
+     * 避免先执行无界 {@code selectItemsByOrderIds} 再在内存截断。旧 Web 列表继续使用
+     * {@link #selectMyOrderList(MealOrder, String)}，其完整明细契约不变。</p>
+     */
+    @Override
+    public List<MealOrder> selectMyOrderPageForTool(MealOrder mealOrder) {
+        mealOrder.setUserId(SecurityUtils.getUserId());
+        List<MealOrder> orders;
+        try {
+            orders = mealOrderMapper.selectMyOrderList(mealOrder);
+        } finally {
+            com.github.pagehelper.PageHelper.clearPage();
+        }
+        fillReviewed(orders);
+        if (orders != null) {
+            orders.forEach(this::fillDuration);
+        }
+        return orders;
+    }
+
+    /**
      * 「按 id 取详情」不受 {@code @DataScope} 保护，这里显式校验家庭归属，
      * 否则换个 orderId 就能读到别人家的订单。
      */
@@ -175,6 +222,21 @@ public class MealOrderServiceImpl implements IMealOrderService {
         MealOrder order = requireOrder(orderId);
         MealScopeGuard.assertSameDept(order.getDeptId(), "订单");
         order.setItems(mealOrderMapper.selectItemsByOrderId(orderId));
+        order.setReviewed(!mealReviewMapper.selectReviewedOrderIds(new Long[] { orderId }).isEmpty());
+        fillDuration(order);
+        return order;
+    }
+
+    /**
+     * 工具专用的订单主记录详情读取。
+     *
+     * <p>沿用原 Service 的订单存在性与家庭归属守卫，但不加载任何明细；
+     * 工具随后执行有界摘要查询，避免无界读取整张订单明细集合。</p>
+     */
+    @Override
+    public MealOrder selectMealOrderForTool(Long orderId) {
+        MealOrder order = requireOrder(orderId);
+        MealScopeGuard.assertSameDept(order.getDeptId(), "订单");
         order.setReviewed(!mealReviewMapper.selectReviewedOrderIds(new Long[] { orderId }).isEmpty());
         fillDuration(order);
         return order;
@@ -207,6 +269,10 @@ public class MealOrderServiceImpl implements IMealOrderService {
             }
             if (!"0".equals(dish.getStatus())) {
                 throw new ServiceException("菜品「" + dish.getName() + "」已下架");
+            }
+            // 停用分类下的菜与分类一起隐藏：最终以下单时的分类状态为准
+            if (!mealDishMapper.isDishMenuVisible(dish.getDishId())) {
+                throw new ServiceException("菜品「" + dish.getName() + "」所属分类已停用");
             }
             // 菜名与封面在此刻落成快照，之后菜品怎么改都不影响这张订单
             MealOrderItem item = new MealOrderItem();
@@ -291,15 +357,29 @@ public class MealOrderServiceImpl implements IMealOrderService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int cancelOrder(Long orderId) {
+        return cancelOrder(orderId, null);
+    }
+
+    /**
+     * 取消订单：工具路径额外要求订单版本等于预览快照。
+     *
+     * <p>Web 路径传 {@code null}，保持原有「读到最新状态后条件更新」的语义；
+     * 工具路径传入预览版本，避免预览之后被并发修改仍继续执行。</p>
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int cancelOrder(Long orderId, Long expectedVersion) {
         MealOrder order = requireOrder(orderId);
         MealScopeGuard.assertSameUser(order.getUserId(), "订单");
         if (!MealOrder.STATUS_WAITING.equals(order.getStatus())) {
             throw new ServiceException("订单已被接单，不能取消");
         }
+        requirePreviewVersion(order.getDataVersion(), expectedVersion);
         MealOrder update = new MealOrder();
         update.setOrderId(orderId);
         update.setStatus(MealOrder.STATUS_CANCELED);
         update.setExpectedStatus(MealOrder.STATUS_WAITING);
+        update.setExpectedVersion(expectedVersion == null ? order.getDataVersion() : expectedVersion);
         update.setCloseReason(MealOrder.CLOSE_REASON_CANCELED);
         update.setCancelTime(new Date());
         update.setUpdateBy(SecurityUtils.getUsername());
@@ -315,14 +395,36 @@ public class MealOrderServiceImpl implements IMealOrderService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int acceptOrder(Long orderId) {
+        return acceptOrder(orderId, null, null, null);
+    }
+
+    /**
+     * 接单：工具路径要求订单版本、本人候选版本与轮次都匹配预览快照。
+     *
+     * <p>Web 路径三个期望值均为 {@code null}，仍按「锁订单后读取最新候选」执行；
+     * 工具路径把预览时的快照一路传入候选 CAS 与订单 CAS，避免预览后状态变化仍命中。</p>
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int acceptOrder(Long orderId, Long expectedVersion, Long candidateVersion, Long candidateRound) {
         Long userId = SecurityUtils.getUserId();
-        MealOrder order = requireOrder(orderId);
+        // 统一锁顺序：先锁订单行，再裁决候选。反过来会在并发接单时形成相反的锁序。
+        MealOrder order = mealOrderMapper.selectOrderForUpdate(orderId);
+        if (order == null) {
+            throw new ServiceException("订单不存在或已删除");
+        }
         MealScopeGuard.assertSameDept(order.getDeptId(), "订单");
         if (!MealOrder.STATUS_WAITING.equals(order.getStatus())) {
             throw new ServiceException("该订单不是待接单状态");
         }
-        // 候选人层裁决：我还挂着吗
-        if (mealOrderCandidateMapper.acceptCandidate(orderId, userId) == 0) {
+        requirePreviewVersion(order.getDataVersion(), expectedVersion);
+        Long round = candidateRound == null
+                ? (order.getCandidateRound() == null ? 0L : order.getCandidateRound()) : candidateRound;
+        if (order.getCandidateRound() != null && order.getCandidateRound() != round) {
+            throw new ServiceException("订单候选轮次已变化，请刷新后重试");
+        }
+        // 候选人层裁决：我还挂在当前轮次吗
+        if (mealOrderCandidateMapper.acceptCandidate(orderId, userId, round, candidateVersion) == 0) {
             throw new ServiceException("该订单已不可接单");
         }
         // 订单层裁决：还在等人接吗 —— 并发下只有一人能拿到 1 行
@@ -330,14 +432,15 @@ public class MealOrderServiceImpl implements IMealOrderService {
         update.setOrderId(orderId);
         update.setStatus(MealOrder.STATUS_COOKING);
         update.setExpectedStatus(MealOrder.STATUS_WAITING);
+        update.setExpectedVersion(expectedVersion == null ? order.getDataVersion() : expectedVersion);
         update.setAcceptBy(currentNickName());
         update.setAcceptUserId(userId);
         update.setUpdateBy(SecurityUtils.getUsername());
         if (mealOrderMapper.updateMealOrderStatus(update) == 0) {
             throw new ServiceException("订单已被他人接走");
         }
-        // 其余候选人失效，订单真正归属当前厨师
-        mealOrderCandidateMapper.invalidateOthers(orderId, userId);
+        // 其余候选人失效，订单真正归属当前厨师；只影响当前轮次
+        mealOrderCandidateMapper.invalidateOthers(orderId, userId, round);
 
         transactionCommitExecutor.afterCommit(() -> mealNotifyService.push("notify:user:" + order.getUserId(),
                 "ORDER_ACCEPTED", order.getOrderId(), "厨师已接单", "厨师已接单，正在准备您的餐点",
@@ -349,7 +452,16 @@ public class MealOrderServiceImpl implements IMealOrderService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void refuseOrder(Long orderId) {
-        mealOrderCandidateService.refuseOrder(orderId);
+        refuseOrder(orderId, null, null, null);
+    }
+
+    /**
+     * 拒单：工具路径要求订单版本、本人候选版本与轮次都匹配预览快照。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void refuseOrder(Long orderId, Long expectedVersion, Long candidateVersion, Long candidateRound) {
+        mealOrderCandidateService.refuseOrder(orderId, expectedVersion, candidateVersion, candidateRound);
     }
 
     @Override
@@ -361,14 +473,86 @@ public class MealOrderServiceImpl implements IMealOrderService {
         return mealOrderMapper.selectChefAssigneesByDeptId(deptId);
     }
 
+    /**
+     * 工具专用的可指派厨师分页查询。
+     *
+     * <p>先确认有效家庭，再对厨师单表做数据库分页；平台内置账号沿用既有全量范围。</p>
+     */
+    @Override
+    public List<MealOrderAssignee> selectAssigneesForTool(int page, int pageSize) {
+        Long deptId;
+        if (MealFamilyGuard.isPlatformAccount()) {
+            deptId = SecurityUtils.getDeptId();
+        } else {
+            deptId = MealFamilyGuard.requireFamilyDeptId(sysDeptMapper);
+        }
+        if (deptId == null) {
+            throw new ServiceException("当前账号没有可用的家庭归属");
+        }
+        com.github.pagehelper.PageHelper.startPage(page, pageSize);
+        try {
+            return mealOrderMapper.selectChefAssigneesByDeptId(deptId);
+        } finally {
+            com.github.pagehelper.PageHelper.clearPage();
+        }
+    }
+
+    /**
+     * 工具专用的订单明细摘要，按 item_id 稳定截断。
+     */
+    @Override
+    public List<MealOrderItem> selectOrderItemSummaries(Long orderId, int limit) {
+        return mealOrderMapper.selectItemSummariesByOrderId(orderId, limit);
+    }
+
+    /**
+     * 批量查询工具专用的订单明细摘要。
+     */
+    @Override
+    public List<MealOrderItem> selectOrderItemSummaries(Long[] orderIds, int limitPerOrder) {
+        if (orderIds == null || orderIds.length == 0) {
+            return List.of();
+        }
+        if (limitPerOrder < 1) {
+            throw new IllegalArgumentException("每单明细上限必须为正数");
+        }
+        return mealOrderMapper.selectItemSummariesByOrderIds(orderIds, limitPerOrder);
+    }
+
+    /**
+     * 统计订单明细总数。
+     */
+    @Override
+    public int countOrderItems(Long orderId) {
+        return mealOrderMapper.countItemsByOrderId(orderId);
+    }
+
+    /**
+     * 批量统计订单明细总数。
+     */
+    @Override
+    public List<Map<String, Object>> countOrderItems(Long[] orderIds) {
+        return mealOrderMapper.countItemsByOrderIds(orderIds);
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int finishOrder(Long orderId) {
+        return finishOrder(orderId, null);
+    }
+
+    /**
+     * 完成：工具路径要求订单版本等于预览快照。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int finishOrder(Long orderId, Long expectedVersion) {
         MealOrder order = requireOrder(orderId);
         MealScopeGuard.assertSameDept(order.getDeptId(), "订单");
         if (!MealOrder.STATUS_COOKING.equals(order.getStatus())) {
             throw new ServiceException("该订单不是制作中状态");
         }
+        requirePreviewVersion(order.getDataVersion(), expectedVersion);
         // 只有实际接单人能标记完成，避免同家庭其他人误操作别人的单
         Long acceptUserId = order.getAcceptUserId();
         if (acceptUserId != null && !acceptUserId.equals(SecurityUtils.getUserId())
@@ -376,7 +560,8 @@ public class MealOrderServiceImpl implements IMealOrderService {
             throw new ServiceException("只有接单的厨师可以标记完成");
         }
         int rows = changeStatus(orderId, MealOrder.STATUS_FINISHED, MealOrder.STATUS_COOKING,
-                null, currentNickName(), null);
+                null, currentNickName(), null,
+                expectedVersion == null ? order.getDataVersion() : expectedVersion);
         transactionCommitExecutor.afterCommit(() -> mealNotifyService.push("notify:user:" + order.getUserId(),
                 "ORDER_COMPLETED", order.getOrderId(), "订单已完成", "您的订单已完成",
                 notificationExtra(order.getOrderNo())));
@@ -398,14 +583,25 @@ public class MealOrderServiceImpl implements IMealOrderService {
     }
 
     /**
-     * 状态流转：where 里带上期望的当前状态，两个厨师同时点「接单」时只有一个能成功
+     * 状态流转：where 里带上期望的当前状态与数据版本，
+     * 两个厨师同时点「接单」或与超时任务并发时只有一个能成功。
+     *
+     * @param orderId         订单ID
+     * @param target          目标状态
+     * @param expected        期望的当前状态
+     * @param acceptBy        接单人（可空）
+     * @param finishBy        完成人（可空）
+     * @param acceptUserId    接单人用户ID（可空）
+     * @param expectedVersion 期望的数据版本
+     * @return 影响行数
      */
     private int changeStatus(Long orderId, String target, String expected, String acceptBy, String finishBy,
-            Long acceptUserId) {
+            Long acceptUserId, Long expectedVersion) {
         MealOrder update = new MealOrder();
         update.setOrderId(orderId);
         update.setStatus(target);
         update.setExpectedStatus(expected);
+        update.setExpectedVersion(expectedVersion);
         update.setAcceptBy(acceptBy);
         update.setAcceptUserId(acceptUserId);
         update.setFinishBy(finishBy);
@@ -432,6 +628,18 @@ public class MealOrderServiceImpl implements IMealOrderService {
             throw new ServiceException("订单不存在或已删除");
         }
         return order;
+    }
+
+    /**
+     * 工具预览版本与实际版本核对；{@code null} 表示 Web 路径不启用预览版本约束。
+     *
+     * @param actual 当前版本
+     * @param expected 预览版本
+     */
+    private static void requirePreviewVersion(Long actual, Long expected) {
+        if (expected != null && (actual == null || !actual.equals(expected))) {
+            throw new ServiceException("订单已变化，请重新预览");
+        }
     }
 
     /**

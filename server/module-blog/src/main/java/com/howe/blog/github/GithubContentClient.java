@@ -42,6 +42,9 @@ public class GithubContentClient
     /** 默认请求超时（毫秒） */
     private static final int DEFAULT_TIMEOUT = 30000;
 
+    /** 有界正文读取的响应绝对上限（2 MiB）。 */
+    private static final int MAX_BOUNDED_RESPONSE_BYTES = 2 * 1024 * 1024;
+
     /**
      * 配置是否完整可用
      *
@@ -231,6 +234,193 @@ public class GithubContentClient
     }
 
     /**
+     * 以有界方式读取单个文件的正文，供只读工具使用。
+     *
+     * <p>与 {@link #getFile(String)} 的差异：不读取完整响应后再判断大小，而是在流式读取阶段
+     * 就执行字节上限；超过 {@code maxSourceBytes} 直接失败，不再回退 blobs 接口。
+     * 本方法只返回文件内容，不修改本地索引，因此不会产生写 SQL。</p>
+     *
+     * @param path 相对仓库根的路径
+     * @param maxSourceBytes 源文件解码后的字节上限
+     * @param timeoutMs 本次读取的超时毫秒数
+     * @return 文件内容；文件不存在时返回 {@code null}
+     * @throws GithubReadException 超限、上游不可用或读取超时
+     */
+    public GithubFile readFileBounded(String path, int maxSourceBytes, int timeoutMs)
+    {
+        assertConfigured();
+        String url = repoApi("/contents/" + encodePath(path)) + "?ref=" + encodeSegment(getBranch());
+        String responseBody;
+        try (HttpResponse response = request(Method.GET, url, timeoutMs).executeAsync())
+        {
+            if (response.getStatus() == 404)
+            {
+                return null;
+            }
+            responseBody = readBoundedBody(response, responseLimit(maxSourceBytes));
+        }
+        catch (GithubReadException exception)
+        {
+            throw exception;
+        }
+        catch (RuntimeException exception)
+        {
+            log.warn("GitHub 正文读取失败，path={}，cause={}", path, exception.getClass().getSimpleName());
+            throw new GithubReadException(classifyReadFailure(exception), exception);
+        }
+        JSONObject body;
+        try
+        {
+            body = JSONObject.parseObject(responseBody);
+        }
+        catch (RuntimeException exception)
+        {
+            throw new GithubReadException(GithubReadException.Reason.UNAVAILABLE);
+        }
+        Long size = body.getLong("size");
+        long fileSize = size == null ? 0L : size;
+        if (fileSize > maxSourceBytes)
+        {
+            throw new GithubReadException(GithubReadException.Reason.TOO_LARGE);
+        }
+        String content = decodeContent(body);
+        if (content == null)
+        {
+            // contents 接口在超过 1MB 时不返回正文；本路径不回退 blobs，避免无界读取。
+            throw new GithubReadException(GithubReadException.Reason.TOO_LARGE);
+        }
+        return new GithubFile(body.getString("path"), body.getString("sha"), content, fileSize);
+    }
+
+    /**
+     * 计算包含 JSON 与 base64 膨胀后的响应上限。
+     *
+     * <p>base64 约为原文的 4/3，再叠加 JSON 字段开销；同时设定绝对上限，
+     * 避免调用方传入过大值导致内存风险。</p>
+     *
+     * @param maxSourceBytes 源文件解码后的字节上限
+     * @return 响应字节上限
+     */
+    private static int responseLimit(int maxSourceBytes)
+    {
+        long expanded = (long) maxSourceBytes * 2 + 65536L;
+        return (int) Math.min(expanded, MAX_BOUNDED_RESPONSE_BYTES);
+    }
+
+    /**
+     * 在流式读取阶段限制响应字节数。
+     *
+     * <p>先看 {@code Content-Length} 快速拒绝，再按实际读取字节数兜底；
+     * 响应超过上限立即关闭连接，不把完整报文读入内存。</p>
+     *
+     * @param response 已建立的响应
+     * @param maxBytes 允许的最大响应字节数
+     * @return 响应正文
+     */
+    private String readBoundedBody(HttpResponse response, int maxBytes)
+    {
+        if (!isSuccess(response.getStatus()))
+        {
+            throw new GithubReadException(GithubReadException.Reason.UNAVAILABLE);
+        }
+        long declared = response.contentLength();
+        if (declared > maxBytes)
+        {
+            throw new GithubReadException(GithubReadException.Reason.TOO_LARGE);
+        }
+        byte[] body;
+        try (java.io.InputStream stream = response.bodyStream())
+        {
+            body = readAtMost(stream, maxBytes);
+        }
+        catch (java.io.IOException exception)
+        {
+            throw new GithubReadException(classifyReadFailure(exception), exception);
+        }
+        return new String(body, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * 只读取不超过上限的字节，超过即失败。
+     *
+     * <p>不使用 {@code IoUtil.readBytes(InputStream, int)}：该重载的第二个参数是初始缓冲大小，
+     * 不是长度上限。这里逐块读取并在累计超过上限时立即中止。</p>
+     *
+     * @param stream 响应流
+     * @param maxBytes 允许读取的最大字节数
+     * @return 读取到的字节
+     * @throws java.io.IOException 读取失败
+     */
+    private static byte[] readAtMost(java.io.InputStream stream, int maxBytes) throws java.io.IOException
+    {
+        java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream(Math.min(maxBytes, 8192));
+        byte[] chunk = new byte[8192];
+        int read;
+        while ((read = stream.read(chunk)) != -1)
+        {
+            if (buffer.size() + read > maxBytes)
+            {
+                throw new GithubReadException(GithubReadException.Reason.TOO_LARGE);
+            }
+            buffer.write(chunk, 0, read);
+        }
+        return buffer.toByteArray();
+    }
+
+    /**
+     * 判断异常链是否包含网络超时。
+     *
+     * <p>Hutool 会将底层 {@code SocketTimeoutException} 包装为 {@code IORuntimeException}
+     * 或 {@code HttpException}，因此沿 cause 链查找。</p>
+     *
+     * @param exception 当前异常
+     * @return cause 链包含 SocketTimeoutException 时返回 true
+     */
+    private static boolean isTimeout(Throwable exception)
+    {
+        Throwable current = exception;
+        // 防御异常 cause 自引用，且限制遍历深度避免异常链异常循环。
+        for (int depth = 0; current != null && depth < 16; depth++)
+        {
+            if (current instanceof java.net.SocketTimeoutException)
+            {
+                return true;
+            }
+            Throwable cause = current.getCause();
+            if (cause == current)
+            {
+                break;
+            }
+            current = cause;
+        }
+        return false;
+    }
+
+    /**
+     * 把异常 cause 链映射为工具读取原因。
+     *
+     * <p>可用包内单测传入真实 SocketTimeoutException 包装链；上游错误文本不进入结果。</p>
+     *
+     * @param exception 原始异常
+     * @return TIMEOUT 或 UNAVAILABLE
+     */
+    static GithubReadException.Reason classifyReadFailure(Throwable exception)
+    {
+        return isTimeout(exception) ? GithubReadException.Reason.TIMEOUT : GithubReadException.Reason.UNAVAILABLE;
+    }
+
+    /**
+     * 判断响应状态是否为成功。
+     *
+     * @param status HTTP 状态码
+     * @return 2xx 时返回 true
+     */
+    private static boolean isSuccess(int status)
+    {
+        return status >= 200 && status < 300;
+    }
+
+    /**
      * 按 sha 读取大文件内容
      */
     private String getBlob(String sha)
@@ -263,13 +453,26 @@ public class GithubContentClient
     private HttpRequest request(Method method, String url)
     {
         int timeout = ConfigUtils.getInt(ConfigConstants.BLOG_GITHUB_TIMEOUT, DEFAULT_TIMEOUT);
+        return request(method, url, timeout);
+    }
+
+    /**
+     * 构造带鉴权头与指定超时的请求。
+     *
+     * @param method HTTP 方法
+     * @param url 完整地址
+     * @param timeoutMs 超时毫秒数
+     * @return 请求对象
+     */
+    private HttpRequest request(Method method, String url, int timeoutMs)
+    {
         return HttpRequest.of(url).method(method)
                 .header("Authorization", "Bearer " + ConfigUtils.getString(ConfigConstants.BLOG_GITHUB_TOKEN))
                 .header("Accept", "application/vnd.github+json")
                 .header("X-GitHub-Api-Version", "2022-11-28")
                 .header("Content-Type", "application/json; charset=utf-8")
                 .header("User-Agent", "howe-blog-admin")
-                .timeout(timeout);
+                .timeout(timeoutMs);
     }
 
     /**

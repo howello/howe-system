@@ -30,6 +30,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="updateBy"    column="update_by"    />
         <result property="updateTime"  column="update_time"  />
         <result property="remark"      column="remark"       />
+        <result property="dataVersion" column="data_version" />
+        <result property="candidateRound" column="candidate_round" />
     </resultMap>
 
     <resultMap type="MealOrderItem" id="MealOrderItemResult">
@@ -47,7 +49,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                d.total_count, d.order_remark, d.accept_by, d.accept_user_id, d.accept_time,
                d.finish_by, d.finish_time, d.cancel_time,
                d.assign_mode, d.assign_user_id, d.assign_user_name, d.deadline_time, d.close_reason,
-               d.del_flag, d.create_by, d.create_time, d.update_by, d.update_time, d.remark
+               d.del_flag, d.create_by, d.create_time, d.update_by, d.update_time, d.remark,
+               d.data_version, d.candidate_round
         from meal_order d
     </sql>
 
@@ -74,12 +77,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="acceptUserId != null">
                 AND d.accept_user_id = #{acceptUserId}
             </if>
-            <!-- 厨师工作台按候选人过滤：只有「我是待响应候选人」的待接单订单可见 -->
+            <!-- 厨师工作台按候选人过滤：只有「我是当前轮次待响应候选人」的待接单订单可见 -->
             <if test="candidateUserId != null">
                 AND exists (
                     select 1 from meal_order_candidate c
                     where c.order_id = d.order_id
                       and c.user_id = #{candidateUserId}
+                      and c.candidate_round = d.candidate_round
                       and c.status in ('0', '4')
                 )
             </if>
@@ -115,8 +119,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                     #{s}
                 </foreach>
             </if>
+            <!--
+              工具只读日期过滤：左闭右开，避免 DATE_FORMAT 截断或隐式把结束日扩成整天。
+              参数由服务端校验后写入 params.createdFrom / params.createdTo，模型不能直接提交 params。
+              这里只判 null，不与空字符串比较：值是 Date 类型，OGNL 的 String 比较会触发类型转换异常。
+            -->
+            <if test="params.createdFrom != null">
+                AND d.create_time &gt;= #{params.createdFrom}
+            </if>
+            <if test="params.createdTo != null">
+                AND d.create_time &lt; #{params.createdTo}
+            </if>
         </where>
-        order by d.create_time desc
+        order by d.create_time desc, d.order_id desc
     </select>
 
     <!-- 厨师制作过的订单：强制按 accept_user_id 过滤，不依赖数据权限；取消单不会被接单故天然不含 -->
@@ -160,6 +175,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 select 1 from meal_order_candidate c
                 where c.order_id = d.order_id
                   and c.user_id = #{candidateUserId}
+                  and c.candidate_round = d.candidate_round
                   and c.status in ('0', '4')
             )
           </if>
@@ -201,7 +217,54 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and r.role_key = 'meal_chef'
           and r.status = '0'
           and r.del_flag = '0'
-        order by nickName asc
+        order by nickName asc, u.user_id asc
+    </select>
+
+    <!--
+      工具只读明细投影：只取摘要需要的字段，并按 item_id 稳定截断。
+      详情最多 100 项、列表每单最多 10 项由调用方通过 SQL 上限控制，避免先拉取无限明细。
+    -->
+    <select id="selectItemSummariesByOrderId" resultMap="MealOrderItemResult">
+        select item_id, order_id, dish_id, dish_name, count
+        from meal_order_item
+        where order_id = #{orderId}
+        order by item_id asc
+        limit #{limit}
+    </select>
+
+    <!--
+      工具专用批量明细摘要：先按订单与 item_id 排名，再在 SQL 层每单最多取 limitPerOrder 条。
+      不能把当前页所有订单的无限明细读入内存后再由 Provider stream.limit()。
+    -->
+    <select id="selectItemSummariesByOrderIds" resultMap="MealOrderItemResult">
+        select item_id, order_id, dish_id, dish_name, count
+        from (
+            select item_id, order_id, dish_id, dish_name, count,
+                   row_number() over (partition by order_id order by item_id asc) as item_rank
+            from meal_order_item
+            where order_id in
+            <foreach item="orderId" collection="orderIds" open="(" separator="," close=")">
+                #{orderId}
+            </foreach>
+        ) ranked_items
+        where item_rank &lt;= #{limitPerOrder}
+        order by order_id asc, item_id asc
+    </select>
+
+    <!-- 统计某订单的明细总数，用于判断摘要是否被截断。 -->
+    <select id="countItemsByOrderId" resultType="int">
+        select count(1) from meal_order_item where order_id = #{orderId}
+    </select>
+
+    <!-- 批量统计明细总数，返回 order_id 与 cnt。 -->
+    <select id="countItemsByOrderIds" resultType="java.util.Map">
+        select order_id as orderId, count(1) as cnt
+        from meal_order_item
+        where order_id in
+        <foreach item="orderId" collection="orderIds" open="(" separator="," close=")">
+            #{orderId}
+        </foreach>
+        group by order_id
     </select>
 
     <select id="selectChefUserInfoByDeptId" resultType="com.howe.meal.domain.vo.MealOrderAssignee">
@@ -278,6 +341,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         update meal_order
         <set>
             status = #{status},
+            data_version = data_version + 1,
             <if test="acceptBy != null and acceptBy != ''">accept_by = #{acceptBy}, accept_time = sysdate(),</if>
             <if test="acceptUserId != null">accept_user_id = #{acceptUserId},</if>
             <if test="finishBy != null and finishBy != ''">finish_by = #{finishBy}, finish_time = sysdate(),</if>
@@ -291,6 +355,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where order_id = #{orderId} and del_flag = '0'
         <if test="expectedStatus != null and expectedStatus != ''">
             and status = #{expectedStatus}
+        </if>
+        <if test="expectedVersion != null">
+            and data_version = #{expectedVersion}
         </if>
         <!-- 超时关闭额外要求确实已过截止时间，避免未到期的订单被误关 -->
         <if test="requireExpired != null and requireExpired">
@@ -345,17 +412,36 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and d.del_flag = '0'
           and not exists (
               select 1 from meal_order_candidate c
-              where c.order_id = d.order_id and c.status in ('0', '4')
+              where c.order_id = d.order_id
+                and c.candidate_round = d.candidate_round
+                and c.status in ('0', '4')
           )
         order by d.create_time asc
         limit #{limit}
     </select>
 
-    <!-- 指派转公开：改模式、重置截止时间，条件限定仍在指派中 -->
+    <!-- 候选人状态变化但订单仍待接单：只推进聚合版本，不改变状态 -->
+    <update id="touchOrderVersion" parameterType="MealOrder">
+        update meal_order
+        set data_version = data_version + 1, update_time = sysdate()
+        where order_id = #{orderId} and del_flag = '0' and status = #{expectedStatus}
+        <if test="expectedCandidateRound != null">
+            and candidate_round = #{expectedCandidateRound}
+        </if>
+    </update>
+
+    <!-- 指派转公开：改模式、递增候选轮次并重置截止时间，条件限定仍在指派中且轮次未变 -->
     <update id="reopenToPublic">
         update meal_order
-        set assign_mode = '2', deadline_time = #{deadlineTime}, update_time = sysdate()
+        set assign_mode = '2', candidate_round = candidate_round + 1,
+            data_version = data_version + 1, deadline_time = #{deadlineTime}, update_time = sysdate()
         where order_id = #{orderId} and status = '0' and assign_mode = '1' and del_flag = '0'
+        <if test="expectedRound != null">
+            and candidate_round = #{expectedRound}
+        </if>
+        <if test="expectedVersion != null">
+            and data_version = #{expectedVersion}
+        </if>
     </update>
 
 </mapper>

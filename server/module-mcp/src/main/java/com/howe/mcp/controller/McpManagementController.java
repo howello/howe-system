@@ -55,14 +55,19 @@ public class McpManagementController extends BaseController {
         return success();
     }
 
-    /** 目录由实际代码定义，不发布未实现业务工具。 */
-    @Operation(summary = "查询 MCP 工具目录")
+    /** 目录由实际代码定义，不发布未实现业务工具；查询与分页只在服务端内存目录执行。 */
+    @Operation(summary = "分页查询 MCP 工具目录")
     @PreAuthorize("@ss.hasPermi('mcp:tool:list')")
     @GetMapping("/tool/list")
-    public TableDataInfo tools() {
-        var rows = service.tools();
-        return table(new McpManagementService.Page<>(rows, rows.size()));
+    public TableDataInfo tools(@ModelAttribute McpManagementService.ToolQuery query) {
+        return table(service.tools(query));
     }
+
+    /** 全量统计与筛选项用于页面工具栏，不受当前查询条件影响。 */
+    @Operation(summary = "查询 MCP 工具目录统计")
+    @PreAuthorize("@ss.hasPermi('mcp:tool:list')")
+    @GetMapping("/tool/summary")
+    public AjaxResult toolsSummary() { return success(service.toolsSummary()); }
 
     /** 查看固定工具契约不授予调用权限。 */
     @Operation(summary = "获取 MCP 工具契约")
@@ -78,6 +83,15 @@ public class McpManagementController extends BaseController {
     public AjaxResult toolStatus(@PathVariable String name, @Valid @RequestBody ToolStatus body) {
         service.toolStatus(name, body.enabled(), getUsername());
         return success();
+    }
+
+    /** 全局开关固定作用于代码目录全部工具，不接受筛选、分页或工具名列表作为范围。 */
+    @Operation(summary = "全局切换 MCP 工具开放状态", description = "范围固定为代码目录全部工具，不受查询条件影响")
+    @PreAuthorize("@ss.hasPermi('mcp:tool:edit')")
+    @Log(title = "MCP 工具全局状态", businessType = BusinessType.UPDATE, isSaveRequestData = false, isSaveResponseData = false)
+    @PutMapping("/tool/status")
+    public AjaxResult toolStatusAll(@Valid @RequestBody ToolStatus body) {
+        return success(service.toolStatusAll(body.enabled(), getUsername()));
     }
 
     /** 此处是全站授权列表，普通用户仅可使用独立 self 接口。 */

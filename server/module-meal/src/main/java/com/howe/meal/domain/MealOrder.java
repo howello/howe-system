@@ -137,9 +137,25 @@ public class MealOrder extends BaseEntity {
     @Schema(description = "是否已评价（查询结果附带，不落库）")
     private Boolean reviewed;
 
+    /** 订单聚合数据版本：任何影响确认依据的变更都递增 */
+    @Schema(description = "订单数据版本，所有修改路径递增", example = "3")
+    private Long dataVersion;
+
+    /** 当前候选轮次：指派转公开时递增，用于识别「同为待接单但已换轮次」 */
+    @Schema(description = "候选轮次，指派转公开时递增", example = "1")
+    private Long candidateRound;
+
     /** 状态流转用：期望的当前状态，作为 where 条件防止并发下重复流转（不落库） */
     @Schema(description = "期望的当前状态（状态流转的并发保护，不落库）")
     private String expectedStatus;
+
+    /** 状态流转用：期望的数据版本，作为 where 条件防止基于旧快照写入（不落库） */
+    @Schema(description = "期望的数据版本（状态流转的并发保护，不落库）")
+    private Long expectedVersion;
+
+    /** 状态流转用：期望的候选轮次（转公开等轮次相关迁移使用，不落库） */
+    @Schema(description = "期望的候选轮次（轮次迁移的并发保护，不落库）")
+    private Long expectedCandidateRound;
 
     /** 查询用：是否只保留当前用户仍是待响应候选人的订单（不落库） */
     @JsonIgnore

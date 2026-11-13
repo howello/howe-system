@@ -35,6 +35,20 @@ public interface IBlogArticleService
     public BlogArticle selectBlogArticleById(Long articleId);
 
     /**
+     * 工具专用的文章详情读取。
+     *
+     * <p>与 {@link #selectBlogArticleById(Long)} 的差异：本方法<b>不回写</b>索引中的
+     * Git SHA 与同步时间，且正文读取受服务端字节预算约束。{@code includeContent=false}
+     * 时只读本地索引，不检查 GitHub 配置、不发起任何网络请求。</p>
+     *
+     * @param articleId 文章ID
+     * @param includeContent 是否读取 GitHub 正文
+     * @param maxContentChars 返回正文的最大 Unicode 码点数
+     * @return 含正文与截断标记的文章；正文被截断时 {@code contentTruncated} 为 true
+     */
+    public BlogArticle readArticleForTool(Long articleId, boolean includeContent, int maxContentChars);
+
+    /**
      * 新增文章：生成 markdown 提交到 GitHub，成功后建立本地索引
      *
      * @param blogArticle 文章

@@ -5,17 +5,15 @@ import com.howe.common.core.domain.model.LoginUser;
 import com.howe.common.exception.ServiceException;
 import com.howe.common.utils.SecurityUtils;
 import com.howe.common.utils.StringUtils;
-import com.howe.meal.constant.MealCategoryTaxonomy;
-import com.howe.meal.domain.MealCategory;
 import com.howe.meal.domain.MealCategoryRef;
 import com.howe.meal.domain.MealProposal;
 import com.howe.meal.domain.dto.MealProposalAuditBody;
-import com.howe.meal.mapper.MealCategoryMapper;
 import com.howe.meal.mapper.MealCategoryRefMapper;
 import com.howe.meal.mapper.MealProposalMapper;
 import com.howe.meal.service.IMealProposalService;
 import com.howe.meal.service.ITransactionCommitExecutor;
 import com.howe.meal.service.MealProposalAuditService;
+import com.howe.meal.util.MealCategoryGuard;
 import com.howe.meal.util.MealScopeGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -36,8 +34,8 @@ import java.util.List;
 public class MealProposalServiceImpl implements IMealProposalService {
 
     private final MealProposalMapper mealProposalMapper;
-    private final MealCategoryMapper mealCategoryMapper;
     private final MealCategoryRefMapper mealCategoryRefMapper;
+    private final MealCategoryGuard mealCategoryGuard;
     private final MealProposalAuditService mealProposalAuditService;
     private final ITransactionCommitExecutor transactionCommitExecutor;
 
@@ -72,16 +70,7 @@ public class MealProposalServiceImpl implements IMealProposalService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int submitProposal(MealProposal mealProposal) {
-        Long categoryId = resolveSingleCategoryId(mealProposal.getCategoryIds());
-        mealProposal.setProposalId(null);
-        mealProposal.setDeptId(SecurityUtils.getDeptId());
-        mealProposal.setUserId(SecurityUtils.getUserId());
-        mealProposal.setUserName(currentNickName());
-        mealProposal.setStatus(MealProposal.STATUS_PENDING);
-        mealProposal.setDishId(null);
-        mealProposal.setCreateBy(SecurityUtils.getUsername());
-        int rows = mealProposalMapper.insertMealProposal(mealProposal);
-        saveProposalCategory(mealProposal.getProposalId(), categoryId);
+        int rows = createProposal(mealProposal);
         // 事务提交后异步触发 AI 自动审核，提交请求不等待 AI
         Long proposalId = mealProposal.getProposalId();
         transactionCommitExecutor.afterCommit(() -> mealProposalAuditService.submitAiAudit(proposalId));
@@ -89,8 +78,45 @@ public class MealProposalServiceImpl implements IMealProposalService {
     }
 
     /**
+     * 工具专用提交：只创建提案，不注册 Web 路径的 afterCommit AI 审核。
+     *
+     * <p>自动审核由 MCP 平台登记为持久化步骤，在真实执行上下文中重新复核授权，
+     * 因此这里必须返回创建结果而不触发任何异步副作用。</p>
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int submitProposalForTool(MealProposal mealProposal) {
+        return createProposal(mealProposal);
+    }
+
+    /**
+     * 共享的提案创建校验与插入逻辑。
+     *
+     * @param mealProposal 提案
+     * @return 插入行数
+     */
+    private int createProposal(MealProposal mealProposal) {
+        Long deptId = SecurityUtils.getDeptId();
+        Long categoryId = mealCategoryGuard.resolveWritableCategoryId(
+                mealProposal.getCategoryIds(), deptId, "提案");
+        mealProposal.setProposalId(null);
+        mealProposal.setDeptId(deptId);
+        mealProposal.setUserId(SecurityUtils.getUserId());
+        mealProposal.setUserName(currentNickName());
+        mealProposal.setStatus(MealProposal.STATUS_PENDING);
+        mealProposal.setDishId(null);
+        mealProposal.setCreateBy(SecurityUtils.getUsername());
+        int rows = mealProposalMapper.insertMealProposal(mealProposal);
+        saveProposalCategory(mealProposal.getProposalId(), categoryId);
+        return rows;
+    }
+
+    /**
      * 人工审核：允许对任意状态（待审核/已通过/已驳回）改判。
      * 通过时若提案尚无菜品则用现有字段新建，已有菜品则重新上架；驳回时把已有菜品下架，均不重复创建菜品。
+     *
+     * <p>并发裁决使用「期望状态 + 期望数据版本」：同为已通过但被其它审核改写过时，
+     * 状态相同也必须拒绝旧快照写入。</p>
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -101,7 +127,7 @@ public class MealProposalServiceImpl implements IMealProposalService {
             throw new ServiceException("审核结果只能是 1（通过）或 2（驳回）");
         }
 
-        MealProposal proposal = mealProposalMapper.selectMealProposalById(body.getProposalId());
+        MealProposal proposal = mealProposalMapper.selectProposalForUpdate(body.getProposalId());
         if (proposal == null) {
             throw new ServiceException("提案不存在或已删除");
         }
@@ -110,8 +136,9 @@ public class MealProposalServiceImpl implements IMealProposalService {
         MealProposal update = new MealProposal();
         update.setProposalId(proposal.getProposalId());
         update.setStatus(body.getStatus());
-        // 期望状态：与 AI 自动审核并发时只有一个能改动成功
+        // 期望状态 + 版本：与 AI 自动审核及其它人工审核并发时只有一个能改动成功
         update.setExpectedStatus(proposal.getStatus());
+        update.setExpectedVersion(proposal.getDataVersion());
         update.setAuditBy(currentNickName());
         update.setAuditRemark(body.getAuditRemark());
         update.setUpdateBy(SecurityUtils.getUsername());
@@ -167,38 +194,6 @@ public class MealProposalServiceImpl implements IMealProposalService {
         ref.setBizId(proposalId);
         ref.setCategoryId(categoryId);
         mealCategoryRefMapper.insertMealCategoryRef(ref);
-    }
-
-    /**
-     * 校验并解析唯一主类 ID
-     *
-     * <p>null 或空列表表示不绑定主类；多于一个直接拒绝；分类必须存在、未删除且为平台公共主类。</p>
-     *
-     * @param categoryIds 入参分类列表
-     * @return 唯一分类 ID；未选择返回 null
-     */
-    private Long resolveSingleCategoryId(List<Long> categoryIds) {
-        if (categoryIds == null || categoryIds.isEmpty()) {
-            return null;
-        }
-        if (categoryIds.size() > 1) {
-            throw new ServiceException("一条提案只能归一个主类");
-        }
-        Long categoryId = categoryIds.get(0);
-        if (categoryId == null) {
-            return null;
-        }
-        MealCategory category = mealCategoryMapper.selectMealCategoryById(categoryId);
-        if (category == null) {
-            throw new ServiceException("分类不存在或已删除");
-        }
-        if (category.getDeptId() == null || category.getDeptId() != MealCategoryTaxonomy.PUBLIC_DEPT_ID) {
-            throw new ServiceException("只能选择平台公共主类");
-        }
-        if (!MealCategoryTaxonomy.isPrimaryCategory(category.getName())) {
-            throw new ServiceException("只能选择 9 个唯一主类之一");
-        }
-        return categoryId;
     }
 
     private String currentNickName() {

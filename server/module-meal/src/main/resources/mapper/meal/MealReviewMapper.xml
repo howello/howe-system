@@ -74,14 +74,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by d.create_time desc
     </select>
 
-    <!-- 我的评价：强制按 user_id 过滤，不依赖数据权限 -->
+    <!-- 我的评价：强制按 user_id 过滤，不依赖数据权限；主键兜底保证同秒创建时次序稳定 -->
     <select id="selectMyReviewList" parameterType="MealReview" resultMap="MealReviewResult">
         <include refid="selectMealReviewVo"/>
         <where>
             d.del_flag = '0'
             AND d.user_id = #{userId}
         </where>
-        order by d.create_time desc
+        order by d.create_time desc, d.review_id desc
     </select>
 
     <!-- 厨师收到的评价：评价挂在订单上，按订单的接单厨师 accept_user_id 过滤 -->

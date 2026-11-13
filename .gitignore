@@ -78,3 +78,6 @@ nbdist/
 # Docker & Environment
 .env
 server/logs/
+
+# Comet 本机运行时状态（不入库）
+.comet/

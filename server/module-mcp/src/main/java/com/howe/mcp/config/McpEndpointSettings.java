@@ -76,6 +76,16 @@ public record McpEndpointSettings(URI backendBaseUrl, URI frontendBaseUrl) {
         return frontendBaseUrl.resolve("/mcp/connections").toASCIIString();
     }
 
+    /** 返回前端写操作确认页面。 */
+    public String confirmationPage() {
+        return frontendBaseUrl.resolve("/mcp/confirm").toASCIIString();
+    }
+
+    /** 返回前端本人操作列表页面。 */
+    public String operationsPage() {
+        return frontendBaseUrl.resolve("/mcp/operations").toASCIIString();
+    }
+
     /** 返回允许的浏览器站点；跨域请求仅允许这两个显式来源。 */
     public Set<String> allowedOrigins() {
         return Set.copyOf(java.util.List.of(backendBaseUrl.toASCIIString(), frontendBaseUrl.toASCIIString()));

@@ -16,21 +16,24 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="respondTime" column="respond_time" />
         <result property="createTime"  column="create_time"  />
         <result property="updateTime"  column="update_time"  />
+        <result property="dataVersion" column="data_version" />
+        <result property="candidateRound" column="candidate_round" />
     </resultMap>
 
     <sql id="selectMealOrderCandidateVo">
         select candidate_id, order_id, dept_id, user_id, user_name, source, status,
-               expire_time, respond_time, create_time, update_time
+               expire_time, respond_time, create_time, update_time, data_version, candidate_round
         from meal_order_candidate
     </sql>
 
     <insert id="insertCandidates">
         insert into meal_order_candidate (
-            order_id, dept_id, user_id, user_name, source, status, expire_time, create_time, update_time
+            order_id, dept_id, user_id, user_name, source, status, expire_time,
+            candidate_round, data_version, create_time, update_time
         ) values
         <foreach item="c" collection="candidates" separator=",">
             (#{c.orderId}, #{c.deptId}, #{c.userId}, #{c.userName}, #{c.source}, #{c.status},
-             #{c.expireTime}, sysdate(), sysdate())
+             #{c.expireTime}, #{c.candidateRound}, 0, sysdate(), sysdate())
         </foreach>
     </insert>
 
@@ -40,11 +43,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     -->
     <insert id="insertCandidatesIgnoringExisting">
         insert ignore into meal_order_candidate (
-            order_id, dept_id, user_id, user_name, source, status, expire_time, create_time, update_time
+            order_id, dept_id, user_id, user_name, source, status, expire_time,
+            candidate_round, data_version, create_time, update_time
         ) values
         <foreach item="c" collection="candidates" separator=",">
             (#{c.orderId}, #{c.deptId}, #{c.userId}, #{c.userName}, #{c.source}, #{c.status},
-             #{c.expireTime}, sysdate(), sysdate())
+             #{c.expireTime}, #{c.candidateRound}, 0, sysdate(), sysdate())
         </foreach>
     </insert>
 
@@ -69,50 +73,64 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     -->
     <update id="acceptCandidate">
         update meal_order_candidate
-        set status = '1', respond_time = sysdate(), update_time = sysdate()
+        set status = '1', respond_time = sysdate(), update_time = sysdate(), data_version = data_version + 1
         where order_id = #{orderId} and user_id = #{userId} and status in ('0', '4')
+          and candidate_round = #{candidateRound}
+          <if test="expectedVersion != null">and data_version = #{expectedVersion}</if>
     </update>
 
     <!-- 拒绝：同样覆盖「待响应」与「超时未响应」两种仍可操作的状态 -->
     <update id="refuseCandidate">
         update meal_order_candidate
-        set status = '2', respond_time = sysdate(), update_time = sysdate()
+        set status = '2', respond_time = sysdate(), update_time = sysdate(), data_version = data_version + 1
         where order_id = #{orderId} and user_id = #{userId} and status in ('0', '4')
+          and candidate_round = #{candidateRound}
+          <if test="expectedVersion != null">and data_version = #{expectedVersion}</if>
     </update>
 
     <select id="countPending" resultType="int">
         select count(*) from meal_order_candidate
-        where order_id = #{orderId} and status in ('0', '4')
+        where order_id = #{orderId} and candidate_round = #{candidateRound} and status in ('0', '4')
     </select>
 
     <update id="invalidateOthers">
         update meal_order_candidate
-        set status = '3', update_time = sysdate()
-        where order_id = #{orderId} and status in ('0', '4') and user_id != #{acceptedUserId}
+        set status = '3', update_time = sysdate(), data_version = data_version + 1
+        where order_id = #{orderId} and candidate_round = #{candidateRound}
+          and status in ('0', '4') and user_id != #{acceptedUserId}
     </update>
 
     <update id="invalidatePending">
         update meal_order_candidate
-        set status = '3', update_time = sysdate()
-        where order_id = #{orderId} and status in ('0', '4')
+        set status = '3', update_time = sysdate(), data_version = data_version + 1
+        where order_id = #{orderId} and candidate_round = #{candidateRound} and status in ('0', '4')
     </update>
 
     <update id="invalidateAll">
         update meal_order_candidate
-        set status = '3', update_time = sysdate()
+        set status = '3', update_time = sysdate(), data_version = data_version + 1
         where order_id = #{orderId} and status != '3'
     </update>
 
     <update id="expireCandidate">
         update meal_order_candidate
-        set status = '4', respond_time = sysdate(), update_time = sysdate()
+        set status = '4', respond_time = sysdate(), update_time = sysdate(), data_version = data_version + 1
         where order_id = #{orderId} and user_id = #{userId} and status = '0'
+          and candidate_round = #{candidateRound}
+    </update>
+
+    <!-- 指派转公开：把原指派人迁入新轮次，保留其已拒绝/已超时状态，同时递增候选版本 -->
+    <update id="promoteCandidateRound">
+        update meal_order_candidate
+        set candidate_round = #{newRound}, expire_time = #{expireTime},
+            data_version = data_version + 1, update_time = sysdate()
+        where order_id = #{orderId} and user_id = #{userId} and candidate_round = #{oldRound}
     </update>
 
     <update id="updateCandidateExpireTime">
         update meal_order_candidate
-        set expire_time = #{expireTime}, update_time = sysdate()
-        where order_id = #{orderId} and user_id = #{userId}
+        set expire_time = #{expireTime}, data_version = data_version + 1, update_time = sysdate()
+        where order_id = #{orderId} and user_id = #{userId} and candidate_round = #{candidateRound}
     </update>
 
     <!--
@@ -128,6 +146,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
               #{orderId}
           </foreach>
           and (c.status not in ('0', '4')
+               or c.candidate_round != (select o.candidate_round from meal_order o where o.order_id = c.order_id)
                or not exists (
                    select 1 from meal_order o
                    where o.order_id = c.order_id and o.status = '0' and o.del_flag = '0'

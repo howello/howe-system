@@ -33,6 +33,29 @@ public interface SysUserMapper
     public List<SysUser> selectFamilyMemberList(@Param("deptId") Long deptId, @Param("keyword") String keyword);
 
     /**
+     * 工具专用的家庭成员主查询，只投影最小字段并支持数据库分页。
+     *
+     * <p>不 JOIN 角色表：多角色成员会被拆成多行并扭曲分页总数；
+     * 角色由调用方拿到当前页后按用户 ID 批量补齐。keyword 只匹配昵称，
+     * 避免把账号名当作可探测字段。</p>
+     *
+     * @param deptId  家庭（部门）ID，为空表示平台账号不过滤家庭
+     * @param keyword 昵称关键字，可为空
+     * @return 当前页成员
+     */
+    public List<com.howe.system.domain.dto.FamilyMemberToolRow> selectFamilyMemberPageForTool(
+            @Param("deptId") Long deptId, @Param("keyword") String keyword);
+
+    /**
+     * 工具专用的家庭角色批量查询。
+     *
+     * @param userIds 当前页用户ID
+     * @return 用户与角色键
+     */
+    public List<com.howe.system.domain.dto.FamilyMemberRoleToolRow> selectFamilyRoleKeysForTool(
+            @Param("userIds") Long[] userIds);
+
+    /**
      * 根据条件分页查询已配用户角色列表
      *
      * @param user 用户信息

@@ -40,9 +40,31 @@ public class BlogTalkServiceImpl implements IBlogTalkService {
         return blogTalkMapper.selectBlogTalkList(blogTalk);
     }
 
+    /**
+     * 工具专用的说说列表查询，正文由 SQL 侧截取。
+     */
+    @Override
+    public List<BlogTalk> selectBlogTalkListForTool(BlogTalk blogTalk, int maxContentChars) {
+        if (maxContentChars < 1) {
+            throw new ServiceException("说说正文上限不合法");
+        }
+        return blogTalkMapper.selectBlogTalkListForTool(blogTalk, maxContentChars + 1);
+    }
+
     @Override
     public BlogTalk selectBlogTalkById(Long talkId) {
         return blogTalkMapper.selectBlogTalkById(talkId);
+    }
+
+    /**
+     * 工具专用的说说详情读取，正文由 SQL 侧截取。
+     */
+    @Override
+    public BlogTalk readBlogTalkForTool(Long talkId, int maxContentChars) {
+        if (talkId == null || maxContentChars < 1) {
+            throw new ServiceException("说说读取参数不合法");
+        }
+        return blogTalkMapper.selectBlogTalkForTool(talkId, maxContentChars + 1);
     }
 
     @Override
@@ -69,6 +91,26 @@ public class BlogTalkServiceImpl implements IBlogTalkService {
             throw new ServiceException("数据不存在");
         }
         return rows;
+    }
+
+    /**
+     * 按数据版本 CAS 更新说说；版本冲突与对象不存在分开报错。
+     */
+    @Override
+    public long updateBlogTalkCas(BlogTalk patch, long expectedVersion) {
+        if (patch == null || patch.getTalkId() == null || expectedVersion < 0) {
+            throw new ServiceException("说说更新参数不合法");
+        }
+        patch.setUpdateBy(SecurityUtils.getUsername());
+        int rows = blogTalkMapper.updateBlogTalkCas(patch, expectedVersion);
+        if (rows == 0) {
+            BlogTalk current = blogTalkMapper.selectBlogTalkById(patch.getTalkId());
+            if (current == null) {
+                throw new ServiceException("说说不存在或已被删除");
+            }
+            throw new ServiceException("说说已被其它操作修改，请刷新后重试");
+        }
+        return blogTalkMapper.selectBlogTalkById(patch.getTalkId()).getDataVersion();
     }
 
     @Override

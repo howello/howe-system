@@ -21,7 +21,7 @@ const isWhiteList = (path: string): boolean => {
 router.beforeEach(async (to, from) => {
   NProgress.start()
   // 独立页面交由 OAuth Cookie 会话验证，不读取后台 JWT、锁屏、角色或菜单。
-  if (['/mcp/login', '/mcp/consent', '/mcp/connections'].includes(to.path)) {
+  if (['/mcp/login', '/mcp/consent', '/mcp/connections', '/mcp/confirm', '/mcp/operations'].includes(to.path)) {
     let policy = document.querySelector<HTMLMetaElement>('meta[name="referrer"]')
     if (!policy) {
       policy = document.createElement('meta'); policy.name = 'referrer'; document.head.appendChild(policy)

@@ -115,13 +115,24 @@ public interface MealOrderMapper {
     List<Long> selectWaitingWithoutPendingCandidate(@Param("limit") int limit);
 
     /**
-     * 指派转公开：修改指派模式并重置接单截止时间
+     * 候选人状态变化但订单仍待接单时推进订单聚合版本
      *
-     * @param orderId      订单ID
-     * @param deadlineTime 新的截止时间
-     * @return 影响行数，0 表示订单已不在指派中
+     * @param mealOrder 订单，orderId 与 expectedStatus 必填
+     * @return 影响行数，0 表示订单已不在期望状态或轮次已变化
      */
-    int reopenToPublic(@Param("orderId") Long orderId, @Param("deadlineTime") Date deadlineTime);
+    int touchOrderVersion(MealOrder mealOrder);
+
+    /**
+     * 指派转公开：修改指派模式、递增候选轮次并重置接单截止时间
+     *
+     * @param orderId        订单ID
+     * @param deadlineTime   新的截止时间
+     * @param expectedRound  期望的当前候选轮次，为 {@code null} 时不限制
+     * @param expectedVersion 期望的订单数据版本，为 {@code null} 时不限制
+     * @return 影响行数，0 表示订单已不在指派中或轮次/版本已变化
+     */
+    int reopenToPublic(@Param("orderId") Long orderId, @Param("deadlineTime") Date deadlineTime,
+            @Param("expectedRound") Long expectedRound, @Param("expectedVersion") Long expectedVersion);
 
     /**
      * 查询具有家庭管理员角色的家庭成员用户ID。
@@ -138,6 +149,48 @@ public interface MealOrderMapper {
      * @return 明细集合
      */
     List<MealOrderItem> selectItemsByOrderId(Long orderId);
+
+    /**
+     * 工具专用的订单明细摘要，最多返回 {@code limit} 项。
+     *
+     * <p>只取 {@code itemId/orderId/dishId/dishName/count}，不返回备注等明细字段；
+     * 按 {@code item_id} 升序稳定截断。</p>
+     *
+     * @param orderId 订单ID
+     * @param limit 最多返回条数
+     * @return 明细摘要
+     */
+    List<MealOrderItem> selectItemSummariesByOrderId(@Param("orderId") Long orderId, @Param("limit") int limit);
+
+    /**
+     * 批量查询工具专用的订单明细摘要。
+     *
+     * <p>每个订单最多返回 {@code limitPerOrder} 条；只取摘要白名单字段，
+     * SQL 使用 {@code row_number() over (partition by order_id order by item_id)}
+     * 按订单逐个限量，不能先查整页所有明细再在 Java 内存截断。</p>
+     *
+     * @param orderIds 订单ID数组
+     * @param limitPerOrder 每单最多返回条数
+     * @return 每单最多 {@code limitPerOrder} 条摘要，按订单与 item_id 稳定排序
+     */
+    List<MealOrderItem> selectItemSummariesByOrderIds(@Param("orderIds") Long[] orderIds,
+            @Param("limitPerOrder") int limitPerOrder);
+
+    /**
+     * 统计单个订单的明细总数，用于判断摘要是否被截断。
+     *
+     * @param orderId 订单ID
+     * @return 明细总数
+     */
+    int countItemsByOrderId(@Param("orderId") Long orderId);
+
+    /**
+     * 批量统计订单明细总数。
+     *
+     * @param orderIds 订单ID数组
+     * @return 每行含 {@code orderId} 与 {@code cnt}
+     */
+    List<Map<String, Object>> countItemsByOrderIds(@Param("orderIds") Long[] orderIds);
 
     /**
      * 批量查询多个订单的明细

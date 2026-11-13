@@ -48,6 +48,24 @@ public interface SysNoticeReadMapper
     public int insertNoticeReadBatch(@Param("userId") Long userId, @Param("noticeIds") Long[] noticeIds);
 
     /**
+     * 锁定并校验一批公告是否全部为正常可读状态。
+     *
+     * @param noticeIds 公告ID数组，按升序传入
+     * @return 正常公告数量
+     */
+    public int countReadableForUpdate(@Param("noticeIds") Long[] noticeIds);
+
+    /**
+     * 查询当前用户在一批公告中已读的公告ID。
+     *
+     * @param userId 用户ID
+     * @param noticeIds 公告ID数组
+     * @return 已读公告ID
+     */
+    public java.util.List<Long> selectReadNoticeIds(@Param("userId") Long userId,
+            @Param("noticeIds") Long[] noticeIds);
+
+    /**
      * 查询带已读状态的公告列表（SQL层限制条数，一次查询完成）
      *
      * @param userId 用户ID
@@ -55,6 +73,16 @@ public interface SysNoticeReadMapper
      * @return 带 isRead 标记的公告列表
      */
     public List<SysNotice> selectNoticeListWithReadStatus(@Param("userId") Long userId, @Param("limit") int limit);
+
+    /**
+     * 工具专用的本人公告查询，不带内置条数限制，由调用方分页。
+     *
+     * @param userId 当前用户ID
+     * @param readState 已读筛选：{@code all}/{@code read}/{@code unread}
+     * @return 公告列表
+     */
+    public List<SysNotice> selectNoticePageWithReadStatus(@Param("userId") Long userId,
+            @Param("readState") String readState);
 
     /**
      * 查询已阅读某公告的用户列表

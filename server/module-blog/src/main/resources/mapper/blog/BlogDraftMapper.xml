@@ -70,6 +70,20 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where draft_id = #{draftId}
     </select>
 
+    <!--
+      工具只读视图：正文只取 maxChars + 1 个字符，供调用方判断是否需要截断。
+      LEFT 按字符截取（MySQL 中即按码点计），不会把无限正文整段读入应用内存。
+    -->
+    <select id="selectBlogDraftForTool" resultMap="BlogDraftResult">
+        select draft_id, title, slug,
+               left(content, #{maxChars}) as content,
+               categories, tags, cover, publish_date,
+               recommend, hide, is_top, status, published_path, publish_time,
+               create_by, create_time, update_by, update_time, remark
+        from blog_draft
+        where draft_id = #{draftId}
+    </select>
+
     <insert id="insertBlogDraft" parameterType="BlogDraft" useGeneratedKeys="true" keyProperty="draftId">
         insert into blog_draft (
             title,

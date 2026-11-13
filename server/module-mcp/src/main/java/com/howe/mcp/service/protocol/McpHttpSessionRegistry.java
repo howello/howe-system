@@ -51,8 +51,15 @@ public final class McpHttpSessionRegistry implements AutoCloseable {
     private final int perUser;
     private final Duration idle;
     // 协议能力是开放集合；独立 SDK mapper 忽略未知扩展，不改变应用或 OAuth 的严格解析策略。
-    private final McpJsonMapper mapper = new JacksonMcpJsonMapper(new ObjectMapper()
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES));
+    private final McpJsonMapper mapper = protocolMapper();
+
+    /** 协议独立映射器同时支持开放能力集合及操作回执的 ISO 时间。 */
+    static McpJsonMapper protocolMapper() {
+        return new JacksonMcpJsonMapper(new ObjectMapper()
+                .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
+                .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES));
+    }
     private final Map<String, Entry> entries = new ConcurrentHashMap<>();
     private final Map<Long, Integer> owners = new HashMap<>();
     private final Semaphore streams = new Semaphore(32);
@@ -229,6 +236,9 @@ public final class McpHttpSessionRegistry implements AutoCloseable {
                 entry.provider.session.responseStream(rpc, stream)
                         .contextWrite(value -> value.put(McpTransportContext.KEY, context)).block(Duration.ofSeconds(70));
             } catch (RuntimeException exception) {
+                log.error("MCP 协议执行失败：类型={}，位置={}，原因类型={}", exception.getClass().getName(),
+                        exception.getStackTrace().length == 0 ? "unknown" : exception.getStackTrace()[0],
+                        exception.getCause() == null ? "none" : exception.getCause().getClass().getName());
                 stream.sendMessage(new McpSchema.JSONRPCResponse("2.0", rpc.id(), null,
                         new McpSchema.JSONRPCResponse.JSONRPCError(-32603, "协议请求未完成", null))).block();
             } finally {

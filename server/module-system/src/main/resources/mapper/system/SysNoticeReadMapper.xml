@@ -48,6 +48,32 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         limit #{limit}
     </select>
 
+    <!--
+      工具专用的本人公告查询：不再内置 LIMIT，由调用方在主查询处执行数据库分页。
+      只返回正常公告与当前用户已读关联；已读筛选在 SQL 层完成，避免内存过滤。
+    -->
+    <select id="selectNoticePageWithReadStatus" resultType="SysNotice">
+        select
+            n.notice_id    as noticeId,
+            n.notice_title as noticeTitle,
+            n.notice_type  as noticeType,
+            n.notice_content as noticeContent,
+            n.status,
+            n.create_time  as createTime,
+            case when r.notice_id is not null then true else false end as isRead
+        from sys_notice n
+        left join sys_notice_read r
+            on r.notice_id = n.notice_id and r.user_id = #{userId}
+        where n.status = '0'
+        <if test="readState == 'read'">
+            and r.notice_id is not null
+        </if>
+        <if test="readState == 'unread'">
+            and r.notice_id is null
+        </if>
+        order by n.notice_id desc
+    </select>
+
     <!-- 批量标记已读 -->
     <insert id="insertNoticeReadBatch">
         insert ignore into sys_notice_read (notice_id, user_id, read_time)
@@ -56,6 +82,28 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             (#{noticeId}, #{userId}, sysdate())
         </foreach>
     </insert>
+
+    <!-- 锁定并校验一批公告全部为正常可读；按 ID 升序减少与公告停用/删除的锁序反转 -->
+    <select id="countReadableForUpdate" resultType="int">
+        select count(*) from sys_notice
+        where notice_id in
+        <foreach collection="noticeIds" item="noticeId" open="(" separator="," close=")">
+            #{noticeId}
+        </foreach>
+          and status = '0'
+        for share
+    </select>
+
+    <!-- 当前用户在一批公告中的已读集合 -->
+    <select id="selectReadNoticeIds" resultType="java.lang.Long">
+        select notice_id from sys_notice_read
+        where user_id = #{userId}
+          and notice_id in
+        <foreach collection="noticeIds" item="noticeId" open="(" separator="," close=")">
+            #{noticeId}
+        </foreach>
+        order by notice_id
+    </select>
 
     <!-- 删除公告时清理已读记录 -->
     <delete id="deleteByNoticeIds">

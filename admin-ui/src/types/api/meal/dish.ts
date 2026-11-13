@@ -29,6 +29,8 @@ export interface MealDish extends BaseEntity {
   categoryIds?: number[];
   /** 分类名称（唯一主类名） */
   categoryNames?: string;
+  /** 所属分类状态（0正常 1停用；用于标记「所属分类已停用」，不落库） */
+  categoryStatus?: string;
   /** 菜名 */
   name?: string;
   /** 封面图地址 */

@@ -31,6 +31,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="updateTime"   column="update_time"   />
         <result property="remark"       column="remark"        />
         <result property="categoryNames" column="category_names" />
+        <result property="dataVersion"  column="data_version"  />
     </resultMap>
 
     <!--
@@ -42,7 +43,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                d.description, d.image, d.tags, d.duration, d.level, d.ingredients, d.steps, d.tips,
                d.reason, d.status, d.audit_by, d.audit_time,
                d.audit_remark, d.dish_id, d.del_flag,
-               d.create_by, d.create_time, d.update_by, d.update_time, d.remark,
+               d.create_by, d.create_time, d.update_by, d.update_time, d.remark, d.data_version,
                (select c.name
                   from meal_category_ref r
                   join meal_category c on c.category_id = r.category_id and c.del_flag = '0'
@@ -70,7 +71,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by d.create_time desc
     </select>
 
-    <!-- 我的提案：强制按 user_id 过滤，不依赖数据权限 -->
+    <!-- 我的提案：强制按 user_id 过滤，不依赖数据权限；主键兜底保证同秒创建时次序稳定 -->
     <select id="selectMyProposalList" parameterType="MealProposal" resultMap="MealProposalResult">
         <include refid="selectMealProposalVo"/>
         <where>
@@ -80,12 +81,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 AND d.status = #{status}
             </if>
         </where>
-        order by d.create_time desc
+        order by d.create_time desc, d.proposal_id desc
     </select>
 
     <select id="selectMealProposalById" parameterType="Long" resultMap="MealProposalResult">
         <include refid="selectMealProposalVo"/>
         where d.proposal_id = #{proposalId} and d.del_flag = '0'
+    </select>
+
+    <!-- 审核与自动审核的行锁入口；必须先于关联菜品加锁，统一锁顺序 -->
+    <select id="selectProposalForUpdate" parameterType="Long" resultMap="MealProposalResult">
+        <include refid="selectMealProposalVo"/>
+        where d.proposal_id = #{proposalId} and d.del_flag = '0'
+        for update
     </select>
 
     <!--
@@ -107,6 +115,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <update id="updateMealProposal" parameterType="MealProposal">
         update meal_proposal
         <set>
+            data_version = data_version + 1,
             <if test="name != null and name != ''">name = #{name},</if>
             <if test="description != null">description = #{description},</if>
             <if test="image != null">image = #{image},</if>
@@ -127,10 +136,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where proposal_id = #{proposalId} and del_flag = '0'
         <!-- 期望状态：AI 自动审核与人工审核并发时，只有一个能改动成功 -->
         <if test="expectedStatus != null and expectedStatus != ''">and status = #{expectedStatus}</if>
+        <!-- 期望版本：同一状态下也必须识别已有审核结果被改写 -->
+        <if test="expectedVersion != null">and data_version = #{expectedVersion}</if>
     </update>
 
     <update id="deleteMealProposalByIds" parameterType="Long">
-        update meal_proposal set del_flag = '2', update_time = sysdate()
+        update meal_proposal set del_flag = '2', data_version = data_version + 1, update_time = sysdate()
         where del_flag = '0' and proposal_id in
         <foreach item="proposalId" collection="array" open="(" separator="," close=")">
             #{proposalId}

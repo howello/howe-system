@@ -36,6 +36,7 @@ public class McpPublicConfigurationController {
         }
         return Map.of("installed", true, "enabled", "true".equalsIgnoreCase(config.getPlainValue(ConfigConstants.MCP_ENABLED)),
                 "backendBaseUrl", active.issuer(), "resource", active.resource(), "loginPage", active.loginPage(),
-                "consentPage", active.consentPage(), "connectionsPage", active.connectionsPage());
+                "consentPage", active.consentPage(), "connectionsPage", active.connectionsPage(),
+                "confirmationPage", active.confirmationPage(), "operationsPage", active.operationsPage());
     }
 }

@@ -16,6 +16,7 @@
         </div>
         <div class="mcp-userbar__actions">
           <el-button size="small" :icon="Refresh" :disabled="busy" @click="load">刷新</el-button>
+          <el-button size="small" :disabled="busy" @click="router.push('/mcp/operations')">我的操作</el-button>
           <el-button size="small" :icon="SwitchButton" :disabled="busy || !client" @click="logout">退出 MCP 登录</el-button>
         </div>
       </div>
@@ -78,7 +79,10 @@
             <el-table-column label="授权范围" min-width="200">
               <template #default="{ row }">
                 <div class="mcp-scope-chips">
-                  <span v-for="scope in row.scopes" :key="scope" class="mcp-scope-chip">{{ scopeLabel(scope) }}</span>
+                  <span v-for="scope in row.scopes" :key="scope" class="mcp-scope-chip" :title="scopeDesc(scope)">
+                    {{ scopeLabel(scope) }}
+                    <span class="mcp-scope-desc">{{ scopeDesc(scope) }}</span>
+                  </span>
                   <span v-if="!row.scopes.length" class="mcp-muted">无</span>
                 </div>
               </template>
@@ -165,6 +169,7 @@ import type { McpConnection, McpCall } from '@/types'
 import McpBrand from './components/McpBrand.vue'
 import './style.css'
 
+import { mcpScopeDescription, mcpScopeLabel } from '@/utils/mcpScopes'
 const router = useRouter()
 const connections = ref<McpConnection[]>([]), calls = ref<McpCall[]>([])
 const connectionPage = ref(1), callPage = ref(1), connectionTotal = ref(0), callTotal = ref(0)
@@ -184,9 +189,9 @@ const latestCall = computed(() => calls.value.length ? formatTime(calls.value[0]
 /** 连接与客户端都正常才算有效。 */
 function isActive(connection: McpConnection): boolean { return connection.status === '0' && connection.clientStatus === '0' }
 /** 已知范围使用中文含义。 */
-function scopeLabel(scope: string): string {
-  return scope === 'mcp:connect' ? '连接工具' : scope === 'offline_access' ? '离线访问' : scope
-}
+function scopeLabel(scope: string): string { return mcpScopeLabel(scope) }
+/** 每个范围的用途说明，和授权确认页使用同一份映射。 */
+function scopeDesc(scope: string): string { return mcpScopeDescription(scope) }
 /** 已知事件给出中文含义。 */
 function eventLabel(event: string): string { return EVENT_LABELS[event] || event }
 /** 结果码只按语义分组着色。 */
@@ -282,5 +287,13 @@ void initialize()
   color: var(--el-text-color-secondary);
   font-size: 11px;
   overflow-wrap: anywhere;
+}
+
+.mcp-scope-desc {
+  display: block;
+  margin-top: 2px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.4;
 }
 </style>

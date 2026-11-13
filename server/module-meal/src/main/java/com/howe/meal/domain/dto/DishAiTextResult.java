@@ -23,6 +23,6 @@ public class DishAiTextResult {
     @Schema(description = "匹配到的唯一主类ID；未匹配时为 null")
     private Long matchedCategoryId;
 
-    @Schema(description = "模型返回但不在 9 个主类内的名称（仅提示，不落库）")
+    @Schema(description = "模型返回但不在候选分类内的名称（仅提示，不落库）")
     private String unmatchedCategoryName;
 }
