@@ -29,6 +29,8 @@ public final class MealCategoryIconGuard {
     private static final Set<String> ALLOWED_ICONS = Set.of(
             // 荤菜
             "🍖", "🍗", "🥩", "🥓", "🍔", "🌭",
+            // 半荤（公共分类「半荤」的默认图标）
+            "🥘",
             // 素菜
             "🥬", "🥦", "🥒", "🥕", "🌽", "🍆", "🍄",
             // 水产

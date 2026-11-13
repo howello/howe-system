@@ -276,7 +276,7 @@ public class MealProposalAuditService {
                 proposal.getProposalId());
         Long matchedCategoryId = text.getMatchedCategoryId();
         Long categoryId = matchedCategoryId != null ? matchedCategoryId : existingCategoryId;
-        // 无论 AI 匹配还是沿用提案，都再校验一次：公共分类须在 8 个主类内，
+        // 无论 AI 匹配还是沿用提案，都再校验一次：公共分类须在 9 个主类内，
         // 私有分类须属于提案所在家庭，停用/删除分类一律视为未分类
         categoryId = mealCategoryGuard.resolveCategoryIdOrNull(categoryId, proposal.getDeptId());
         // 提案原本没有分类时，把 AI 匹配到的分类一并写入提案，便于人工查看与后续改判

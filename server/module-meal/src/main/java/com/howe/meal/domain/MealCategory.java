@@ -10,7 +10,7 @@ import lombok.EqualsAndHashCode;
 /**
  * 点餐-菜品分类对象 meal_category
  *
- * <p>分类分两类：<b>公共分类</b>（{@code deptId = 0}）固定 8 条，名称由
+ * <p>分类分两类：<b>公共分类</b>（{@code deptId = 0}）固定 9 条，名称由
  * {@link com.howe.meal.constant.MealCategoryTaxonomy} 定义，任何角色都不能新增、删除或改名；
  * <b>家庭私有分类</b>（{@code deptId > 0}）由家庭管理员与平台超管维护，可增删改。
  * 一道菜最多绑定其中一个。因此本表<b>不能走 {@code @DataScope}</b>
@@ -33,7 +33,7 @@ public class MealCategory extends BaseEntity {
     @Schema(description = "所属家庭ID（0=公共分类）", example = "0")
     private Long deptId;
 
-    @Schema(description = "分类名称（公共分类为 8 个锁定名称之一；家庭私有分类可自定义）", example = "荤菜")
+    @Schema(description = "分类名称（公共分类为 9 个锁定名称之一；家庭私有分类可自定义）", example = "荤菜")
     @NotBlank(message = "分类名称不能为空")
     @Size(max = 64, message = "分类名称长度不能超过64个字符")
     private String name;

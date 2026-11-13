@@ -62,7 +62,9 @@ public class MealCategoryReviewServiceImpl implements IMealCategoryReviewService
             "8. icon 字段原样回显用户提交值，不得生成或修改。",
             "9. 只返回符合 JSON Schema 的对象，不要输出 Markdown 代码块或解释文字。",
             "10. UPDATE 操作且 publicNameLocked=true 时，提交名称与锁定名称相同是允许的，不得视为重名；"
-                    + "只有名称不同才违反名称锁定。");
+                    + "只有名称不同才违反名称锁定。",
+            "11. 当请求包含 movingFromPublicToFamily: true 时，表示公共分类正在降为家庭私有分类，"
+                    + "沿用原公共名称是允许的，不得以「与公共分类同名」为由拒绝。");
 
     private static final String DEFAULT_SYSTEM_PROMPT =
             "你是家庭点餐分类编辑。请审阅用户提交的分类名称、分类说明和分类依据，并在合格时做克制的中文润色。"
@@ -148,14 +150,27 @@ public class MealCategoryReviewServiceImpl implements IMealCategoryReviewService
                 builder.append("original.basis: ").append(nullToEmpty(exist.getBasis())).append('\n');
             }
         }
-        boolean publicCategory = ownerDeptId != null
+        boolean targetPublic = ownerDeptId != null
                 && ownerDeptId.longValue() == MealCategoryTaxonomy.PUBLIC_DEPT_ID;
-        builder.append("publicNameLocked: ").append(publicCategory).append('\n');
-        if (publicCategory && categoryId != null) {
-            MealCategory self = mealCategoryMapper.selectMealCategoryById(categoryId);
-            if (self != null) {
-                builder.append("lockedName: ").append(nullToEmpty(self.getName())).append('\n');
-            }
+        MealCategory self = categoryId == null ? null : mealCategoryMapper.selectMealCategoryById(categoryId);
+        boolean sourcePublic = self != null && self.getDeptId() != null
+                && self.getDeptId().longValue() == MealCategoryTaxonomy.PUBLIC_DEPT_ID;
+        // 名称锁定只约束「原本就是公共、且没有迁移归属」的分类；
+        // 公共→家庭、家庭→公共都属于归属迁移，名称按目标集合规则走
+        boolean nameLocked = targetPublic && sourcePublic;
+        builder.append("publicNameLocked: ").append(nameLocked).append('\n');
+        if (nameLocked && self != null) {
+            builder.append("lockedName: ").append(nullToEmpty(self.getName())).append('\n');
+        }
+        if (self != null && sourcePublic && !targetPublic) {
+            builder.append("movingFromPublicToFamily: true\n");
+            builder.append("note: 本次是把公共分类降为家庭私有分类，提交名称沿用原公共名称是允许的，"
+                    + "不得以「与公共分类同名」为由拒绝；只需检查说明与依据是否清晰。\n");
+        }
+        if (self != null && !sourcePublic && targetPublic) {
+            builder.append("movingFromFamilyToPublic: true\n");
+            builder.append("note: 本次是把家庭私有分类升级为公共分类，允许使用任意合法名称，"
+                    + "不必限制在 9 个固定公共名称内；只需检查名称、说明与依据是否清晰一致。\n");
         }
         builder.append("submitted.name: ").append(nullToEmpty(request.getName())).append('\n');
         builder.append("submitted.description: ").append(nullToEmpty(request.getDescription())).append('\n');
@@ -172,21 +187,27 @@ public class MealCategoryReviewServiceImpl implements IMealCategoryReviewService
         }
         builder.append("\n【本归属已有分类（不得重名或语义重复）】\n");
         List<MealCategory> existing = loadExisting(ownerDeptId);
-        if (existing.isEmpty()) {
-            builder.append("（无）\n");
-        } else {
-            for (MealCategory category : existing) {
-                if (categoryId != null && categoryId.equals(category.getCategoryId())) {
-                    continue;
-                }
-                // 公共分类已在上一段完整列出，这里只补充家庭私有分类，避免同一分类出现两次
-                if (category.getDeptId() != null
-                        && category.getDeptId().longValue() == MealCategoryTaxonomy.PUBLIC_DEPT_ID) {
-                    continue;
-                }
-                builder.append("- ").append(category.getName())
-                        .append("：").append(nullToEmpty(category.getDescription())).append('\n');
+        boolean any = false;
+        for (MealCategory category : existing) {
+            if (categoryId != null && categoryId.equals(category.getCategoryId())) {
+                continue;
             }
+            // 9 个固定公共名称已在上一段完整列出；这里只补充「实际库里额外的公共分类」
+            // 和「家庭私有分类」，避免同一分类出现两次
+            if (category.getDeptId() != null
+                    && category.getDeptId().longValue() == MealCategoryTaxonomy.PUBLIC_DEPT_ID
+                    && MealCategoryTaxonomy.isPrimaryCategory(category.getName())) {
+                continue;
+            }
+            builder.append("- ").append(category.getName())
+                    .append(category.getDeptId() != null
+                            && category.getDeptId().longValue() == MealCategoryTaxonomy.PUBLIC_DEPT_ID
+                            ? "（公共）" : "（家庭私有）")
+                    .append("：").append(nullToEmpty(category.getDescription())).append('\n');
+            any = true;
+        }
+        if (!any) {
+            builder.append("（无）\n");
         }
         builder.append("\n请按 JSON Schema 返回审阅结论。");
         return builder.toString();
