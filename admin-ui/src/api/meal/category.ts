@@ -31,8 +31,7 @@ export function addCategory(data: MealCategorySaveRequest): Promise<AjaxResult<M
     url: '/meal/category',
     method: 'post',
     data: data,
-    timeout: 30000,
-    repeatSubmit: false
+    timeout: 30000
   })
 }
 
@@ -45,8 +44,7 @@ export function updateCategory(
     url: '/meal/category/' + categoryId,
     method: 'put',
     data: data,
-    timeout: 30000,
-    repeatSubmit: false
+    timeout: 30000
   })
 }
 

@@ -15,6 +15,7 @@ export interface MealCategoryIconGroup {
 /** 按用途分组的图标 */
 export const MEAL_CATEGORY_ICON_GROUPS: MealCategoryIconGroup[] = [
   { label: "荤菜", icons: ["🍖", "🍗", "🥩", "🥓", "🍔", "🌭"] },
+  { label: "半荤", icons: ["🥘"] },
   { label: "素菜", icons: ["🥬", "🥦", "🥒", "🥕", "🌽", "🍆", "🍄"] },
   { label: "水产", icons: ["🐟", "🐠", "🦐", "🦀", "🦑", "🦪"] },
   { label: "蛋豆", icons: ["🥚", "🍳", "🫘", "🧈"] },

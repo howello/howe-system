@@ -11,7 +11,7 @@ import java.util.Map;
  *
  * <p>分类分两类：</p>
  * <ul>
- *   <li><b>公共分类</b>：{@code dept_id = 0}，固定 8 条，名称由本类定义，</li>
+ *   <li><b>公共分类</b>：{@code dept_id = 0}，固定 9 条，名称由本类定义，</li>
  * </ul>
  * 平台管理员只能维护说明、依据、图标、排序与状态，<b>不能新增、删除或改名</b>；
  * 家庭私有分类挂在各自家庭下，由家庭管理员与平台超管维护。
@@ -22,6 +22,8 @@ import java.util.Map;
  */
 public final class MealCategoryTaxonomy {
 
+    /** 主类：岷县 */
+    public static final String MINXIAN = "岷县";
     /** 主类：荤菜 */
     public static final String MEAT = "荤菜";
     /** 主类：半荤 */
@@ -136,7 +138,8 @@ public final class MealCategoryTaxonomy {
         }
         builder.append("判定顺序（命中即停）：")
                 .append("1. 招牌不是分类，不参与判定；")
-                .append("2. 饺子/包子/饼/面条/馒头/花卷等面食，或米饭/炒饭/粥/煲仔饭等主食 → 面点")
+                .append("2. 岷县地方特色 → 岷县；")
+                .append("3. 饺子/包子/饼/面条/馒头/花卷等面食，或米饭/炒饭/粥/煲仔饭等主食 → 面点")
                 .append("（例外：酸汤水饺、汤面等以面食/主食为主体的带汤菜也归面点，汤只是做法）；")
                 .append("3. 汤/羹/煲汤 → 汤羹；")
                 .append("4. 凉拌/卤味冷盘 → 凉卤；")
@@ -154,22 +157,24 @@ public final class MealCategoryTaxonomy {
      * @return 主类定义列表
      */
     private static List<Definition> buildDefinitions() {
-        List<Definition> list = new ArrayList<>(8);
-        list.add(new Definition(MEAT, "🍖", 1, "以肉为主、肉量明显的菜",
+        List<Definition> list = new ArrayList<>(9);
+        list.add(new Definition(MINXIAN, "🏔️", 1, "岷县地方特色菜",
+                "只要顾客认「岷县」就优先归这里；普通家常菜不要硬归岷县。示例：岷县浆水面、岷县凉粉、岷县点心、当归炖鸡、洋芋拌汤、面片"));
+        list.add(new Definition(MEAT, "🍖", 2, "以肉为主、肉量明显的菜",
                 "肉少菜多的不放；鱼虾蟹贝不放；汤羹不放。示例：红烧肉、回锅肉、辣子鸡、小炒黄牛肉、糖醋排骨、火锅"));
-        list.add(new Definition(HALF_MEAT, "🥘", 2, "肉少菜多、肉丝肉片配大量蔬菜、肉末配菜",
+        list.add(new Definition(HALF_MEAT, "🥘", 3, "肉少菜多、肉丝肉片配大量蔬菜、肉末配菜",
                 "肉为主的不放；纯素不放。示例：鱼香肉丝、肉末豆角、蚂蚁上树、芹菜肉丝、蒜苔肉丝、青椒肉丝"));
-        list.add(new Definition(VEGETABLE, "🥬", 3, "纯素菜、时蔬、菌菇、素炒",
+        list.add(new Definition(VEGETABLE, "🥬", 4, "纯素菜、时蔬、菌菇、素炒",
                 "含肉的不放；豆腐/蛋为主的不放。示例：清炒时蔬、手撕包菜、蒜蓉西兰花、干锅花菜、菌菇小炒"));
-        list.add(new Definition(AQUATIC, "🐟", 4, "鱼、虾、蟹、贝、蛙等水产为主料",
+        list.add(new Definition(AQUATIC, "🐟", 5, "鱼、虾、蟹、贝、蛙等水产为主料",
                 "鱼香肉丝不放；水产汤归汤羹；凉拌水产归凉卤。示例：水煮鱼、酸菜鱼、红烧鱼、辣炒虾、干锅牛蛙、辣炒花甲"));
-        list.add(new Definition(EGG_BEAN, "🥚", 5, "蛋类菜、豆腐、豆制品为主",
+        list.add(new Definition(EGG_BEAN, "🥚", 6, "蛋类菜、豆腐、豆制品为主",
                 "只有少量豆腐/蛋的荤菜不放；汤里的豆腐蛋不归这里。示例：麻婆豆腐、家常豆腐、番茄炒蛋、蒸蛋、香干炒肉丝"));
-        list.add(new Definition(COLD, "🥗", 6, "凉拌菜、卤味冷盘、冷菜",
+        list.add(new Definition(COLD, "🥗", 7, "凉拌菜、卤味冷盘、冷菜",
                 "热炒、热炖、热汤不放。示例：拍黄瓜、口水鸡、夫妻肺片、卤味拼盘、凉拌木耳"));
-        list.add(new Definition(SOUP, "🥣", 7, "汤、羹、煲汤、带汤炖品",
+        list.add(new Definition(SOUP, "🥣", 8, "汤、羹、煲汤、带汤炖品",
                 "干锅、炒菜、面点不放。示例：番茄蛋汤、酸辣汤、当归鸡汤、排骨汤、豆腐羹"));
-        list.add(new Definition(STAPLE, "🍜", 8, "饺子、包子、饼、面条、馒头、花卷等面食，以及米饭、炒饭、粥、煲仔饭等主食",
+        list.add(new Definition(STAPLE, "🍜", 9, "饺子、包子、饼、面条、馒头、花卷等面食，以及米饭、炒饭、粥、煲仔饭等主食",
                 "含肉面点也归面点，不归荤菜。示例：水饺、煎饺、葱油饼、牛肉面、包子、花卷、黄金炒饭、排骨煲仔饭"));
         return Collections.unmodifiableList(list);
     }
@@ -184,6 +189,7 @@ public final class MealCategoryTaxonomy {
      */
     private static Map<String, String> buildLegacyMapping() {
         Map<String, String> map = new LinkedHashMap<>();
+        map.put("岷县", MINXIAN);
         map.put("热菜", MEAT);
         map.put("荤菜", MEAT);
         map.put("肉", MEAT);

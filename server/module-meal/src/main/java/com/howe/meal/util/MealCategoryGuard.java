@@ -19,7 +19,7 @@ import java.util.List;
  * <ul>
  *   <li>最多绑定 1 个分类（唯一主类）；</li>
  *   <li>分类必须存在、未删除、启用；</li>
- *   <li>公共分类（{@code dept_id = 0}）必须是 {@link MealCategoryTaxonomy} 定义的 8 个名称之一；</li>
+ *   <li>公共分类（{@code dept_id = 0}）必须是 {@link MealCategoryTaxonomy} 定义的 9 个名称之一；</li>
  *   <li>公共菜（{@code ownerDeptId = 0}）只能绑定公共分类；</li>
  *   <li>家庭私有菜与提案可绑定公共分类或<b>本家庭</b>的私有分类。</li>
  * </ul>
@@ -62,9 +62,7 @@ public class MealCategoryGuard {
         boolean isPublic = category.getDeptId() != null
                 && category.getDeptId().longValue() == MealCategoryTaxonomy.PUBLIC_DEPT_ID;
         if (isPublic) {
-            if (!MealCategoryTaxonomy.isPrimaryCategory(category.getName())) {
-                throw new ServiceException("公共分类不在允许的 8 个主类范围内");
-            }
+            // 公共分类不要求名称属于 9 个固定名称：私有分类升级为公共后可以保留自定义名称
             return categoryId;
         }
         // 私有分类：必须是当前业务归属的那个家庭
@@ -98,7 +96,7 @@ public class MealCategoryGuard {
         boolean isPublic = category.getDeptId() != null
                 && category.getDeptId().longValue() == MealCategoryTaxonomy.PUBLIC_DEPT_ID;
         if (isPublic) {
-            return MealCategoryTaxonomy.isPrimaryCategory(category.getName()) ? categoryId : null;
+            return categoryId;
         }
         if (ownerDeptId == null || ownerDeptId.longValue() == 0L) {
             return null;
@@ -120,7 +118,7 @@ public class MealCategoryGuard {
         boolean isPublic = category.getDeptId() != null
                 && category.getDeptId().longValue() == MealCategoryTaxonomy.PUBLIC_DEPT_ID;
         if (isPublic) {
-            return MealCategoryTaxonomy.isPrimaryCategory(category.getName());
+            return true;
         }
         return ownerDeptId != null && ownerDeptId.longValue() != 0L
                 && ownerDeptId.equals(category.getDeptId());

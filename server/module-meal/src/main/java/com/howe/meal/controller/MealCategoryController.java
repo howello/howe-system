@@ -37,7 +37,7 @@ import java.util.List;
  *
  * @author howe
  */
-@Tag(name = "点餐-菜品分类", description = "公共分类（dept_id=0，固定 8 个）与家庭私有分类")
+@Tag(name = "点餐-菜品分类", description = "公共分类（dept_id=0，固定 9 个）与家庭私有分类")
 @RestController
 @RequestMapping("/meal/category")
 @RequiredArgsConstructor

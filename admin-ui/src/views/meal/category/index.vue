@@ -4,7 +4,7 @@
       type="info"
       :closable="false"
       show-icon
-      title="8 个公共分类名称与数量固定；家庭私有分类可新增、修改、删除，保存前会先经 AI 审阅并润色。"
+      title="9 个公共分类名称与数量固定；家庭私有分类可新增、修改、删除，保存前会先经 AI 审阅并润色。"
       style="margin-bottom: 12px"
     />
 
@@ -88,18 +88,36 @@
 
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
 
-    <el-dialog :title="title" v-model="open" width="680px" append-to-body :close-on-click-modal="false">
+    <el-dialog
+      :title="title"
+      v-model="open"
+      width="680px"
+      append-to-body
+      :close-on-click-modal="false"
+      :close-on-press-escape="!submitting"
+      :show-close="!submitting"
+      :before-close="handleDialogClose"
+    >
       <el-form ref="entityFormRef" :model="form" :rules="rules" label-width="90px">
-        <el-form-item v-if="isAdmin && isCreate" label="归属家庭" prop="deptId">
-          <el-select v-model="form.deptId" placeholder="请选择家庭（公共分类不可新增）" filterable style="width: 100%">
+        <el-form-item v-if="isAdmin" label="归属" prop="deptId">
+          <el-select v-model="form.deptId" placeholder="请选择归属" filterable style="width: 100%">
+            <el-option v-if="!isCreate" label="公共分类" :value="0" />
             <el-option v-for="item in familyOptions" :key="item.deptId" :label="item.name" :value="item.deptId" />
           </el-select>
-          <div class="form-tip">公共分类固定 8 个，不支持新增；家庭私有分类在所选家庭内可见</div>
+          <div class="form-tip">
+            {{ isCreate
+              ? "公共分类不能在这里新建；家庭私有分类在所选家庭内可见"
+              : isPublicCategory
+                ? "选家庭 = 公共分类降为家庭私有分类，挂它下面的公共菜一并迁走"
+                : "选「公共分类」= 升为公共分类，名下菜品一并转为公共；选家庭 = 迁到该家庭" }}
+          </div>
         </el-form-item>
         <el-form-item label="分类名称" prop="name">
-          <el-input v-model="form.name" :disabled="isPublicCategory" placeholder="如：岷县" maxlength="64" show-word-limit />
+          <el-input v-model="form.name" :disabled="nameLocked" placeholder="如：岷县" maxlength="64" show-word-limit />
           <div class="form-tip">
-            {{ isPublicCategory ? "公共分类名称固定，不支持修改" : "同一家庭内不能重名，也不能与 8 个公共分类重名" }}
+            {{ nameLocked
+              ? "公共分类名称固定，不支持修改；要改名请先把归属改到某个家庭"
+              : "同一归属内不能重名；升为公共分类时也允许保留自定义名称" }}
           </div>
         </el-form-item>
         <el-form-item label="分类说明" prop="description">
@@ -185,10 +203,10 @@
 
       <template #footer>
         <div class="dialog-footer">
-          <el-button type="primary" :loading="submitting" @click="submitForm">
+          <el-button type="primary" :loading="submitting" :disabled="submitting" @click="submitForm">
             {{ submitting ? "AI 审阅中…" : "确 定" }}
           </el-button>
-          <el-button @click="cancel">取 消</el-button>
+          <el-button :disabled="submitting" @click="cancel">取 消</el-button>
         </div>
       </template>
     </el-dialog>
@@ -197,6 +215,7 @@
 
 <script setup lang="ts" name="MealCategory">
 import { useAppProxy, formRef } from '@/utils/appProxy'
+import { ElMessageBox } from 'element-plus'
 import useUserStore from "@/store/modules/user"
 import { addCategory, getCategory, listCategory, updateCategory, delCategory } from "@/api/meal/category"
 import { listDishOwnerOptions } from "@/api/meal/dish"
@@ -240,7 +259,24 @@ const data = reactive({
     deptId: undefined
   } as MealCategoryQueryParams,
   rules: {
-    deptId: [{ required: true, message: "请选择归属家庭", trigger: "change" }],
+    // 归属只在「超管新增」时必填；编辑时允许保持原归属不动
+    deptId: [
+      {
+        required: true,
+        validator: (_rule: unknown, value: number | undefined, callback: (error?: Error) => void) => {
+          if (!isCreate.value || !isAdmin.value) {
+            callback()
+            return
+          }
+          if (value === undefined || value === null || value <= 0) {
+            callback(new Error("请选择归属家庭"))
+            return
+          }
+          callback()
+        },
+        trigger: "change"
+      }
+    ],
     name: [{ required: true, message: "分类名称不能为空", trigger: "blur" }],
     description: [{ required: true, message: "分类说明不能为空", trigger: "blur" }],
     basis: [{ required: true, message: "分类依据不能为空", trigger: "blur" }]
@@ -258,7 +294,7 @@ const review = reactive({
 
 const { queryParams, form, rules } = toRefs(data)
 
-/** 当前编辑的是否公共分类（编辑时按原归属判断，新增时按选择的家庭判断） */
+/** 当前表单是否仍是公共分类（编辑时跟随归属选择变化：改成家庭就不再是公共分类） */
 const isPublicCategory = computed(() => {
   if (isCreate.value) {
     return false
@@ -266,7 +302,18 @@ const isPublicCategory = computed(() => {
   return form.value.deptId === 0
 })
 
+/**
+ * 名称是否锁定
+ *
+ * 公共分类保持为公共时名称锁定；一旦把归属改到某个家庭（降为私有分类），
+ * 名称就按私有分类规则允许修改。新增时永远可改。
+ */
+const nameLocked = computed(() => !isCreate.value && isPublicCategory.value)
+
 const isCreate = ref<boolean>(false)
+
+/** 打开编辑弹窗时该分类的原始归属，用于判断「归属是否真的被改了」 */
+const originalDeptId = ref<number | undefined>(undefined)
 
 /** 批量删除只允许选择家庭私有分类 */
 function isSelectable(row: MealCategory) {
@@ -331,6 +378,14 @@ function resetReview() {
   review.changes = []
 }
 
+/** 请求进行中不允许关闭弹窗，避免旧响应写到新表单上 */
+function handleDialogClose(done: () => void) {
+  if (submitting.value) {
+    return
+  }
+  done()
+}
+
 function cancel() {
   open.value = false
   reset()
@@ -338,6 +393,7 @@ function cancel() {
 
 function reset() {
   resetReview()
+  originalDeptId.value = undefined
   form.value = {
     deptId: undefined,
     name: "",
@@ -370,6 +426,7 @@ function handleSelectionChange(selection: MealCategory[]) {
 function handleAdd() {
   reset()
   isCreate.value = true
+  originalDeptId.value = undefined
   // 非超管固定本家庭，不显示归属选择
   if (!isAdmin.value) {
     form.value.deptId = undefined
@@ -398,6 +455,7 @@ function handleUpdate(row?: MealCategory) {
       remark: category.remark,
       categoryId: category.categoryId
     }
+    originalDeptId.value = category.deptId
     open.value = true
     title.value = category.deptId === 0 ? "修改公共分类" : "修改分类"
   })
@@ -419,14 +477,26 @@ function applyExample(example: string) {
 }
 
 function submitForm() {
+  // 入口同步拦截：请求进行中或弹窗已关闭时不再发起保存，避免连点与响应后的重复提交
+  if (submitting.value || !open.value) {
+    return
+  }
+  // 先上锁再进入异步校验，防止校验回调返回前连续点击
+  submitting.value = true
   formRef(proxy.$refs["entityFormRef"]).validate((valid: boolean) => {
     if (!valid) {
+      submitting.value = false
       return
     }
     resetReview()
-    submitting.value = true
+    // 编辑时只有「归属真的变了」才传 deptId：保持公共分类不变时传 0 会被后端当成非法目标
+    const deptIdForSubmit = isCreate.value
+      ? form.value.deptId
+      : form.value.deptId !== undefined && form.value.deptId !== originalDeptId.value
+        ? form.value.deptId
+        : undefined
     const payload: MealCategorySaveRequest = {
-      deptId: isAdmin.value ? form.value.deptId : undefined,
+      deptId: isAdmin.value ? deptIdForSubmit : undefined,
       name: form.value.name?.trim(),
       description: form.value.description?.trim(),
       basis: form.value.basis?.trim(),
@@ -442,6 +512,9 @@ function submitForm() {
     request
       .then((response: any) => {
         handleReviewResult(response.data)
+      })
+      .catch(() => {
+        // 请求失败（校验、权限、重名等）已在请求层提示，这里只需释放锁让用户改完重试
       })
       .finally(() => {
         submitting.value = false
@@ -466,12 +539,39 @@ function handleReviewResult(result?: MealCategorySaveResult) {
   }
   review.changes = result.changes || []
   if (result.saved) {
-    if (!review.changes.length) {
-      proxy.$modal.msgSuccess(result.reviewStatus === "SKIPPED" ? "已保存（未经 AI 审阅）" : "已保存")
-      open.value = false
-    }
+    // 保存成功后必须关闭弹窗：否则用户再点「确定」会重复提交，
+    // 新增会撞「已存在同名分类」，修改会再走一次 AI 审阅并可能被判重复。
+    open.value = false
+    showSavedFeedback(result)
     getList()
   }
+}
+
+/**
+ * 保存成功后的反馈：弹窗已关闭，用只读结果框展示 AI 调整过的字段与迁移数量
+ *
+ * @param result 保存结果
+ */
+function showSavedFeedback(result: MealCategorySaveResult) {
+  const lines: string[] = []
+  if (result.movedDishCount && result.movedDishCount > 0) {
+    lines.push(`已连同 ${result.movedDishCount} 道菜品一起迁移到新归属`)
+  }
+  if (review.changes.length) {
+    for (const change of review.changes) {
+      lines.push(`${fieldLabel(change.field)}：${change.before || "（空）"} → ${change.after}`)
+    }
+  }
+  if (!lines.length) {
+    if (result.reviewStatus === "SKIPPED") {
+      proxy.$modal.msgWarning("已保存（未经 AI 审阅）")
+    } else {
+      proxy.$modal.msgSuccess("已保存")
+    }
+    return
+  }
+  const title = result.reviewStatus === "SKIPPED" ? "已保存（未经 AI 审阅）" : "已保存，AI 已调整以下字段"
+  ElMessageBox.alert(lines.join("\n"), title, { confirmButtonText: "关闭" }).catch(() => undefined)
 }
 
 function handleDelete(row?: MealCategory) {

@@ -52,6 +52,9 @@ public class MealCategorySaveResult {
     @Schema(description = "被 AI 调整的字段差异（原值 → 保存值）")
     private List<FieldChange> changes = new ArrayList<>();
 
+    @Schema(description = "随分类一起迁移归属的菜品数量（仅超管改归属时返回）")
+    private Integer movedDishCount;
+
     /**
      * 字段差异
      *

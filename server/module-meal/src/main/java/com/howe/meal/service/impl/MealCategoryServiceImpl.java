@@ -1,5 +1,6 @@
 package com.howe.meal.service.impl;
 
+import com.howe.common.core.domain.entity.SysDept;
 import com.howe.common.exception.ServiceException;
 import com.howe.common.utils.SecurityUtils;
 import com.howe.meal.constant.MealCategoryTaxonomy;
@@ -14,6 +15,7 @@ import com.howe.meal.service.IMealCategoryService;
 import com.howe.meal.util.MealCategoryContentGuard;
 import com.howe.meal.util.MealCategoryIconGuard;
 import com.howe.meal.util.MealScopeGuard;
+import com.howe.system.mapper.SysDeptMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -46,6 +48,8 @@ public class MealCategoryServiceImpl implements IMealCategoryService {
     private final MealCategoryRefMapper mealCategoryRefMapper;
 
     private final IMealCategoryReviewService mealCategoryReviewService;
+
+    private final SysDeptMapper sysDeptMapper;
 
     @Override
     public List<MealCategory> selectMealCategoryList(MealCategory mealCategory) {
@@ -97,9 +101,10 @@ public class MealCategoryServiceImpl implements IMealCategoryService {
      * 修改分类
      *
      * <p>公共分类只允许平台管理员修改非名称字段；私有分类允许所属家庭管理员与超管改名。
-     * 归属不允许通过修改接口迁移。</p>
+     * 平台管理员可以修改私有分类的归属家庭，此时会连同引用它的菜品一起迁移。</p>
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public MealCategorySaveResult updateMealCategory(Long categoryId, MealCategorySaveRequest request) {
         MealCategory exist = requireCategory(categoryId);
         boolean isPublic = isPublic(exist);
@@ -111,22 +116,38 @@ public class MealCategoryServiceImpl implements IMealCategoryService {
             MealScopeGuard.assertSameDept(exist.getDeptId(), "分类");
         }
         Long ownerDeptId = exist.getDeptId() == null ? 0L : exist.getDeptId();
-        MealCategoryReviewResult review = mealCategoryReviewService.review(request, OP_UPDATE, categoryId, ownerDeptId);
+        // 归属：只有平台管理员能改；支持家庭↔家庭、公共→家庭、家庭→公共
+        Long targetDeptId = resolveUpdateDeptId(exist, request.getDeptId());
+        boolean deptChanged = !Objects.equals(ownerDeptId, targetDeptId);
+        // 名称锁定只约束「继续留在公共集合」的分类；
+        // 一旦发生归属迁移（公共→家庭 或 家庭→公共），名称按目标集合的规则走
+        boolean nameLocked = isPublic && !deptChanged;
+        MealCategoryReviewResult review = mealCategoryReviewService.review(request, OP_UPDATE, categoryId,
+                targetDeptId);
         if (review != null && !Boolean.TRUE.equals(review.getApproved())) {
             return rejectedResult(review);
         }
         MealCategorySaveRequest effective = review == null ? normalize(request) : normalize(review, request);
-        if (isPublic && !Objects.equals(effective.getName().trim(), exist.getName())) {
+        if (nameLocked && !Objects.equals(effective.getName().trim(), exist.getName())) {
             throw new ServiceException("公共分类名称固定，不支持修改");
         }
         checkContent(effective);
-        checkNameAvailable(effective.getName(), ownerDeptId, categoryId);
-        MealCategory update = toEntity(effective, ownerDeptId);
+        // 迁移到公共时不要求名称属于 9 个固定名称；迁移到家庭时允许沿用原公共名称
+        boolean allowPublicName = deptChanged && (isPublic || targetDeptId == 0L);
+        checkNameAvailable(effective.getName(), targetDeptId, categoryId, allowPublicName);
+        MealCategory update = toEntity(effective, targetDeptId);
         update.setCategoryId(categoryId);
         update.setUpdateBy(SecurityUtils.getUsername());
         mealCategoryMapper.updateMealCategory(update);
+        // 归属变化时，把引用该分类的菜品一起迁到目标归属（公共 ↔ 家庭、家庭 ↔ 家庭）
+        int movedDishes = 0;
+        if (deptChanged) {
+            movedDishes = mealCategoryMapper.moveDishOwnerByCategory(categoryId, ownerDeptId, targetDeptId,
+                    SecurityUtils.getUsername());
+        }
         MealCategorySaveResult result = savedResult(update, request, review);
         result.setCategory(mealCategoryMapper.selectMealCategoryById(categoryId));
+        result.setMovedDishCount(movedDishes);
         return result;
     }
 
@@ -199,6 +220,50 @@ public class MealCategoryServiceImpl implements IMealCategoryService {
     }
 
     /**
+     * 解析修改分类时的目标归属
+     *
+     * <p>只有平台管理员可以改归属，支持四种迁移：</p>
+     * <ul>
+     *   <li>家庭 → 另一个家庭；</li>
+     *   <li>公共 → 家庭（公共分类降为家庭私有分类，挂它下面的公共菜一并迁走）；</li>
+     *   <li><b>家庭 → 公共</b>（私有分类升为公共分类，挂它下面的该家庭私有菜一并转为公共菜）；</li>
+     *   <li>公共 → 公共（只是改说明等字段，归属不变）。</li>
+     * </ul>
+     *
+     * <p>{@code requested = 0} 表示目标为公共分类。私有分类升级为公共时不限制名称，
+     * 9 个固定名称只约束「原本就是公共」的分类。</p>
+     *
+     * <p>家庭管理员传入的 deptId 一律忽略，仍沿用原归属。</p>
+     *
+     * @param exist     库中现有分类
+     * @param requested 前端传入的归属
+     * @return 目标归属（0 表示公共，>0 表示家庭）
+     */
+    private Long resolveUpdateDeptId(MealCategory exist, Long requested) {
+        Long ownerDeptId = exist.getDeptId() == null ? 0L : exist.getDeptId();
+        if (requested == null || !SecurityUtils.isAdmin()) {
+            return ownerDeptId;
+        }
+        if (requested.equals(ownerDeptId)) {
+            return ownerDeptId;
+        }
+        // 目标为公共：私有分类升级为公共分类
+        if (requested == 0L) {
+            if (ownerDeptId == 0L) {
+                return ownerDeptId;
+            }
+            return 0L;
+        }
+        SysDept dept = sysDeptMapper.selectDeptById(requested);
+        if (dept == null || !"0".equals(dept.getDelFlag()) || !"0".equals(dept.getStatus())
+                || !"F".equals(dept.getDeptType())) {
+            throw new ServiceException("请选择有效的家庭归属");
+        }
+        // 公共 → 家庭：允许。迁移后该分类变成普通家庭私有分类，不再受 9 个公共名称限制。
+        return requested;
+    }
+
+    /**
      * 校验最终落库的文本内容
      *
      * <p>固定提示词里的「纯文本 + 长度上限」不能只靠模型遵守：AI 润色结果在落库前
@@ -217,11 +282,15 @@ public class MealCategoryServiceImpl implements IMealCategoryService {
     /**
      * 重名校验：同一归属内不允许重名，私有分类也不允许与公共分类同名
      *
-     * @param name       分类名称
-     * @param ownerDeptId 归属家庭 ID
-     * @param excludeId  修改时排除自身
+     * <p>例外：公共分类降为家庭私有时，原名称本身就是公共名称，
+     * 此时允许保留名称（{@code allowPublicName=true}）。</p>
+     *
+     * @param name            分类名称
+     * @param ownerDeptId     归属家庭 ID
+     * @param excludeId       修改时排除自身
+     * @param allowPublicName 是否允许使用公共分类名称
      */
-    private void checkNameAvailable(String name, Long ownerDeptId, Long excludeId) {
+    private void checkNameAvailable(String name, Long ownerDeptId, Long excludeId, boolean allowPublicName) {
         String trimmed = name == null ? "" : name.trim();
         if (trimmed.isEmpty()) {
             throw new ServiceException("分类名称不能为空");
@@ -239,11 +308,22 @@ public class MealCategoryServiceImpl implements IMealCategoryService {
                 throw new ServiceException("已存在同名分类「" + trimmed + "」");
             }
         }
-        // 私有分类不得与 8 个公共分类同名
-        if (ownerDeptId != null && ownerDeptId.longValue() != 0L
+        // 私有分类不得与 9 个公共分类同名；公共分类降为私有时保留原名称是允许的
+        if (!allowPublicName && ownerDeptId != null && ownerDeptId.longValue() != 0L
                 && MealCategoryTaxonomy.isPrimaryCategory(trimmed)) {
             throw new ServiceException("「" + trimmed + "」是公共分类名称，家庭分类不能重名");
         }
+    }
+
+    /**
+     * 重名校验（不允许使用公共分类名称）
+     *
+     * @param name        分类名称
+     * @param ownerDeptId 归属家庭 ID
+     * @param excludeId   修改时排除自身
+     */
+    private void checkNameAvailable(String name, Long ownerDeptId, Long excludeId) {
+        checkNameAvailable(name, ownerDeptId, excludeId, false);
     }
 
     /**

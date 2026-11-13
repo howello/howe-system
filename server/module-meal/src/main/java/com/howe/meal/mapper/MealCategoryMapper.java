@@ -62,4 +62,21 @@ public interface MealCategoryMapper {
      * @return 结果
      */
     int deleteMealCategoryByIds(Long[] categoryIds);
+
+    /**
+     * 把引用某分类的菜品批量改到目标归属
+     *
+     * <p>仅在平台管理员修改分类归属时使用：分类换家庭后，原来挂它的私有菜
+     * 必须一起迁走，否则菜会引用不属于自己家庭的分类。</p>
+     *
+     * @param categoryId    分类 ID
+     * @param sourceDeptId  分类原归属家庭 ID
+     * @param targetDeptId  目标归属家庭 ID
+     * @param updateBy      更新人
+     * @return 影响行数
+     */
+    int moveDishOwnerByCategory(@Param("categoryId") Long categoryId,
+                                @Param("sourceDeptId") Long sourceDeptId,
+                                @Param("targetDeptId") Long targetDeptId,
+                                @Param("updateBy") String updateBy);
 }

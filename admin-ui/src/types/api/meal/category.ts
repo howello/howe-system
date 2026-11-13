@@ -13,7 +13,7 @@ export interface MealCategoryQueryParams extends PageDomain {
 /**
  * 点餐-菜品分类
  *
- * 公共分类（deptId = 0）固定 8 个：荤菜、半荤、素菜、水产、蛋豆、凉卤、汤羹、面点，
+ * 公共分类（deptId = 0）固定 9 个：荤菜、半荤、素菜、水产、蛋豆、凉卤、汤羹、面点，
  * 名称与数量锁定，仅平台管理员可改说明、依据、图标、排序、状态。
  * 家庭私有分类（deptId = 家庭ID）由家庭管理员与平台超管增删改。
  * 「招牌」不是分类，只做点餐端推荐位。
@@ -25,7 +25,7 @@ export interface MealCategory extends BaseEntity {
   deptId?: number;
   /** 归属家庭名称（列表展示用，后端不落库） */
   deptName?: string;
-  /** 分类名称（公共分类为 8 个锁定名称之一） */
+  /** 分类名称（公共分类为 9 个锁定名称之一） */
   name?: string;
   /** 分类说明（一句话定位） */
   description?: string;
@@ -80,4 +80,6 @@ export interface MealCategorySaveResult {
   category?: MealCategory;
   /** 被 AI 调整的字段差异 */
   changes: MealCategoryFieldChange[];
+  /** 随分类一起迁移归属的菜品数量（仅超管改归属时返回） */
+  movedDishCount?: number | null;
 }
