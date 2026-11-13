@@ -257,6 +257,9 @@ public class ConfigConstants {
     /** App 发版日志润色的 system 提示词 */
     public static final String AI_PROMPT_MEAL_APP_VERSION_LOG = "ai.prompt.meal.app.versionLog";
 
+    /** 点餐分类 AI 审阅与润色的 system 提示词 */
+    public static final String AI_PROMPT_MEAL_CATEGORY_REVIEW_SYSTEM = "ai.prompt.meal.category.reviewSystem";
+
     /**
      * 点餐 App 版本发布令牌
      *

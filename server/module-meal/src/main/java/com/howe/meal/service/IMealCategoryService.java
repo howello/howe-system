@@ -1,19 +1,24 @@
 package com.howe.meal.service;
 
 import com.howe.meal.domain.MealCategory;
+import com.howe.meal.domain.dto.MealCategorySaveRequest;
+import com.howe.meal.domain.dto.MealCategorySaveResult;
 
 import java.util.List;
 
 /**
  * 点餐-菜品分类 服务层
  *
- * <p>分类是固定 9 条的唯一主类：新增与删除不开放，修改仅平台管理员可用。</p>
+ * <p>公共分类（{@code deptId = 0}）固定 8 条，名称与数量锁定，只允许平台管理员
+ * 修改说明、依据、图标、排序、状态；家庭私有分类由家庭管理员与平台超管维护，
+ * 可新增、修改、删除。</p>
  *
  * @author howe
  */
 public interface IMealCategoryService {
+
     /**
-     * 查询分类列表（公共主类 + 当前家庭的私有分类）
+     * 查询分类列表（公共分类 + 当前家庭的私有分类）
      *
      * @param mealCategory 查询条件
      * @return 分类集合
@@ -29,26 +34,29 @@ public interface IMealCategoryService {
     MealCategory selectMealCategoryById(Long categoryId);
 
     /**
-     * 新增分类：不开放，始终抛错
+     * 新增家庭私有分类（经 AI 审阅后保存）
      *
-     * @param mealCategory 分类
-     * @return 结果
+     * @param request 分类保存请求
+     * @return 保存结果（含审阅结论）
      */
-    int insertMealCategory(MealCategory mealCategory);
+    MealCategorySaveResult insertMealCategory(MealCategorySaveRequest request);
 
     /**
-     * 修改分类（仅平台管理员，且不能改名）
+     * 修改分类（经 AI 审阅后保存）
      *
-     * @param mealCategory 分类
-     * @return 结果
+     * @param categoryId 分类 ID
+     * @param request    分类保存请求
+     * @return 保存结果（含审阅结论）
      */
-    int updateMealCategory(MealCategory mealCategory);
+    MealCategorySaveResult updateMealCategory(Long categoryId, MealCategorySaveRequest request);
 
     /**
-     * 批量删除分类：不开放，始终抛错
+     * 批量删除家庭私有分类
+     *
+     * <p>公共分类不可删除；分类下仍有菜品或提案引用时整批拒绝。</p>
      *
      * @param categoryIds 分类ID数组
-     * @return 结果
+     * @return 影响行数
      */
     int deleteMealCategoryByIds(Long[] categoryIds);
 }

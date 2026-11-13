@@ -106,6 +106,10 @@ public class MealDish extends BaseEntity {
     @Schema(description = "分类名称（查询结果附带，不落库）")
     private String categoryNames;
 
+    /** 查询用：所属分类状态（0正常 1停用；不落库，管理端用于标记「所属分类已停用」） */
+    @Schema(description = "所属分类状态（查询结果附带，不落库）")
+    private String categoryStatus;
+
     /** 查询用：关键词（菜名或食材，不落库） */
     @Schema(description = "关键词（按菜名或食材模糊匹配，不落库）")
     private String keyword;
@@ -113,4 +117,13 @@ public class MealDish extends BaseEntity {
     /** 招牌聚合用：近 90 天被点份数（仅招牌接口返回，不落库） */
     @Schema(description = "近 90 天被点份数（仅招牌接口返回，不落库）", example = "12")
     private Long orderCount;
+
+    /**
+     * 查询用：是否只取点餐端可见的菜（不落库）
+     *
+     * <p>{@code true} 时排除所属分类已停用或已删除的菜；后台列表不传该参数，
+     * 仍能看到停用分类下的菜并做提示。</p>
+     */
+    @Schema(description = "点餐端菜单可见过滤（停用分类下的菜不返回，不落库）")
+    private Boolean menuVisible;
 }

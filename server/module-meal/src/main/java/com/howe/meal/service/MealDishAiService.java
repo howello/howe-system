@@ -25,6 +25,7 @@ import com.howe.meal.mapper.MealCategoryMapper;
 import com.howe.meal.mapper.MealCategoryRefMapper;
 import com.howe.meal.mapper.MealDishMapper;
 import com.howe.meal.service.IMealDishService;
+import com.howe.meal.util.MealCategoryGuard;
 import com.howe.meal.service.IMealWeComNotifyService;
 import com.howe.meal.util.MealScopeGuard;
 import lombok.RequiredArgsConstructor;
@@ -44,7 +45,7 @@ import java.util.Set;
  * 菜品一键 AI 补齐服务
  *
  * <p>拆成「文本」与「封面」两条独立流水线，前端可并行调用：文本补齐先由后端判断缺失字段
- * → 只把缺失字段交给对话模型（结构化输出）→ 分类只从 9 个唯一主类中匹配；
+ * → 只把缺失字段交给对话模型（结构化输出）→ 分类只从该归属可见的启用分类中匹配；
  * 封面则在缺失时调文生图。两条流水线互不依赖，不引入 Agent 编排框架，模型只负责填空。</p>
  *
  * <p>只补缺失、绝不覆盖用户已填字段；生成结果不落库，由前端回填后走原有提交。
@@ -54,7 +55,7 @@ import java.util.Set;
  * <p>菜品编辑页的「AI 更新」通过 {@link #submitUpdateFromText} 提交到业务线程池执行：
  * 请求线程只校验权限并立即返回；异步落库使用 {@link MealDishMapper} 直接更新，不读取登录态。</p>
  *
- * <p>分类规则（9 个主类定义与判定顺序）由 {@link MealCategoryTaxonomy} 固定追加到提示词，
+ * <p>分类规则（公共分类定义与判定顺序）由 {@link MealCategoryTaxonomy} 固定追加到提示词，
  * 不随 {@code sys_config} 变化；AI 只能返回其中一个主类名称。</p>
  *
  * @author howe
@@ -167,6 +168,8 @@ public class MealDishAiService {
 
     private final MealCategoryRefMapper mealCategoryRefMapper;
 
+    private final MealCategoryGuard mealCategoryGuard;
+
     private final TransactionTemplate transactionTemplate;
 
     private final IMealDishService mealDishService;
@@ -241,7 +244,7 @@ public class MealDishAiService {
         try {
             // 分类只在当前为空时补齐，已有主类不请求、不覆盖
             boolean needCategory = mealCategoryRefMapper.selectCategoryId(MealCategoryRef.BIZ_DISH, dishId) == null;
-            Map<String, Long> categoryIdByName = needCategory ? loadCandidateCategories() : Map.of();
+            Map<String, Long> categoryIdByName = needCategory ? loadCandidateCategories(deptId) : Map.of();
             boolean requestCategory = needCategory && !categoryIdByName.isEmpty();
 
             Map<String, Object> properties = new LinkedHashMap<>();
@@ -384,14 +387,14 @@ public class MealDishAiService {
      *
      * @param name    菜名
      * @param current 当前已填字段快照
-     * @param deptId  归属家庭 ID，决定可用菜品范围（分类候选固定为 9 个公共主类）
+     * @param deptId  归属家庭 ID，决定可用菜品范围（分类候选为该家庭的公共分类 + 私有分类）
      * @return 只含被补齐文本字段与唯一主类匹配结果
      */
     public DishAiTextResult generateTextForDept(String name, DishAiGenerateRequest.Current current, Long deptId) {
-        Map<String, Long> categoryIdByName = loadCandidateCategories();
+        Map<String, Long> categoryIdByName = loadCandidateCategories(deptId);
         DishAiTextResult result = emptyTextResult();
         Missing missing = detectMissing(current);
-        // 分类只能从 9 个主类里选；候选为空（未初始化）时不请求分类字段
+        // 分类只能从该家庭可见的启用分类里选；候选为空（未初始化）时不请求分类字段
         boolean requestCategories = missing.categories && !categoryIdByName.isEmpty();
 
         boolean needText = requestCategories || missing.description || missing.tags || missing.duration
@@ -422,7 +425,7 @@ public class MealDishAiService {
      *
      * @param name    菜名
      * @param current 当前已填字段快照
-     * @param deptId  归属家庭 ID，决定已有菜品范围（分类候选固定为 9 个公共主类）
+     * @param deptId  归属家庭 ID，决定已有菜品范围（分类候选为该家庭的公共分类 + 私有分类）
      * @return 判定结果；通过时携带补齐的字段与唯一主类匹配结果
      */
     public DishAiAuditResult auditAndComplete(String name, DishAiGenerateRequest.Current current, Long deptId) {
@@ -436,7 +439,7 @@ public class MealDishAiService {
             return rejected;
         }
 
-        Map<String, Long> categoryIdByName = loadCandidateCategories();
+        Map<String, Long> categoryIdByName = loadCandidateCategories(deptId);
         Missing missing = detectMissing(current);
         boolean requestCategories = missing.categories && !categoryIdByName.isEmpty();
 
@@ -656,7 +659,7 @@ public class MealDishAiService {
     private void appendFieldSchema(Missing missing, boolean requestCategories, Map<String, Object> properties,
             List<String> required) {
         if (requestCategories) {
-            properties.put("category", stringSchema("唯一主类名称，必须是给定的 9 个名称之一"));
+            properties.put("category", stringSchema("分类名称，必须是给定候选分类之一"));
             required.add("category");
         }
         if (missing.description) {
@@ -698,7 +701,7 @@ public class MealDishAiService {
     }
 
     /**
-     * 把模型返回的数据按缺失字段抽取到结果（分类只匹配 9 个主类，未命中的单列）
+     * 把模型返回的数据按缺失字段抽取到结果（分类只匹配给定候选，未命中的单列）
      *
      * @param result            结果输出
      * @param data              模型返回的结构化数据
@@ -783,7 +786,7 @@ public class MealDishAiService {
      */
     private void appendUpdateSchema(Map<String, Object> properties, boolean requestCategory) {
         if (requestCategory) {
-            properties.put("category", stringSchema("唯一主类名称，必须是给定的 9 个名称之一"));
+            properties.put("category", stringSchema("分类名称，必须是给定候选分类之一"));
         }
         properties.put("description", stringSchema());
         properties.put("tags", arrayOfStringSchema());
@@ -863,26 +866,31 @@ public class MealDishAiService {
     }
 
     /**
-     * 查询 9 个候选主类并建立「主类名 → 分类ID」映射
+     * 查询指定归属下可选的分类，并建立「分类名 → 分类ID」映射
      *
-     * <p>候选固定为平台公共主类（{@code dept_id = 0}、启用、未删除），不再包含家庭私有分类。</p>
+     * <p>候选为该归属可见的启用分类：公共分类（{@code dept_id = 0}）与归属家庭的私有分类。
+     * 公共分则只保留 8 个名称内的记录；私有分类按名称参与匹配。</p>
      *
-     * @return 主类名 → 分类ID 映射
+     * @param ownerDeptId 菜品/提案归属家庭 ID；0 表示公共菜谱
+     * @return 分类名 → 分类ID 映射
      */
-    private Map<String, Long> loadCandidateCategories() {
+    private Map<String, Long> loadCandidateCategories(Long ownerDeptId) {
         MealCategory query = new MealCategory();
-        query.setDeptId(MealCategoryTaxonomy.PUBLIC_DEPT_ID);
+        query.setDeptId(ownerDeptId == null ? MealCategoryTaxonomy.PUBLIC_DEPT_ID : ownerDeptId);
         query.setStatus("0");
         List<MealCategory> categories = mealCategoryMapper.selectMealCategoryList(query);
         Map<String, Long> categoryIdByName = new LinkedHashMap<>();
         for (MealCategory category : categories) {
+            if (!mealCategoryGuard.isSelectable(category, ownerDeptId)) {
+                continue;
+            }
             String name = category.getName() == null ? null : category.getName().trim();
-            if (name != null && MealCategoryTaxonomy.isPrimaryCategory(name)) {
+            if (name != null && !name.isEmpty()) {
                 categoryIdByName.putIfAbsent(name, category.getCategoryId());
             }
         }
-        // 兜底：库里还没初始化 9 条主类时，按常量清单查一次，避免分类字段整段不请求
-        if (categoryIdByName.isEmpty()) {
+        // 兜底：库里还没初始化公共分类时，按常量清单查一次，避免分类字段整段不请求
+        if (categoryIdByName.isEmpty() && (ownerDeptId == null || ownerDeptId.longValue() == 0L)) {
             for (String name : MealCategoryTaxonomy.names()) {
                 Long categoryId = mealCategoryMapper.selectPrimaryCategoryId(name);
                 if (categoryId != null) {
@@ -905,7 +913,7 @@ public class MealDishAiService {
 
     /**
      * 读取文本补齐的 system 提示词（可在「参数设置」修改，未配置时用缺省值），
-     * 并固定追加 9 个主类定义与判定顺序
+     * 并固定追加公共分类定义与判定顺序
      *
      * @return system 提示词
      */
@@ -923,7 +931,7 @@ public class MealDishAiService {
     }
 
     /**
-     * 读取 AI 更新的 system 提示词，并固定追加 9 个主类定义与判定顺序
+     * 读取 AI 更新的 system 提示词，并固定追加公共分类定义与判定顺序
      *
      * @return system 提示词
      */

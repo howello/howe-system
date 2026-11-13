@@ -5,17 +5,15 @@ import com.howe.common.core.domain.model.LoginUser;
 import com.howe.common.exception.ServiceException;
 import com.howe.common.utils.SecurityUtils;
 import com.howe.common.utils.StringUtils;
-import com.howe.meal.constant.MealCategoryTaxonomy;
-import com.howe.meal.domain.MealCategory;
 import com.howe.meal.domain.MealCategoryRef;
 import com.howe.meal.domain.MealProposal;
 import com.howe.meal.domain.dto.MealProposalAuditBody;
-import com.howe.meal.mapper.MealCategoryMapper;
 import com.howe.meal.mapper.MealCategoryRefMapper;
 import com.howe.meal.mapper.MealProposalMapper;
 import com.howe.meal.service.IMealProposalService;
 import com.howe.meal.service.ITransactionCommitExecutor;
 import com.howe.meal.service.MealProposalAuditService;
+import com.howe.meal.util.MealCategoryGuard;
 import com.howe.meal.util.MealScopeGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -36,8 +34,8 @@ import java.util.List;
 public class MealProposalServiceImpl implements IMealProposalService {
 
     private final MealProposalMapper mealProposalMapper;
-    private final MealCategoryMapper mealCategoryMapper;
     private final MealCategoryRefMapper mealCategoryRefMapper;
+    private final MealCategoryGuard mealCategoryGuard;
     private final MealProposalAuditService mealProposalAuditService;
     private final ITransactionCommitExecutor transactionCommitExecutor;
 
@@ -98,9 +96,11 @@ public class MealProposalServiceImpl implements IMealProposalService {
      * @return 插入行数
      */
     private int createProposal(MealProposal mealProposal) {
-        Long categoryId = resolveSingleCategoryId(mealProposal.getCategoryIds());
+        Long deptId = SecurityUtils.getDeptId();
+        Long categoryId = mealCategoryGuard.resolveWritableCategoryId(
+                mealProposal.getCategoryIds(), deptId, "提案");
         mealProposal.setProposalId(null);
-        mealProposal.setDeptId(SecurityUtils.getDeptId());
+        mealProposal.setDeptId(deptId);
         mealProposal.setUserId(SecurityUtils.getUserId());
         mealProposal.setUserName(currentNickName());
         mealProposal.setStatus(MealProposal.STATUS_PENDING);
@@ -194,38 +194,6 @@ public class MealProposalServiceImpl implements IMealProposalService {
         ref.setBizId(proposalId);
         ref.setCategoryId(categoryId);
         mealCategoryRefMapper.insertMealCategoryRef(ref);
-    }
-
-    /**
-     * 校验并解析唯一主类 ID
-     *
-     * <p>null 或空列表表示不绑定主类；多于一个直接拒绝；分类必须存在、未删除且为平台公共主类。</p>
-     *
-     * @param categoryIds 入参分类列表
-     * @return 唯一分类 ID；未选择返回 null
-     */
-    private Long resolveSingleCategoryId(List<Long> categoryIds) {
-        if (categoryIds == null || categoryIds.isEmpty()) {
-            return null;
-        }
-        if (categoryIds.size() > 1) {
-            throw new ServiceException("一条提案只能归一个主类");
-        }
-        Long categoryId = categoryIds.get(0);
-        if (categoryId == null) {
-            return null;
-        }
-        MealCategory category = mealCategoryMapper.selectMealCategoryById(categoryId);
-        if (category == null) {
-            throw new ServiceException("分类不存在或已删除");
-        }
-        if (category.getDeptId() == null || category.getDeptId() != MealCategoryTaxonomy.PUBLIC_DEPT_ID) {
-            throw new ServiceException("只能选择平台公共主类");
-        }
-        if (!MealCategoryTaxonomy.isPrimaryCategory(category.getName())) {
-            throw new ServiceException("只能选择 9 个唯一主类之一");
-        }
-        return categoryId;
     }
 
     private String currentNickName() {

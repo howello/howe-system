@@ -106,4 +106,15 @@ public interface MealDishMapper {
                         @Param("expectedDeptId") Long expectedDeptId,
                         @Param("targetDeptId") Long targetDeptId,
                         @Param("updateBy") String updateBy);
+
+    /**
+     * 判断菜品是否能出现在点餐端菜单
+     *
+     * <p>条件与列表的 {@code menuVisible} 一致：所属分类未停用、未删除；
+     * 未绑定分类的菜仍视为可见。用于下单时的最终校验。</p>
+     *
+     * @param dishId 菜品 ID
+     * @return 可见返回 true
+     */
+    boolean isDishMenuVisible(@Param("dishId") Long dishId);
 }

@@ -270,6 +270,10 @@ public class MealOrderServiceImpl implements IMealOrderService {
             if (!"0".equals(dish.getStatus())) {
                 throw new ServiceException("菜品「" + dish.getName() + "」已下架");
             }
+            // 停用分类下的菜与分类一起隐藏：最终以下单时的分类状态为准
+            if (!mealDishMapper.isDishMenuVisible(dish.getDishId())) {
+                throw new ServiceException("菜品「" + dish.getName() + "」所属分类已停用");
+            }
             // 菜名与封面在此刻落成快照，之后菜品怎么改都不影响这张订单
             MealOrderItem item = new MealOrderItem();
             item.setDishId(dish.getDishId());

@@ -1,5 +1,12 @@
 import request from '@/utils/request'
-import type { MealCategoryQueryParams, MealCategory, AjaxResult, TableDataInfo } from '@/types'
+import type {
+  MealCategoryQueryParams,
+  MealCategory,
+  MealCategorySaveRequest,
+  MealCategorySaveResult,
+  AjaxResult,
+  TableDataInfo
+} from '@/types'
 
 // 查询分类列表
 export function listCategory(query: MealCategoryQueryParams): Promise<TableDataInfo<MealCategory[]>> {
@@ -18,21 +25,28 @@ export function getCategory(categoryId: number): Promise<AjaxResult<MealCategory
   })
 }
 
-// 新增分类
-export function addCategory(data: MealCategory): Promise<AjaxResult> {
+// 新增分类：经 AI 审阅，AI 调用可能超过请求层默认超时
+export function addCategory(data: MealCategorySaveRequest): Promise<AjaxResult<MealCategorySaveResult>> {
   return request({
     url: '/meal/category',
     method: 'post',
-    data: data
+    data: data,
+    timeout: 30000,
+    repeatSubmit: false
   })
 }
 
-// 修改分类
-export function updateCategory(data: MealCategory): Promise<AjaxResult> {
+// 修改分类：经 AI 审阅
+export function updateCategory(
+  categoryId: number,
+  data: MealCategorySaveRequest
+): Promise<AjaxResult<MealCategorySaveResult>> {
   return request({
-    url: '/meal/category',
+    url: '/meal/category/' + categoryId,
     method: 'put',
-    data: data
+    data: data,
+    timeout: 30000,
+    repeatSubmit: false
   })
 }
 

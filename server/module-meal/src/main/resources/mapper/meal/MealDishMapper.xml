@@ -29,6 +29,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="updateTime"   column="update_time"   />
         <result property="remark"       column="remark"        />
         <result property="categoryNames" column="category_names" />
+        <result property="categoryStatus" column="category_status" />
         <result property="orderCount"   column="order_count"   />
     </resultMap>
 
@@ -45,8 +46,28 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                   from meal_category_ref r
                   join meal_category c on c.category_id = r.category_id and c.del_flag = '0'
                  where r.biz_type = 1 and r.biz_id = d.dish_id
-                 limit 1) as category_names
+                 limit 1) as category_names,
+               (select c.status
+                  from meal_category_ref r
+                  join meal_category c on c.category_id = r.category_id and c.del_flag = '0'
+                 where r.biz_type = 1 and r.biz_id = d.dish_id
+                 limit 1) as category_status
         from meal_dish d
+    </sql>
+
+    <!--
+      菜品在点餐端「当前可见」：所属分类未停用、未删除。
+      无分类关联时 NOT EXISTS 为真，未分类菜仍然保留；
+      关联到已停用/已删除分类时隐藏，与「分类和菜一起隐藏」的产品口径一致。
+      仅点餐端查询传 menuVisible=true，后台列表不传，仍能看到停用分类下的菜。
+    -->
+    <sql id="menuVisibleCondition">
+        AND NOT EXISTS (
+            SELECT 1 FROM meal_category_ref mv_r
+            LEFT JOIN meal_category mv_c ON mv_c.category_id = mv_r.category_id
+            WHERE mv_r.biz_type = 1 AND mv_r.biz_id = d.dish_id
+              AND (mv_c.category_id IS NULL OR mv_c.del_flag &lt;&gt; '0' OR mv_c.status &lt;&gt; '0')
+        )
     </sql>
 
     <!--
@@ -74,6 +95,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="keyword != null and keyword != ''">
                 AND (d.name like concat('%', #{keyword}, '%')
                      or d.ingredients like concat('%', #{keyword}, '%'))
+            </if>
+            <if test="menuVisible != null and menuVisible">
+                <include refid="menuVisibleCondition"/>
             </if>
         </where>
         order by d.sort asc, d.dish_id desc
@@ -104,6 +128,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                     </foreach>
                 )
             </if>
+            <include refid="menuVisibleCondition"/>
         </where>
         order by d.sort asc, d.dish_id desc
         limit #{limit}
@@ -212,6 +237,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <if test="deptId != null">
             and (d.dept_id = #{deptId} or d.dept_id = 0)
         </if>
+        <!-- 停用分类下的菜不参与招牌，由后续候选顺延补位 -->
+        <include refid="menuVisibleCondition"/>
         order by t.cnt desc, d.sort asc, d.dish_id asc
         limit #{limit}
     </select>
@@ -222,5 +249,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         set dept_id = #{targetDeptId}, update_by = #{updateBy}, update_time = sysdate()
         where dish_id = #{dishId} and del_flag = '0' and dept_id = #{expectedDeptId}
     </update>
+
+    <!--
+      下单时的最终可见性校验：与菜单列表的 menuVisible 同一口径。
+      未绑定分类的菜返回 true；绑定了停用/已删除分类返回 false。
+    -->
+    <select id="isDishMenuVisible" resultType="boolean">
+        select not exists (
+            select 1 from meal_category_ref r
+            left join meal_category c on c.category_id = r.category_id
+            where r.biz_type = 1 and r.biz_id = #{dishId}
+              and (c.category_id is null or c.del_flag &lt;&gt; '0' or c.status &lt;&gt; '0')
+        )
+    </select>
 
 </mapper>

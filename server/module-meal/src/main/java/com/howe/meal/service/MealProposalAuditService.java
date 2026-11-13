@@ -3,8 +3,6 @@ package com.howe.meal.service;
 import com.howe.common.exception.ServiceException;
 import com.howe.common.utils.StringUtils;
 import com.howe.common.utils.spring.SpringUtils;
-import com.howe.meal.constant.MealCategoryTaxonomy;
-import com.howe.meal.domain.MealCategory;
 import com.howe.meal.domain.MealCategoryRef;
 import com.howe.meal.domain.MealDish;
 import com.howe.meal.domain.MealProposal;
@@ -12,11 +10,11 @@ import com.howe.meal.domain.dto.DishAiAuditResult;
 import com.howe.meal.domain.dto.DishAiCoverResult;
 import com.howe.meal.domain.dto.DishAiGenerateRequest;
 import com.howe.meal.domain.dto.DishAiTextResult;
-import com.howe.meal.mapper.MealCategoryMapper;
 import com.howe.meal.mapper.MealCategoryRefMapper;
 import com.howe.meal.mapper.MealDishMapper;
 import com.howe.meal.mapper.MealProposalMapper;
 import com.howe.meal.service.IMealWeComNotifyService;
+import com.howe.meal.util.MealCategoryGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -62,7 +60,7 @@ public class MealProposalAuditService {
 
     private final MealCategoryRefMapper mealCategoryRefMapper;
 
-    private final MealCategoryMapper mealCategoryMapper;
+    private final MealCategoryGuard mealCategoryGuard;
 
     private final MealDishAiService mealDishAiService;
 
@@ -278,8 +276,9 @@ public class MealProposalAuditService {
                 proposal.getProposalId());
         Long matchedCategoryId = text.getMatchedCategoryId();
         Long categoryId = matchedCategoryId != null ? matchedCategoryId : existingCategoryId;
-        // 无论是 AI 匹配还是沿用提案，都再校验一次：只接受 9 个公共主类，避免历史/异常关联写进菜品
-        categoryId = requirePrimaryCategoryOrNull(categoryId);
+        // 无论 AI 匹配还是沿用提案，都再校验一次：公共分类须在 8 个主类内，
+        // 私有分类须属于提案所在家庭，停用/删除分类一律视为未分类
+        categoryId = mealCategoryGuard.resolveCategoryIdOrNull(categoryId, proposal.getDeptId());
         // 提案原本没有分类时，把 AI 匹配到的分类一并写入提案，便于人工查看与后续改判
         boolean fillProposalCategory = existingCategoryId == null && categoryId != null;
 
@@ -367,27 +366,6 @@ public class MealProposalAuditService {
         update.setAuditRemark("AI 自动审核未完成：" + reason + "，等待人工审核");
         update.setUpdateBy(AI_AUDITOR);
         transactionTemplate.executeWithoutResult(status -> mealProposalMapper.updateMealProposal(update));
-    }
-
-    /**
-     * 校验分类 ID 是否为 9 个公共主类之一
-     *
-     * <p>AI 匹配结果与提案历史关联都要过这一道：不是公共主类（含旧分类、家庭私有分类、
-     * 已删除分类）一律视为未分类，返回 null，让菜品落到「待分类」而不是写进非法分类。</p>
-     *
-     * @param categoryId 待校验的分类 ID
-     * @return 合法的主类 ID；非法或为空返回 null
-     */
-    private Long requirePrimaryCategoryOrNull(Long categoryId) {
-        if (categoryId == null) {
-            return null;
-        }
-        MealCategory category = mealCategoryMapper.selectMealCategoryById(categoryId);
-        if (category == null || category.getDeptId() == null
-                || category.getDeptId() != MealCategoryTaxonomy.PUBLIC_DEPT_ID) {
-            return null;
-        }
-        return MealCategoryTaxonomy.isPrimaryCategory(category.getName()) ? categoryId : null;
     }
 
     /** 写入提案的唯一主类关联；categoryId 为空则不做任何事 */

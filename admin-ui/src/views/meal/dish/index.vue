@@ -76,9 +76,10 @@
           <a class="link-type" style="cursor: pointer" @click="handleUpdate(scope.row)">{{ scope.row.name }}</a>
         </template>
       </el-table-column>
-      <el-table-column label="分类" align="center" prop="categoryNames" :show-overflow-tooltip="true" min-width="120">
+      <el-table-column label="分类" align="center" prop="categoryNames" :show-overflow-tooltip="true" min-width="150">
         <template #default="scope">
-          <el-tag v-if="scope.row.categoryNames" size="small">{{ scope.row.categoryNames }}</el-tag>
+          <el-tag v-if="scope.row.categoryNames && scope.row.categoryStatus !== '1'" size="small">{{ scope.row.categoryNames }}</el-tag>
+          <el-tag v-else-if="scope.row.categoryNames" type="info" size="small">{{ scope.row.categoryNames }}（已停用）</el-tag>
           <el-tag v-else type="warning" size="small">待分类</el-tag>
         </template>
       </el-table-column>
