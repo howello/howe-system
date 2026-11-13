@@ -46,6 +46,51 @@ public class MealMemberServiceImpl implements IMealMemberService {
         return userMapper.selectFamilyMemberList(scopedDeptId(), keyword);
     }
 
+    /**
+     * 工具专用的家庭成员分页查询。
+     *
+     * <p>用户主表做数据库分页并只投影最小字段，角色在拿到当前页后按用户 ID 批量补齐，
+     * 避免原 Web 查询的 user-role JOIN 把多角色成员拆成多行、扭曲总数。</p>
+     */
+    @Override
+    public com.howe.meal.tool.service.IMealReadService.PageResult<java.util.Map<String, Object>>
+            listFamilyMembersForTool(String keyword, int page, int pageSize) {
+        assertFamilyManager();
+        // 普通家庭管理员必须有有效家庭；内置平台管理员沿用原有全量语义（deptId 为 null）。
+        Long deptId = scopedDeptId();
+        com.github.pagehelper.PageHelper.startPage(page, pageSize);
+        List<com.howe.system.domain.dto.FamilyMemberToolRow> rows;
+        com.github.pagehelper.PageInfo<com.howe.system.domain.dto.FamilyMemberToolRow> info;
+        try {
+            rows = userMapper.selectFamilyMemberPageForTool(deptId, keyword);
+            info = new com.github.pagehelper.PageInfo<>(rows);
+        } finally {
+            com.github.pagehelper.PageHelper.clearPage();
+        }
+        Long[] userIds = rows.stream().map(com.howe.system.domain.dto.FamilyMemberToolRow::userId)
+                .toArray(Long[]::new);
+        List<com.howe.system.domain.dto.FamilyMemberRoleToolRow> roles = userIds.length == 0
+                ? List.of() : userMapper.selectFamilyRoleKeysForTool(userIds);
+        java.util.Map<Long, List<String>> roleMap = new java.util.LinkedHashMap<>();
+        for (com.howe.system.domain.dto.FamilyMemberRoleToolRow role : roles) {
+            if (FamilyRoleConstants.isFamilyRole(role.roleKey())) {
+                roleMap.computeIfAbsent(role.userId(), key -> new java.util.ArrayList<>()).add(role.roleKey());
+            }
+        }
+        List<java.util.Map<String, Object>> items = new java.util.ArrayList<>(rows.size());
+        for (com.howe.system.domain.dto.FamilyMemberToolRow row : rows) {
+            java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
+            item.put("userId", String.valueOf(row.userId()));
+            item.put("displayName", row.nickName() == null || row.nickName().isBlank()
+                    ? row.userName() : row.nickName());
+            item.put("familyRoleKeys", roleMap.getOrDefault(row.userId(), List.of()));
+            item.put("status", "0".equals(row.status()) ? "normal" : "disabled");
+            items.add(item);
+        }
+        return new com.howe.meal.tool.service.IMealReadService.PageResult<>(items, info.getTotal(),
+                info.isHasNextPage());
+    }
+
     @Override
     public List<SysRole> selectAssignableRoles() {
         assertFamilyManager();

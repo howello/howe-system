@@ -65,6 +65,25 @@ public class MealReviewServiceImpl implements IMealReviewService {
     }
 
     /**
+     * 工具专用的本人评价分页查询。
+     *
+     * <p>分页由调用方启动；本方法在评价主查询后立即清理 PageHelper 上下文，
+     * 再补菜品快照，避免补数据的查询被当作分页目标。</p>
+     */
+    @Override
+    public List<MealReview> selectMyReviewPageForTool(MealReview mealReview) {
+        mealReview.setUserId(SecurityUtils.getUserId());
+        List<MealReview> reviews;
+        try {
+            reviews = mealReviewMapper.selectMyReviewList(mealReview);
+        } finally {
+            com.github.pagehelper.PageHelper.clearPage();
+        }
+        fillItems(reviews);
+        return reviews;
+    }
+
+    /**
      * 批量填充评价对应订单的菜品快照
      *
      * <p>评价卡片要展示「点了什么菜、长什么样、每道菜备注」，这些信息在订单明细里，

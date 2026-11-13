@@ -37,6 +37,18 @@ public interface IMealOrderCandidateService {
     void refuseOrder(Long orderId);
 
     /**
+     * 工具专用的拒单：要求订单版本、本人候选版本与轮次都匹配预览快照。
+     *
+     * <p>三个期望值为 {@code null} 时等价于 {@link #refuseOrder(Long)}，供 Web 路径复用。</p>
+     *
+     * @param orderId 订单ID
+     * @param expectedVersion 期望的订单数据版本
+     * @param candidateVersion 期望的本人候选数据版本
+     * @param candidateRound 期望的候选轮次
+     */
+    void refuseOrder(Long orderId, Long expectedVersion, Long candidateVersion, Long candidateRound);
+
+    /**
      * 处理超时：按订单模式与策略关闭或转公开
      *
      * <p>调用前订单必须仍是待接单；关闭使用条件更新，竞争失败时静默返回。</p>

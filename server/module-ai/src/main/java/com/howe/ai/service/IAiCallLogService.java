@@ -50,4 +50,21 @@ public interface IAiCallLogService
      * @return 统计结果
      */
     List<AiCallLogStats> selectStats(String groupBy, Date beginTime, Date endTime, String scene);
+
+    /**
+     * 按维度聚合用量统计并做数据库分页。
+     *
+     * <p>分页作用在聚合主查询上，{@code total} 表示聚合组数而不是原始调用记录数；
+     * 展示名只补齐当前页。旧的无分页重载继续保留，供既有管理接口使用。</p>
+     *
+     * @param groupBy 聚合维度：scene / model / day
+     * @param beginTime 起始时间，可为空
+     * @param endTime 结束时间，可为空
+     * @param scene 场景过滤，可为空
+     * @param page 页码，从 1 开始
+     * @param pageSize 每页条数
+     * @return 当前页与聚合组总数
+     */
+    com.howe.ai.service.AiStatsPage selectStatsPage(String groupBy, Date beginTime, Date endTime, String scene,
+            int page, int pageSize);
 }

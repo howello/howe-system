@@ -38,6 +38,17 @@ public interface MealProposalMapper {
     MealProposal selectMealProposalById(Long proposalId);
 
     /**
+     * 按主键查询并锁定提案行
+     *
+     * <p>审核、自动审核与删除统一先锁提案行，再锁关联菜品，
+     * 保证同一提案在所有路径上的变更串行化。</p>
+     *
+     * @param proposalId 提案ID
+     * @return 提案
+     */
+    MealProposal selectProposalForUpdate(Long proposalId);
+
+    /**
      * 新增提案
      *
      * @param mealProposal 提案

@@ -48,4 +48,7 @@ public class BlogTalk extends BaseEntity {
 
     @Schema(description = "状态（0发布 1隐藏）", example = "0")
     private String status;
+
+    @Schema(description = "数据版本，所有修改路径递增", example = "2")
+    private Long dataVersion;
 }

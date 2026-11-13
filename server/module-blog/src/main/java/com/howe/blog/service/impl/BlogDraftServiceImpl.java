@@ -46,6 +46,22 @@ public class BlogDraftServiceImpl implements IBlogDraftService
         return blogDraftMapper.selectBlogDraftById(draftId);
     }
 
+    /**
+     * 工具专用的草稿详情读取。
+     *
+     * <p>正文由 SQL 侧截取 {@code maxContentChars + 1} 个字符，调用方据此判断截断；
+     * 本方法不写库，也不改变草稿状态。</p>
+     */
+    @Override
+    public BlogDraft readDraftForTool(Long draftId, int maxContentChars)
+    {
+        if (draftId == null || maxContentChars < 1)
+        {
+            throw new ServiceException("草稿读取参数不合法");
+        }
+        return blogDraftMapper.selectBlogDraftForTool(draftId, maxContentChars + 1);
+    }
+
     @Override
     public int insertBlogDraft(BlogDraft blogDraft)
     {

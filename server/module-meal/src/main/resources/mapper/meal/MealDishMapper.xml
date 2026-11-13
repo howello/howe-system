@@ -205,6 +205,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         ) t
         inner join meal_dish d on d.dish_id = t.dish_id
         where d.del_flag = '0' and d.status = '0'
+        <!--
+          历史订单的家口径不等于菜品当前归属：菜品被迁移到别的家庭后，
+          原家庭仍能凭历史订单看到它。非平台账号必须再叠加菜品当前可见性。
+        -->
+        <if test="deptId != null">
+            and (d.dept_id = #{deptId} or d.dept_id = 0)
+        </if>
         order by t.cnt desc, d.sort asc, d.dish_id asc
         limit #{limit}
     </select>

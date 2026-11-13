@@ -80,7 +80,7 @@ public final class McpManagementServiceImpl implements McpManagementService {
                     (row, index) -> new ToolState(row.getString(1), row.getString(2), time(row.getTimestamp(3)), row.getString(4)),
                     definition.schema().name());
             ToolState state = states.isEmpty() ? new ToolState("N", "", null, "") : states.get(0);
-            return new ToolView(definition.schema(), definition.version(), definition.scope(), definition.permissions(),
+            return new ToolView(definition.schema(), definition.version(), definition.resolvedScope(), definition.permissions(),
                     definition.timeout().toMillis(), definition.maxResultBytes(), state.enabled(), state.updateBy(), state.updatedAt(), state.remark());
         }).toList();
     }

@@ -101,8 +101,9 @@ public class MealOrderTimeoutTask {
                 if (order == null) {
                     continue;
                 }
-                // 再确认一次确实没有待响应候选人，避免与并发接单交错
-                if (mealOrderCandidateMapper.countPending(orderId) > 0) {
+                // 再确认一次确实没有当前轮次的待响应候选人，避免与并发接单交错
+                Long round = order.getCandidateRound() == null ? 0L : order.getCandidateRound();
+                if (mealOrderCandidateMapper.countPending(orderId, round) > 0) {
                     continue;
                 }
                 if (mealOrderCandidateService.closeAllRefused(order)) {

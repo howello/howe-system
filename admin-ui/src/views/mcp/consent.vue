@@ -38,7 +38,7 @@
           >
             <el-checkbox :value="scope">
               {{ scopeLabel(scope) }}
-              <span v-if="scope === 'mcp:connect'" class="mcp-required">必需</span>
+              <span v-if="isRequired(scope)" class="mcp-required">必需</span>
             </el-checkbox>
             <p class="mcp-scope__desc">{{ scopeDesc(scope) }}</p>
           </div>
@@ -77,23 +77,18 @@ import { ArrowLeft, Connection } from '@element-plus/icons-vue'
 import { createMcpBrowserClient, mcpErrorMessage, McpBrowserError, type McpBrowserClient } from '@/api/mcp/browser'
 import type { McpConsent } from '@/types'
 import McpBrand from './components/McpBrand.vue'
+import { mcpDefaultSelected, mcpScopeDescription, mcpScopeLabel, mcpScopeRequired } from '@/utils/mcpScopes'
 import './style.css'
 
 const route = useRoute(), router = useRouter()
 const context = ref<McpConsent>(), selected = ref<string[]>([]), busy = ref(false), error = ref('')
 let client: McpBrowserClient | undefined
 /** 已知范围使用中文含义，未知范围保留明确标识。 */
-function scopeLabel(scope: string): string {
-  return scope === 'mcp:connect' ? '连接 MCP 并使用已开放的工具' : scope === 'offline_access' ? '离线访问' : scope
-}
+function scopeLabel(scope: string): string { return mcpScopeLabel(scope) }
 /** 每个范围的用途说明，帮助用户判断是否同意。 */
-function scopeDesc(scope: string): string {
-  return scope === 'mcp:connect'
-    ? '允许客户端在本次会话中调用工具目录里已开放的工具。'
-    : scope === 'offline_access'
-      ? '允许刷新令牌，使客户端在页面关闭后仍能保持连接。'
-      : '该范围暂未提供说明。'
-}
+function scopeDesc(scope: string): string { return mcpScopeDescription(scope) }
+/** 必需范围由服务端声明决定，不在页面重复硬编码。 */
+function isRequired(scope: string): boolean { return mcpScopeRequired(scope) }
 /** 同意只提交勾选范围；拒绝提交空范围，由服务端终结原请求。 */
 async function submit(accepted: boolean): Promise<void> {
   if (!client || !context.value || busy.value) return
@@ -111,7 +106,7 @@ async function initialize(): Promise<void> {
     const verified = await client.consent(state)
     if (route.query.state !== state) return
     context.value = verified
-    selected.value = context.value.scopes.filter(scope => scope === 'mcp:connect')
+    selected.value = mcpDefaultSelected(context.value.scopes)
   } catch (cause) {
     if (route.query.state !== state) return
     // 不把 state 或任意 returnUrl 复制到登录跳转；会话过期后需要重新发起连接。

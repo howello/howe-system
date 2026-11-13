@@ -47,6 +47,17 @@ public interface IMealProposalService {
     int submitProposal(MealProposal mealProposal);
 
     /**
+     * 工具专用的提案提交：共享原创建校验，但不注册事务提交后的异步 AI 审核。
+     *
+     * <p>MCP 路径把自动审核登记为平台持久化步骤，由平台在真实执行上下文中
+     * 复核授权后再调用模型；因此这里不能沿用 Web 路径的 afterCommit 链。</p>
+     *
+     * @param mealProposal 提案
+     * @return 结果
+     */
+    int submitProposalForTool(MealProposal mealProposal);
+
+    /**
      * 人工审核提案：允许对任意状态改判。
      * 通过时若无菜品则新建、已有菜品则重新上架；驳回时把已有菜品下架，均不重复创建菜品。
      *

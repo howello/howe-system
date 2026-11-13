@@ -103,12 +103,36 @@ public class MealOrderCandidateServiceImpl implements IMealOrderCandidateService
         candidate.setSource(source);
         candidate.setStatus(MealOrderCandidate.STATUS_PENDING);
         candidate.setExpireTime(expireTime);
+        // 候选人必须带订单当前轮次，接单/拒单时按轮次裁决，识别"同为待接单但已转公开"。
+        candidate.setCandidateRound(orderRound(orderId));
         return candidate;
+    }
+
+    /**
+     * 读取订单当前候选轮次；查不到时按 0 处理。
+     *
+     * @param orderId 订单ID
+     * @return 当前轮次
+     */
+    private Long orderRound(Long orderId) {
+        MealOrder order = mealOrderMapper.selectMealOrderById(orderId);
+        return order == null || order.getCandidateRound() == null ? 0L : order.getCandidateRound();
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class, isolation = Isolation.READ_COMMITTED)
     public void refuseOrder(Long orderId) {
+        refuseOrder(orderId, null, null, null);
+    }
+
+    /**
+     * 拒单：工具路径把预览时的订单版本、候选版本与轮次一路传入 CAS。
+     *
+     * <p>Web 路径三个期望值均为 {@code null}，仍按锁订单后读取的最新快照执行。</p>
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class, isolation = Isolation.READ_COMMITTED)
+    public void refuseOrder(Long orderId, Long expectedVersion, Long candidateVersion, Long candidateRound) {
         Long userId = SecurityUtils.getUserId();
         // 先锁订单行：同一订单的并发拒绝在这里排队，避免双方都读到对方仍待响应
         MealOrder order = mealOrderMapper.selectOrderForUpdate(orderId);
@@ -119,12 +143,23 @@ public class MealOrderCandidateServiceImpl implements IMealOrderCandidateService
         if (!MealOrder.STATUS_WAITING.equals(order.getStatus())) {
             throw new ServiceException("该订单已不是待接单状态");
         }
-        if (candidateMapper.refuseCandidate(orderId, userId) == 0) {
+        if (expectedVersion != null && !expectedVersion.equals(order.getDataVersion())) {
+            throw new ServiceException("订单已变化，请重新预览");
+        }
+        Long round = candidateRound == null
+                ? (order.getCandidateRound() == null ? 0L : order.getCandidateRound()) : candidateRound;
+        if (candidateRound != null && order.getCandidateRound() != null
+                && !candidateRound.equals(order.getCandidateRound())) {
+            throw new ServiceException("订单候选轮次已变化，请重新预览");
+        }
+        if (candidateMapper.refuseCandidate(orderId, userId, round, candidateVersion) == 0) {
             throw new ServiceException("该订单已不可拒绝");
         }
 
-        if (candidateMapper.countPending(orderId) > 0) {
-            // 仍有其他人待响应，订单维持待接单
+        if (candidateMapper.countPending(orderId, round) > 0) {
+            // 仍有其他人待响应：本人候选状态已变化，必须推进订单聚合版本，
+            // 否则其他厨师基于旧版本发起的接单/拒单仍会命中旧快照。
+            touchOrderVersion(orderId, round);
             return;
         }
 
@@ -179,27 +214,30 @@ public class MealOrderCandidateServiceImpl implements IMealOrderCandidateService
      */
     private boolean reopenToPublic(MealOrder order, String assigneeStatus, String fallbackReason) {
         Long orderId = order.getOrderId();
+        Long oldRound = order.getCandidateRound() == null ? 0L : order.getCandidateRound();
+        Long newRound = oldRound + 1;
         Date newDeadline = new Date(System.currentTimeMillis() + timeoutMinutes() * 60_000L);
-        if (mealOrderMapper.reopenToPublic(orderId, newDeadline) == 0) {
-            // 订单已被接单或已关闭，静默退出
+        // 轮次与版本一起 CAS：旧轮次的确认/操作不能再命中新一轮订单。
+        if (mealOrderMapper.reopenToPublic(orderId, newDeadline, oldRound, order.getDataVersion()) == 0) {
+            // 订单已被接单、已关闭或轮次已变化，静默退出
             return false;
         }
 
         Long assignUserId = order.getAssignUserId();
         if (assignUserId != null) {
             if (MealOrderCandidate.STATUS_EXPIRED.equals(assigneeStatus)) {
-                candidateMapper.expireCandidate(orderId, assignUserId);
+                candidateMapper.expireCandidate(orderId, assignUserId, oldRound);
             }
-            // 截止时间随新一轮延长；状态保持拒绝或超时未响应，不再回到待响应
-            candidateMapper.updateCandidateExpireTime(orderId, assignUserId, newDeadline);
+            // 迁入新轮次并延长截止时间；状态保持拒绝或超时未响应，不再回到待响应
+            candidateMapper.promoteCandidateRound(orderId, assignUserId, oldRound, newRound, newDeadline);
         }
 
-        List<MealOrderCandidate> reopened = buildReopenedCandidates(order, newDeadline);
+        List<MealOrderCandidate> reopened = buildReopenedCandidates(order, newRound, newDeadline);
         if (!reopened.isEmpty()) {
             candidateMapper.insertCandidatesIgnoringExisting(reopened);
         }
 
-        if (candidateMapper.countPending(orderId) == 0) {
+        if (candidateMapper.countPending(orderId, newRound) == 0) {
             // 补入后仍无人可接：按触发原因关闭，不一律记成「全员拒绝」
             return closeAsUnaccepted(order, fallbackReason);
         }
@@ -223,18 +261,21 @@ public class MealOrderCandidateServiceImpl implements IMealOrderCandidateService
      * 组装指派转公开时需要补入的候选人（本家庭其他符合资格的厨师）
      *
      * @param order       订单
+     * @param newRound    新候选轮次
      * @param newDeadline 新的截止时间
      * @return 待插入的候选人
      */
-    private List<MealOrderCandidate> buildReopenedCandidates(MealOrder order, Date newDeadline) {
+    private List<MealOrderCandidate> buildReopenedCandidates(MealOrder order, Long newRound, Date newDeadline) {
         Set<Long> existing = new HashSet<>(candidateMapper.selectCandidateUserIds(order.getOrderId()));
         List<MealOrderCandidate> candidates = new ArrayList<>();
         for (MealOrderAssignee chef : mealOrderMapper.selectChefAssigneesByDeptId(order.getDeptId())) {
             if (existing.contains(chef.userId())) {
                 continue;
             }
-            candidates.add(buildCandidate(order.getOrderId(), order.getDeptId(), chef,
-                    MealOrderCandidate.SOURCE_REOPENED, newDeadline));
+            MealOrderCandidate candidate = buildCandidate(order.getOrderId(), order.getDeptId(), chef,
+                    MealOrderCandidate.SOURCE_REOPENED, newDeadline);
+            candidate.setCandidateRound(newRound);
+            candidates.add(candidate);
         }
         return candidates;
     }
@@ -250,10 +291,12 @@ public class MealOrderCandidateServiceImpl implements IMealOrderCandidateService
      * @return 是否实际关闭成功
      */
     private boolean closeAsUnaccepted(MealOrder order, String closeReason) {
+        Long round = order.getCandidateRound() == null ? 0L : order.getCandidateRound();
         MealOrder update = new MealOrder();
         update.setOrderId(order.getOrderId());
         update.setStatus(MealOrder.STATUS_UNACCEPTED);
         update.setExpectedStatus(MealOrder.STATUS_WAITING);
+        update.setExpectedVersion(order.getDataVersion());
         update.setCloseReason(closeReason);
         update.setUpdateBy(currentOperator());
         // 超时关闭额外要求确实已过截止时间；拒绝关闭不要求
@@ -261,7 +304,7 @@ public class MealOrderCandidateServiceImpl implements IMealOrderCandidateService
         if (mealOrderMapper.updateMealOrderStatus(update) == 0) {
             return false;
         }
-        candidateMapper.invalidatePending(order.getOrderId());
+        candidateMapper.invalidatePending(order.getOrderId(), round);
         Long userId = order.getUserId();
         Long orderId = order.getOrderId();
         String orderNo = order.getOrderNo();
@@ -310,6 +353,27 @@ public class MealOrderCandidateServiceImpl implements IMealOrderCandidateService
         String value = ConfigUtils.getString(ConfigConstants.MEAL_ORDER_ASSIGN_REFUSE_STRATEGY,
                 STRATEGY_REOPEN);
         return STRATEGY_REOPEN.equals(value) || "2".equals(value) ? value : STRATEGY_REOPEN;
+    }
+
+    /**
+     * 候选人状态已变化但订单仍待接单时，推进订单聚合版本。
+     *
+     * <p>订单版本是「接单/拒单确认依据」的聚合版本：其他厨师持有的旧版本必须失效，
+     * 否则会基于已变化的候选快照做出接单判断。</p>
+     *
+     * @param orderId 订单ID
+     * @param round   当前候选轮次
+     */
+    private void touchOrderVersion(Long orderId, Long round) {
+        MealOrder touch = new MealOrder();
+        touch.setOrderId(orderId);
+        touch.setExpectedStatus(MealOrder.STATUS_WAITING);
+        touch.setExpectedCandidateRound(round);
+        touch.setUpdateBy(currentOperator());
+        if (mealOrderMapper.touchOrderVersion(touch) == 0) {
+            // 订单已被其它操作抢先推进或关闭，本轮无需再做任何事。
+            log.info("订单版本推进未命中，订单可能已变化，orderId={}", orderId);
+        }
     }
 
     /**

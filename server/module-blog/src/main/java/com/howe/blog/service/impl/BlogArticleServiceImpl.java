@@ -50,6 +50,12 @@ public class BlogArticleServiceImpl implements IBlogArticleService
     /** 摘要截取长度 */
     private static final int SUMMARY_LENGTH = 200;
 
+    /** 工具读取正文的源文件字节上限（1 MiB）。 */
+    private static final int TOOL_SOURCE_BYTES_LIMIT = 1024 * 1024;
+
+    /** 工具读取正文的上游超时，需小于工具总超时并预留解析时间。 */
+    private static final int TOOL_GITHUB_TIMEOUT_MS = 15000;
+
     @Autowired
     private BlogArticleMapper blogArticleMapper;
 
@@ -86,6 +92,41 @@ public class BlogArticleServiceImpl implements IBlogArticleService
         patch.setGitSha(file.getSha());
         patch.setLastSyncTime(article.getLastSyncTime());
         blogArticleMapper.updateBlogArticle(patch);
+        return article;
+    }
+
+    /**
+     * 工具专用的文章详情读取。
+     *
+     * <p>只读路径：不调用任何 update Mapper，不产生同步时间回写。正文读取走有界接口，
+     * 源文件超过 1 MiB 时直接失败，由调用方映射为稳定错误码。</p>
+     */
+    @Override
+    public BlogArticle readArticleForTool(Long articleId, boolean includeContent, int maxContentChars)
+    {
+        BlogArticle article = blogArticleMapper.selectBlogArticleById(articleId);
+        if (article == null)
+        {
+            throw new ServiceException("文章不存在或已被删除");
+        }
+        if (!includeContent)
+        {
+            return article;
+        }
+        if (article.getFilePath() == null || article.getFilePath().isBlank())
+        {
+            throw new ServiceException("文章缺少仓库路径");
+        }
+        GithubFile file = githubClient.readFileBounded(article.getFilePath(), TOOL_SOURCE_BYTES_LIMIT,
+                TOOL_GITHUB_TIMEOUT_MS);
+        if (file == null)
+        {
+            throw new ServiceException("文章文件在仓库中已不存在");
+        }
+        MarkdownDocument document = FrontmatterUtils.parse(file.getContent());
+        article.setContent(document.getBody());
+        applyFrontmatter(article, document.getFrontmatter());
+        article.setGitSha(file.getSha());
         return article;
     }
 

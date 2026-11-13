@@ -121,11 +121,7 @@ public class AiCallLogServiceImpl implements IAiCallLogService
     @Override
     public List<AiCallLogStats> selectStats(String groupBy, Date beginTime, Date endTime, String scene)
     {
-        String dimension = StrUtil.isBlank(groupBy) ? "scene" : groupBy.trim().toLowerCase();
-        if (!GROUP_BY.contains(dimension))
-        {
-            throw new ServiceException("不支持的聚合维度：" + groupBy + "，可选 scene / model / day");
-        }
+        String dimension = dimension(groupBy);
         List<AiCallLogStats> stats = aiCallLogMapper.selectStats(dimension, beginTime, endTime, scene);
         if (stats == null || stats.isEmpty())
         {
@@ -133,6 +129,51 @@ public class AiCallLogServiceImpl implements IAiCallLogService
         }
         fillGroupLabels(stats, dimension);
         return stats;
+    }
+
+    /**
+     * 用量统计的数据库分页版本。
+     *
+     * <p>分页作用在 {@code GROUP BY} 主查询上：{@code total} 是聚合组数；
+     * 展示名只补齐当前页，避免为未返回的分组做无谓查询。</p>
+     */
+    @Override
+    public com.howe.ai.service.AiStatsPage selectStatsPage(String groupBy, Date beginTime, Date endTime, String scene,
+            int page, int pageSize)
+    {
+        String dimension = dimension(groupBy);
+        com.github.pagehelper.PageHelper.startPage(page, pageSize);
+        try
+        {
+            List<AiCallLogStats> stats = aiCallLogMapper.selectStats(dimension, beginTime, endTime, scene);
+            com.github.pagehelper.PageInfo<AiCallLogStats> info = new com.github.pagehelper.PageInfo<>(stats);
+            List<AiCallLogStats> rows = stats == null ? List.of() : stats;
+            if (!rows.isEmpty())
+            {
+                fillGroupLabels(rows, dimension);
+            }
+            return new com.howe.ai.service.AiStatsPage(rows, info.getTotal(), info.isHasNextPage());
+        }
+        finally
+        {
+            com.github.pagehelper.PageHelper.clearPage();
+        }
+    }
+
+    /**
+     * 校验并规范化聚合维度。
+     *
+     * @param groupBy 原始维度
+     * @return 规范化维度
+     */
+    private String dimension(String groupBy)
+    {
+        String dimension = StrUtil.isBlank(groupBy) ? "scene" : groupBy.trim().toLowerCase();
+        if (!GROUP_BY.contains(dimension))
+        {
+            throw new ServiceException("不支持的聚合维度：" + groupBy + "，可选 scene / model / day");
+        }
+        return dimension;
     }
 
     /**

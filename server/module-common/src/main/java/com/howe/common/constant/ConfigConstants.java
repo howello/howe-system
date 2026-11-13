@@ -30,6 +30,24 @@ public class ConfigConstants {
     public static final String MCP_TOOL_CONCURRENCY = "mcp.tool.concurrency";
     /** MCP 单进程内同一用户跨客户端共享的工具执行并发（启动读取，默认 2）。 */
     public static final String MCP_TOOL_USER_CONCURRENCY = "mcp.tool.userConcurrency";
+    /** MCP 本地写操作执行并发（启动读取，默认 4）。 */
+    public static final String MCP_OPERATION_LOCAL_CONCURRENCY = "mcp.operation.localConcurrency";
+    /** MCP 博客发布执行并发（启动读取，默认 1）。 */
+    public static final String MCP_OPERATION_PUBLISH_CONCURRENCY = "mcp.operation.publishConcurrency";
+
+    /** 点餐写执行并发；启动时读取，修改后重启生效。 */
+    public static final String MCP_OPERATION_MEAL_CONCURRENCY = "mcp.operation.mealConcurrency";
+
+    /** 点餐提案自动审核步骤并发；启动时读取，修改后重启生效。 */
+    public static final String MCP_OPERATION_MEAL_AUDIT_CONCURRENCY = "mcp.operation.mealAuditConcurrency";
+
+    /** 写操作进程内总并发；启动时读取，修改后重启生效。 */
+    public static final String MCP_OPERATION_TOTAL_CONCURRENCY = "mcp.operation.totalConcurrency";
+
+    /** 写操作进程内单账号并发；启动时读取，修改后重启生效。 */
+    public static final String MCP_OPERATION_USER_CONCURRENCY = "mcp.operation.userConcurrency";
+    /** MCP 操作账本元数据保留天数（默认 30）。 */
+    public static final String MCP_OPERATION_RETAIN_DAYS = "mcp.operation.retainDays";
     /** MCP 自动客户端登记的 IP 每分钟限额。 */
     public static final String MCP_REGISTRATION_IP_PER_MINUTE = "mcp.registration.ipPerMinute";
     /** 自动登记总量上限，同时作为数据库登记配额互斥行。 */

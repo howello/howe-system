@@ -4,6 +4,11 @@ export interface McpPublicConfiguration {
   enabled: boolean
   backendBaseUrl?: string
   resource?: string
+  loginPage?: string
+  consentPage?: string
+  connectionsPage?: string
+  confirmationPage?: string
+  operationsPage?: string
 }
 /** 独立浏览器会话 CSRF 契约。 */
 export interface McpCsrf { csrfToken: string; csrfHeaderName: string; csrfParameterName: string }

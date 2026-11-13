@@ -104,28 +104,92 @@ public class MealProposalAuditService {
         if (proposal == null || !MealProposal.STATUS_PENDING.equals(proposal.getStatus())) {
             return;
         }
+        runAudit(proposal);
+    }
+
+    /**
+     * 在给定提案快照上执行一次自动审核。
+     *
+     * <p>供 Web 异步链与 MCP 持久化步骤共用；调用方负责在调用前完成授权复核，
+     * 并在外部调用前落阶段。方法本身不再触发通知、轮询或调度。</p>
+     *
+     * @param proposal 已读取的提案快照
+     * @return 审核执行结果
+     */
+    public AuditRun runAudit(MealProposal proposal) {
         DishAiAuditResult audit;
         try {
             audit = mealDishAiService.auditAndComplete(proposal.getName(), snapshotCurrent(proposal),
                     proposal.getDeptId());
         } catch (Exception e) {
-            log.warn("新菜提案 AI 自动审核调用失败，proposalId={}", proposalId, e);
-            markAuditFailed(proposalId, e);
+            log.warn("新菜提案 AI 自动审核调用失败，proposalId={}", proposal.getProposalId(), e);
+            markAuditFailed(proposal, e);
             notifyAuditResult(proposal, "审核未完成", readableMessage(e), null);
-            return;
+            return new AuditRun(AuditRun.Outcome.FAILED, null, null);
         }
         try {
             if (!audit.isApproved()) {
-                applyReject(proposalId, audit.getRejectReason());
+                applyReject(proposal, audit.getRejectReason());
                 notifyAuditResult(proposal, "已驳回", readableAuditReason(audit.getRejectReason()), null);
-            } else {
-                applyApprove(proposal, audit);
-                notifyAuditResult(proposal, "已通过", "已经自动补齐资料并加进菜单", null);
+                return new AuditRun(AuditRun.Outcome.REJECTED, null, null);
             }
+            Long dishId = applyApprove(proposal, audit);
+            notifyAuditResult(proposal, "已通过", "已经自动补齐资料并加进菜单", null);
+            return new AuditRun(AuditRun.Outcome.APPROVED, dishId, null);
         } catch (Exception e) {
             // 写入失败通常是提案状态已被人工审核抢先改动，事务已回滚，不影响人工结果
-            log.warn("写入新菜提案 AI 审核结果失败，proposalId={}", proposalId, e);
+            log.warn("写入新菜提案 AI 审核结果失败，proposalId={}", proposal.getProposalId(), e);
             notifyAuditResult(proposal, "审核未完成", "结果没能保存成功，等家人手动看一下", null);
+            return new AuditRun(AuditRun.Outcome.CONFLICT, null, null);
+        }
+    }
+
+    /** 工具步骤在事务外调用模型；每次后续外部动作前都重新检查授权。 */
+    public DishAiAuditResult prepareAuditForTool(MealProposal proposal,
+            com.howe.common.tool.operation.ToolOperationStepContext.Guard guard) {
+        guard.externalSendIntent();
+        DishAiAuditResult audit = mealDishAiService.auditAndComplete(proposal.getName(), snapshotCurrent(proposal),
+                proposal.getDeptId());
+        if (audit.isApproved() && isBlank(proposal.getImage())) {
+            guard.check();
+            proposal.setImage(generateCover(proposal.getName()));
+        }
+        return audit;
+    }
+
+    /** 仅应用已经取得的审核结果；由平台围栏事务包裹，不发起外部调用。 */
+    public AuditRun applyAuditForTool(MealProposal proposal, DishAiAuditResult audit) {
+        MealProposal current = mealProposalMapper.selectProposalForUpdate(proposal.getProposalId());
+        if (current == null || !MealProposal.STATUS_PENDING.equals(current.getStatus())
+                || !java.util.Objects.equals(current.getDataVersion(), proposal.getDataVersion())) {
+            return new AuditRun(AuditRun.Outcome.CONFLICT, null, null);
+        }
+        if (!audit.isApproved()) {
+            applyReject(proposal, audit.getRejectReason());
+            return new AuditRun(AuditRun.Outcome.REJECTED, null, null);
+        }
+        return new AuditRun(AuditRun.Outcome.APPROVED, applyApprove(proposal, audit, false), null);
+    }
+
+    /**
+     * 一次自动审核的执行结果。
+     *
+     * @param outcome 结果种类
+     * @param dishId 通过时生成的菜品ID
+     * @param reason 失败原因，可空
+     */
+    public record AuditRun(Outcome outcome, Long dishId, String reason) {
+
+        /** 审核结果种类。 */
+        public enum Outcome {
+            /** 通过。 */
+            APPROVED,
+            /** 驳回。 */
+            REJECTED,
+            /** 提案状态已变化。 */
+            CONFLICT,
+            /** AI 调用或写入失败。 */
+            FAILED
         }
     }
 
@@ -198,7 +262,12 @@ public class MealProposalAuditService {
     }
 
     /** AI 审核通过：补齐字段 + 生成封面 + 建菜品 + 回写提案（同一事务） */
-    private void applyApprove(MealProposal proposal, DishAiAuditResult audit) {
+    private Long applyApprove(MealProposal proposal, DishAiAuditResult audit) {
+        return applyApprove(proposal, audit, true);
+    }
+
+    /** 应用审核通过结果，工具路径禁止在事务内补发封面调用。 */
+    private Long applyApprove(MealProposal proposal, DishAiAuditResult audit, boolean generateMissingCover) {
         DishAiTextResult text = audit.getText();
         Map<String, Object> fields = text.getFields();
         if (fields == null) {
@@ -215,7 +284,7 @@ public class MealProposalAuditService {
         boolean fillProposalCategory = existingCategoryId == null && categoryId != null;
 
         String cover = proposal.getImage();
-        if (isBlank(cover)) {
+        if (isBlank(cover) && generateMissingCover) {
             cover = generateCover(proposal.getName());
         }
         String description = firstNonBlank(proposal.getDescription(), fieldText(fields, "description"));
@@ -231,9 +300,11 @@ public class MealProposalAuditService {
 
         String finalCover = cover;
         Long finalCategoryId = categoryId;
+        Long[] created = new Long[1];
         transactionTemplate.executeWithoutResult(status -> {
             Long dishId = insertDish(proposal.getDeptId(), proposal.getName(), finalCover, description, tags,
                     duration, level, serve, kcal, ingredients, steps, tips, finalCategoryId, AI_AUDITOR);
+            created[0] = dishId;
             if (fillProposalCategory) {
                 saveProposalCategory(proposal.getProposalId(), finalCategoryId);
             }
@@ -242,6 +313,8 @@ public class MealProposalAuditService {
             update.setProposalId(proposal.getProposalId());
             update.setStatus(MealProposal.STATUS_APPROVED);
             update.setExpectedStatus(MealProposal.STATUS_PENDING);
+            // AI 调用前读取的版本参与 CAS：期间被人工审核改动时放弃写入，不覆盖人工结果。
+            update.setExpectedVersion(proposal.getDataVersion());
             update.setAuditBy(AI_AUDITOR);
             update.setAuditRemark(AI_APPROVE_REMARK);
             update.setDishId(dishId);
@@ -262,31 +335,35 @@ public class MealProposalAuditService {
                 throw new ServiceException("提案状态已变化，放弃 AI 自动审核写入");
             }
         });
+        return created[0];
     }
 
     /** AI 驳回：置状态并写可读原因 */
-    private void applyReject(Long proposalId, String rejectReason) {
+    private void applyReject(MealProposal proposal, String rejectReason) {
         MealProposal update = new MealProposal();
-        update.setProposalId(proposalId);
+        update.setProposalId(proposal.getProposalId());
         update.setStatus(MealProposal.STATUS_REJECTED);
         update.setExpectedStatus(MealProposal.STATUS_PENDING);
+        // 与通过路径一致：AI 调用前的版本参与 CAS，人工审核抢先时放弃写入。
+        update.setExpectedVersion(proposal.getDataVersion());
         update.setAuditBy(AI_AUDITOR);
         update.setAuditRemark(StringUtils.isNotEmpty(rejectReason) ? rejectReason : AI_REJECT_FALLBACK);
         update.setUpdateBy(AI_AUDITOR);
         transactionTemplate.executeWithoutResult(status -> {
             int rows = mealProposalMapper.updateMealProposal(update);
             if (rows == 0) {
-                log.info("新菜提案状态已变化，放弃 AI 驳回写入，proposalId={}", proposalId);
+                log.info("新菜提案状态已变化，放弃 AI 驳回写入，proposalId={}", proposal.getProposalId());
             }
         });
     }
 
     /** AI 调用失败：保留待审核，写入可读原因供人工处理 */
-    private void markAuditFailed(Long proposalId, Exception cause) {
+    private void markAuditFailed(MealProposal proposal, Exception cause) {
         String reason = cause instanceof ServiceException ? cause.getMessage() : "AI 自动审核未完成";
         MealProposal update = new MealProposal();
-        update.setProposalId(proposalId);
+        update.setProposalId(proposal.getProposalId());
         update.setExpectedStatus(MealProposal.STATUS_PENDING);
+        update.setExpectedVersion(proposal.getDataVersion());
         update.setAuditRemark("AI 自动审核未完成：" + reason + "，等待人工审核");
         update.setUpdateBy(AI_AUDITOR);
         transactionTemplate.executeWithoutResult(status -> mealProposalMapper.updateMealProposal(update));

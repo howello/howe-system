@@ -78,4 +78,12 @@ public class MealOrderCandidate implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Schema(description = "更新时间")
     private Date updateTime;
+
+    /** 候选行数据版本：状态、轮次、有效期变化均递增 */
+    @Schema(description = "候选数据版本", example = "2")
+    private Long dataVersion;
+
+    /** 候选轮次：必须与订单当前轮次一致才能响应 */
+    @Schema(description = "候选轮次", example = "0")
+    private Long candidateRound;
 }

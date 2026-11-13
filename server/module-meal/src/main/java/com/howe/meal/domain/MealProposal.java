@@ -106,6 +106,14 @@ public class MealProposal extends BaseEntity {
     @Schema(description = "期望的当前状态（审核并发保护，不落库）")
     private String expectedStatus;
 
+    /** 提案数据版本：AI、人工、失败备注等所有修改路径递增 */
+    @Schema(description = "提案数据版本，所有修改路径递增", example = "1")
+    private Long dataVersion;
+
+    /** 状态流转用：期望的数据版本，作为 where 条件防止基于旧快照审核（不落库） */
+    @Schema(description = "期望的数据版本（审核并发保护，不落库）")
+    private Long expectedVersion;
+
     @Schema(description = "删除标记（0存在 2删除）", example = "0")
     private String delFlag;
 

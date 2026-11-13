@@ -26,6 +26,21 @@ public interface IMealMemberService {
     List<SysUser> selectFamilyMemberList(String keyword);
 
     /**
+     * 工具专用的家庭成员分页查询。
+     *
+     * <p>只返回 {@code userId}、{@code displayName}、家庭角色键与状态的最小投影；
+     * 分页只作用于用户主查询，角色在拿到当前页后按 ID 批量补齐，
+     * 避免多角色 JOIN 切割行、扭曲总数并读取无关隐私字段。</p>
+     *
+     * @param keyword 昵称关键字，可为空
+     * @param page 页码，从 1 开始
+     * @param pageSize 每页条数
+     * @return 分页结果
+     */
+    com.howe.meal.tool.service.IMealReadService.PageResult<java.util.Map<String, Object>> listFamilyMembersForTool(
+            String keyword, int page, int pageSize);
+
+    /**
      * 查询可分配的家庭角色（点餐员 / 厨师 / 家庭管理员）
      *
      * @return 家庭角色集合
