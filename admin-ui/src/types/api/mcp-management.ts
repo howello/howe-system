@@ -11,9 +11,15 @@ export interface McpAdminClientDetail { client: McpAdminClient; redirectUris: st
 /** 代码中真实注册的工具契约。 */
 export interface McpAdminTool {
   schema: { name: string; title?: string; description?: string; inputSchema: unknown; annotations?: Record<string, unknown> }
-  version: string; scope: string; permissions: string[]; timeoutMs: number; maxResultBytes: number
+  version: string; capabilityGroup: string; scope: string; permissions: string[]; timeoutMs: number; maxResultBytes: number
   enabled: string; updateBy: string; updatedAt: string | null; remark: string
 }
+/** 工具目录查询条件；模块取能力分组第一段，mcp 表示平台工具。 */
+export interface McpAdminToolQuery extends PageDomain { keyword?: string; module?: string; capabilityGroup?: string; enabled?: string }
+/** 工具目录全量统计与筛选选项，不受列表查询条件影响。 */
+export interface McpAdminToolSummary { catalogTotal: number; enabledTotal: number; modules: string[]; capabilityGroups: string[] }
+/** 全局工具状态切换结果。 */
+export interface McpAdminToolStatusResult { enabled: string; total: number; changed: number; unchanged: number }
 /** 授权状态，不含授权载荷或令牌。 */
 export interface McpAdminGrant {
   grantId: number; userId: number; clientId: string; clientName: string; resource: string

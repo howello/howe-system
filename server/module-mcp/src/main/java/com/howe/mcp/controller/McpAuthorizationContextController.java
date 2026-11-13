@@ -7,11 +7,15 @@ import com.howe.mcp.config.McpEndpointSettings;
 import com.howe.mcp.service.security.McpAuthorizationRequestValidator;
 import com.howe.mcp.service.McpJdbcAuthorizationService;
 import com.howe.mcp.service.spi.McpAccountBridge;
+import com.howe.mcp.tool.McpToolDefinition;
+import com.howe.mcp.tool.McpToolRegistry;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +48,7 @@ public class McpAuthorizationContextController {
     private final McpJdbcAuthorizationService authorizations;
     private final JdbcRegisteredClientRepository clients;
     private final McpAccountBridge accounts;
+    private final McpToolRegistry tools;
 
     /** 登录后只恢复本 Session 中已缓存的 GET 请求，忽略客户端任意 returnUrl 和请求 Host。 */
     @RateLimiter(count = 30, time = 60, limitType = LimitType.IP)
@@ -93,7 +98,38 @@ public class McpAuthorizationContextController {
             return invalid();
         }
         return ResponseEntity.ok().header("Cache-Control", "no-store").body(new ConsentView(state, client.getClientId(),
-                client.getClientName(), original.getRedirectUri(), List.copyOf(original.getScopes()), endpoints.issuer() + "/oauth2/authorize"));
+                client.getClientName(), original.getRedirectUri(), List.copyOf(original.getScopes()),
+                endpoints.issuer() + "/oauth2/authorize", scopeTools(original.getScopes())));
+    }
+
+    /**
+     * 按本次请求范围投影代码目录中的工具名称。
+     *
+     * <p>只用于帮助用户理解授权范围，不表示当前账号此刻必然能调用；实际调用仍受
+     * 工具开放状态、业务权限与对象归属限制。目录外的数据库记录不会进入结果。</p>
+     *
+     * @param scopes 本次请求的授权范围，顺序由授权请求决定
+     * @return 每个请求范围对应的最小工具展示
+     */
+    private List<ScopeTools> scopeTools(java.util.Set<String> scopes) {
+        Map<String, List<ToolItem>> grouped = new LinkedHashMap<>();
+        for (String scope : scopes) {
+            grouped.put(scope, new ArrayList<>());
+        }
+        for (McpToolDefinition definition : tools.catalog()) {
+            List<ToolItem> items = grouped.get(definition.resolvedScope());
+            if (items == null) {
+                continue;
+            }
+            String title = definition.schema().title();
+            if (items.stream().noneMatch(item -> item.name().equals(definition.schema().name()))) {
+                items.add(new ToolItem(definition.schema().name(), title == null || title.isBlank() ? null : title));
+            }
+        }
+        return grouped.entrySet().stream()
+                .map(entry -> new ScopeTools(entry.getKey(), entry.getValue().stream()
+                        .sorted(java.util.Comparator.comparing(ToolItem::name)).toList()))
+                .toList();
     }
 
     /** 无效或他人的 state 使用同一响应，不泄露请求是否存在。 */
@@ -103,5 +139,21 @@ public class McpAuthorizationContextController {
 
     /** 授权页面所需的最小公开信息，不包含用户凭据、授权码或客户端密钥。 */
     public record ConsentView(String state, String clientId, String clientName, String redirectUri,
-            List<String> scopes, String submitUrl) { }
+            List<String> scopes, String submitUrl, List<ScopeTools> scopeTools) { }
+
+    /**
+     * 单个授权范围覆盖的工具展示。
+     *
+     * @param scope 原始 scope 标识
+     * @param tools 该范围下的工具名称与标题
+     */
+    public record ScopeTools(String scope, List<ToolItem> tools) { }
+
+    /**
+     * 授权页使用的工具最小信息。
+     *
+     * @param name 工具名
+     * @param title 展示标题，缺失时为 null
+     */
+    public record ToolItem(String name, String title) { }
 }

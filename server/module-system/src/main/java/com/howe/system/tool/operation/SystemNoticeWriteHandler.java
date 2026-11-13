@@ -89,8 +89,26 @@ public final class SystemNoticeWriteHandler implements ToolOperationHandler {
             evidence.put("alreadyReadIds", result.alreadyReadIds().stream().map(String::valueOf).toList());
             return new Outcome(OutcomeKind.APPLIED, "LOCAL", "marked", evidence);
         } catch (ServiceException exception) {
-            throw new ToolException("state_conflict", "公告不存在、已停用或状态已变化");
+            throw translate(exception);
         }
+    }
+
+    /**
+     * 把领域异常收敛为稳定工具错误码。
+     *
+     * <p>公告不存在或已停用属于对象不可用，不是状态竞争；统一映射为
+     * {@code not_found_or_forbidden}，提示用户重新查询可读公告后再准备。
+     * 未识别的领域异常保留 {@code state_conflict} 兜底，不回显异常原文。</p>
+     *
+     * @param exception 领域服务异常
+     * @return 可安全展示的工具异常
+     */
+    private static ToolException translate(ServiceException exception) {
+        String message = exception.getMessage() == null ? "" : exception.getMessage();
+        if (message.contains("不存在") || message.contains("已停用")) {
+            return new ToolException("not_found_or_forbidden", "公告不存在或已停用，请重新查询可读公告后再准备操作");
+        }
+        return new ToolException("state_conflict", "公告已读未完成，请重新查询公告状态");
     }
 
     /** 本地写无远端对账。 */

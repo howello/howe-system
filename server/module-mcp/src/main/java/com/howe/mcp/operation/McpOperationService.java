@@ -359,7 +359,7 @@ public final class McpOperationService {
         return result;
     }
 
-    /** 稳定视图。 */
+    /** 稳定视图；列表额外提供准备期限，供页面判断是否仍可进入确认页。 */
     private static Map<String, Object> view(McpOperationRecord record) {
         Map<String, Object> view = new LinkedHashMap<>();
         view.put("operationId", record.operationId());
@@ -369,6 +369,9 @@ public final class McpOperationService {
         view.put("resultCode", record.resultCode());
         view.put("createdAt", record.createdAt());
         view.put("finishedAt", record.finishedAt());
+        view.put("prepareExpiresAt", record.prepareExpiresAt());
+        view.put("canConfirm", McpOperationState.PREPARED.equals(record.state())
+                && record.prepareExpiresAt() != null && record.prepareExpiresAt().isAfter(Instant.now()));
         return view;
     }
 

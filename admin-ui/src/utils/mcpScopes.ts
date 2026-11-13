@@ -4,6 +4,8 @@
  * 只维护当前后端真正支持的 scope；新增 scope 时必须同步
  * `module-mcp` 的 `McpScopes.SUPPORTED` 与后端全链路校验。
  */
+import { mcpSortModules } from './mcpModules'
+
 export interface McpScopeMeta {
   /** 中文名称。 */
   label: string
@@ -11,8 +13,6 @@ export interface McpScopeMeta {
   description: string
   /** 是否必需。 */
   required?: boolean
-  /** 是否默认勾选。 */
-  defaultSelected?: boolean
 }
 
 /** 已知范围映射；未知范围保留原文，不猜测含义。 */
@@ -20,8 +20,7 @@ export const MCP_SCOPE_META: Record<string, McpScopeMeta> = {
   'mcp:connect': {
     label: '连接 MCP 并使用已开放的工具',
     description: '允许客户端在本次会话中调用工具目录里已开放的工具。',
-    required: true,
-    defaultSelected: true
+    required: true
   },
   offline_access: {
     label: '离线访问',
@@ -125,9 +124,45 @@ export function mcpScopeRequired(scope: string): boolean {
 /**
  * 返回默认勾选的范围。
  *
+ * <p>授权页默认选择本次请求包含的全部范围（含离线访问），由用户按需取消；
+ * 只返回请求中真实存在的范围，不添加客户端未申请的权限。</p>
+ *
  * @param scopes 本次请求的全部范围
  * @returns 默认勾选集合
  */
 export function mcpDefaultSelected(scopes: string[]): string[] {
-  return scopes.filter(scope => MCP_SCOPE_META[scope]?.defaultSelected === true)
+  return Array.from(new Set(scopes))
+}
+
+/**
+ * 返回 scope 所属模块。
+ *
+ * `mcp:connect` 与 `offline_access` 归入平台；其余按冒号前缀归类，
+ * 未知范围放入“其他”，不根据名称猜测授权关系。
+ *
+ * @param scope 授权范围
+ * @returns 模块标识
+ */
+export function mcpScopeModule(scope: string): string {
+  if (scope === 'mcp:connect' || scope === 'offline_access') return 'mcp'
+  const index = scope.indexOf(':')
+  if (index < 1) return 'other'
+  return scope.slice(0, index)
+}
+
+/**
+ * 按模块分组 scope，供授权页 tab 使用。
+ *
+ * @param scopes 本次请求的范围
+ * @returns 按固定模块顺序排列的分组
+ */
+export function mcpGroupScopes(scopes: string[]): Array<{ module: string; scopes: string[] }> {
+  const grouped = new Map<string, string[]>()
+  for (const scope of scopes) {
+    const module = mcpScopeModule(scope)
+    const list = grouped.get(module) ?? []
+    list.push(scope)
+    grouped.set(module, list)
+  }
+  return mcpSortModules(Array.from(grouped.keys())).map(module => ({ module, scopes: grouped.get(module) ?? [] }))
 }

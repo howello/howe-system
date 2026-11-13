@@ -60,13 +60,22 @@
           若对象版本、授权或家庭归属已变化，本次确认会失效并需要重新预览。
         </div>
 
+        <el-alert
+          v-if="expired"
+          title="本次准备已过期，不能继续确认。请让 AI 客户端重新准备操作。"
+          type="warning"
+          :closable="false"
+          show-icon
+          class="mcp-error"
+        />
+
         <div class="mcp-actions mcp-actions--split">
           <el-button size="large" :disabled="busy || !view.canConfirm" @click="reject">拒绝</el-button>
           <el-button
             size="large"
             type="primary"
             :loading="busy"
-            :disabled="!view.canConfirm || busy"
+            :disabled="!view.canConfirm || busy || expired"
             @click="confirm"
           >确认执行</el-button>
         </div>
@@ -74,7 +83,7 @@
 
       <p v-else-if="!error" class="mcp-loading" role="status">正在读取操作详情…</p>
 
-      <router-link class="mcp-back" to="/mcp/operations">
+      <router-link class="mcp-back" to="/mcp/operations?autoOpen=0">
         <el-icon><ArrowLeft /></el-icon> 返回我的操作
       </router-link>
     </section>
@@ -83,7 +92,7 @@
 </template>
 
 <script setup lang="ts" name="McpConfirm">
-import { onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
@@ -99,10 +108,19 @@ const router = useRouter()
 const view = ref<McpOperationView>()
 const busy = ref(false)
 const error = ref('')
+const now = ref(Date.now())
 let client: McpOperationClient | undefined
+/** 页面停留期间定时刷新到期状态，确保倒计时结束后按钮立即禁用。 */
+let expiryTimer: number | undefined
 
 /** 只接受 32 位小写十六进制操作标识。 */
 const operationId = String(route.query.operationId ?? '')
+
+/** 服务端准备期限已过时不再允许确认；服务端仍做最终判断。 */
+const expired = computed(() => {
+  const value = view.value?.prepareExpiresAt
+  return Boolean(value) && new Date(value!).getTime() <= now.value
+})
 
 /** 状态中文名。 */
 function stateLabel(state: string): string {
@@ -173,5 +191,12 @@ async function reject(): Promise<void> {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  void load()
+  expiryTimer = window.setInterval(() => { now.value = Date.now() }, 1000)
+})
+
+onBeforeUnmount(() => {
+  if (expiryTimer !== undefined) { window.clearInterval(expiryTimer); expiryTimer = undefined }
+})
 </script>

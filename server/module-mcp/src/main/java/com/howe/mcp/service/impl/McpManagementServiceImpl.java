@@ -12,6 +12,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcOperations;
@@ -74,31 +75,57 @@ public final class McpManagementServiceImpl implements McpManagementService {
 
     /** 目录仅来自实际注册代码；数据库遗留或任意新增名称不会成为可调用工具。 */
     @Override
-    public List<ToolView> tools() {
-        return tools.catalog().stream().map(definition -> {
-            List<ToolState> states = jdbc.query("select enabled,update_by,update_time,remark from mcp_tool_config where tool_name=?",
-                    (row, index) -> new ToolState(row.getString(1), row.getString(2), time(row.getTimestamp(3)), row.getString(4)),
-                    definition.schema().name());
-            ToolState state = states.isEmpty() ? new ToolState("N", "", null, "") : states.get(0);
-            return new ToolView(definition.schema(), definition.version(), definition.resolvedScope(), definition.permissions(),
-                    definition.timeout().toMillis(), definition.maxResultBytes(), state.enabled(), state.updateBy(), state.updatedAt(), state.remark());
-        }).toList();
+    public Page<ToolView> tools(ToolQuery query) {
+        ToolFilter filter = toolFilter(query);
+        List<ToolView> matched = catalog().stream().filter(filter::matches).toList();
+        int from = Math.min((filter.page - 1) * filter.size, matched.size());
+        int to = Math.min(from + filter.size, matched.size());
+        return new Page<>(matched.subList(from, to), matched.size());
+    }
+
+    /** 统计与筛选项均基于代码目录全量快照，不受列表查询条件影响。 */
+    @Override
+    public ToolSummary toolsSummary() {
+        List<ToolView> rows = catalog();
+        List<String> modules = rows.stream().map(value -> module(value.capabilityGroup())).distinct().sorted().toList();
+        List<String> groups = rows.stream().map(ToolView::capabilityGroup).distinct().sorted().toList();
+        return new ToolSummary(rows.size(), rows.stream().filter(value -> "Y".equals(value.enabled())).count(),
+                modules, groups);
     }
 
     /** 单个工具详情采用代码目录，未知名称直接拒绝。 */
     @Override
     public ToolView tool(String name) {
-        return tools().stream().filter(value -> value.schema().name().equals(name)).findFirst().orElseThrow(McpManagementServiceImpl::missing);
+        if (name == null || name.isBlank() || name.length() > 64) { throw missing(); }
+        return catalog().stream().filter(value -> value.schema().name().equals(name)).findFirst()
+                .orElseThrow(McpManagementServiceImpl::missing);
     }
 
     /** 只允许切换代码中已有工具，不接受 schema、权限、实现或回调的编辑。 */
     @Override
     public void toolStatus(String name, String enabled, String operator) {
-        if (!"Y".equals(enabled) && !"N".equals(enabled)) { throw new ServiceException("工具状态无效"); }
-        if (operator == null || operator.isBlank() || operator.length() > 64) { throw new ServiceException("操作账号无效"); }
-        if (tools.catalog().stream().map(McpToolDefinition::schema).noneMatch(value -> value.name().equals(name))) { throw missing(); }
-        int changed = jdbc.update("update mcp_tool_config set enabled=?,update_by=?,update_time=current_timestamp where tool_name=?", enabled, operator, name);
-        if (changed != 1) { throw new ServiceException("工具配置缺失，请完成安装脚本后重试"); }
+        String checked = requiredToolStatus(enabled);
+        requireOperator(operator);
+        if (name == null || tools.catalog().stream().map(McpToolDefinition::schema)
+                .noneMatch(value -> value.name().equals(name))) {
+            throw missing();
+        }
+        // 与批量开关共用锁定语义：先锁行确认配置存在，再在事务内比较并更新。
+        transactions.executeWithoutResult(transaction -> updateToolStatus(List.of(name), checked, operator));
+    }
+
+    /** 全量切换只作用于代码目录快照；配置缺失整批回滚，不自动补建。 */
+    @Override
+    public ToolStatusResult toolStatusAll(String enabled, String operator) {
+        String checked = requiredToolStatus(enabled);
+        requireOperator(operator);
+        List<String> names = tools.catalog().stream().map(value -> value.schema().name()).sorted().toList();
+        long[] changed = new long[1];
+        if (!names.isEmpty()) {
+            transactions.executeWithoutResult(transaction -> changed[0] = updateToolStatus(names, checked, operator));
+        }
+        long total = names.size();
+        return new ToolStatusResult(checked, total, changed[0], total - changed[0]);
     }
 
     /** 全站授权查询明确要求后台方法权限，服务不从请求推定操作者身份。 */
@@ -172,6 +199,73 @@ public final class McpManagementServiceImpl implements McpManagementService {
         return new Page<>(jdbc.query(select + filter.where + " order by " + order + " limit ? offset ?", mapper, values.toArray()), count == null ? 0 : count);
     }
 
+    /** 合并代码目录与配置状态；一次读取配置，避免逐条查询。 */
+    private List<ToolView> catalog() {
+        Map<String, ToolState> states = new java.util.HashMap<>();
+        jdbc.query("select tool_name,enabled,update_by,update_time,remark from mcp_tool_config", row -> {
+            states.put(row.getString(1), new ToolState(row.getString(2), row.getString(3),
+                    time(row.getTimestamp(4)), row.getString(5)));
+        });
+        return tools.catalog().stream().map(definition -> {
+            ToolState state = states.getOrDefault(definition.schema().name(), new ToolState("N", "", null, ""));
+            return new ToolView(definition.schema(), definition.version(), definition.capabilityGroup(),
+                    definition.resolvedScope(), definition.permissions(), definition.timeout().toMillis(),
+                    definition.maxResultBytes(), state.enabled(), state.updateBy(), state.updatedAt(), state.remark());
+        }).toList();
+    }
+
+    /** 在调用方事务内锁定目录配置并只更新发生变化的条目，返回实际变化数。 */
+    private long updateToolStatus(List<String> names, String enabled, String operator) {
+        List<ToolState> locked = jdbc.query("""
+                select tool_name,enabled from mcp_tool_config
+                 where tool_name in (""" + placeholders(names.size()) + ") order by tool_name for update",
+                (row, index) -> new ToolState(row.getString(1), row.getString(2), null, null, ""), names.toArray());
+        if (locked.size() != names.size()) { throw new ServiceException("工具配置缺失，请完成安装脚本后重试"); }
+        long changed = 0;
+        for (ToolState state : locked) {
+            if (enabled.equals(state.enabled())) { continue; }
+            int updated = jdbc.update("update mcp_tool_config set enabled=?,update_by=?,update_time=current_timestamp where tool_name=?",
+                    enabled, operator, state.toolName());
+            if (updated != 1) { throw new ServiceException("工具配置缺失，请完成安装脚本后重试"); }
+            changed++;
+        }
+        return changed;
+    }
+
+    /** 生成与绑定参数数量一致的占位符，参数值仍由 JDBC 绑定。 */
+    private static String placeholders(int count) {
+        return String.join(",", java.util.Collections.nCopies(count, "?"));
+    }
+
+    /** 工具目录筛选：关键字为字面子串，模块取能力分组第一段。 */
+    private static ToolFilter toolFilter(ToolQuery query) {
+        int page = query.pageNum() == null ? 1 : query.pageNum();
+        int size = query.pageSize() == null ? 20 : query.pageSize();
+        if (page < 1 || page > 10000 || size < 1 || size > 100) { throw new ServiceException("分页参数无效"); }
+        String keyword = text(query.keyword(), 128);
+        String module = text(query.module(), 32);
+        String group = text(query.capabilityGroup(), 64);
+        String enabled = query.enabled() == null || query.enabled().isBlank() ? null : requiredToolStatus(query.enabled());
+        return new ToolFilter(page, size, keyword, module, group, enabled);
+    }
+
+    /** 取能力分组第一段作为模块标识，平台工具的 mcp 前缀保留原样。 */
+    private static String module(String capabilityGroup) {
+        int index = capabilityGroup.indexOf('.');
+        return index < 0 ? capabilityGroup : capabilityGroup.substring(0, index);
+    }
+
+    /** 工具状态只接受 Y/N。 */
+    private static String requiredToolStatus(String value) {
+        if (!"Y".equals(value) && !"N".equals(value)) { throw new ServiceException("工具状态无效"); }
+        return value;
+    }
+
+    /** 更新者必须来自后台当前账号。 */
+    private static void requireOperator(String operator) {
+        if (operator == null || operator.isBlank() || operator.length() > 64) { throw new ServiceException("操作账号无效"); }
+    }
+
     /** 约束单页、偏移和所有查询文本，不允许客户端提供排序 SQL。 */
     private static Filter filter(Query query) {
         int page = query.pageNum() == null ? 1 : query.pageNum();
@@ -190,8 +284,9 @@ public final class McpManagementServiceImpl implements McpManagementService {
     /** 查询文本保留字面语义并限制长度。 */
     private static String text(String value, int max) {
         if (value == null || value.isBlank()) { return null; }
-        if (value.length() > max) { throw new ServiceException("查询条件过长"); }
-        return value;
+        String trimmed = value.trim();
+        if (trimmed.length() > max) { throw new ServiceException("查询条件过长"); }
+        return trimmed;
     }
     /** 可选账号主键不能是非正数。 */
     private static Long positive(Long value) {
@@ -225,6 +320,32 @@ public final class McpManagementServiceImpl implements McpManagementService {
                 row.getString("result_code"), row.getLong("elapsed_ms"), time(row.getTimestamp("create_time")));
     }
 
+    /** 工具目录内存筛选条件；只比较已校验的显式字段。 */
+    private static final class ToolFilter {
+        private final int page; private final int size; private final String keyword;
+        private final String module; private final String group; private final String enabled;
+
+        /** 保存已校验的查询条件。 */
+        private ToolFilter(int page, int size, String keyword, String module, String group, String enabled) {
+            this.page = page; this.size = size; this.keyword = keyword;
+            this.module = module; this.group = group; this.enabled = enabled;
+        }
+
+        /** 关键字按去首尾空格后的字面子串匹配名称与标题，英文忽略大小写。 */
+        private boolean matches(ToolView value) {
+            if (module != null && !module.equals(McpManagementServiceImpl.module(value.capabilityGroup()))) {
+                return false;
+            }
+            if (group != null && !group.equals(value.capabilityGroup())) { return false; }
+            if (enabled != null && !enabled.equals(value.enabled())) { return false; }
+            if (keyword == null) { return true; }
+            String needle = keyword.toLowerCase(java.util.Locale.ROOT);
+            String title = value.schema().title() == null ? "" : value.schema().title();
+            return value.schema().name().toLowerCase(java.util.Locale.ROOT).contains(needle)
+                    || title.toLowerCase(java.util.Locale.ROOT).contains(needle);
+        }
+    }
+
     /** 绑定参数式筛选器，SQL 列名只能由本类常量提供。 */
     private static final class Filter {
         private final int page; private final int size; private final String keyword;
@@ -247,5 +368,10 @@ public final class McpManagementServiceImpl implements McpManagementService {
     }
 
     /** 工具数据库状态不包含实现或动态脚本。 */
-    private record ToolState(String enabled, String updateBy, String updatedAt, String remark) { }
+    private record ToolState(String toolName, String enabled, String updateBy, String updatedAt, String remark) {
+        /** 目录合并时按工具名索引，不需要回填名称。 */
+        private ToolState(String enabled, String updateBy, String updatedAt, String remark) {
+            this(null, enabled, updateBy, updatedAt, remark);
+        }
+    }
 }
