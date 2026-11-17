@@ -260,6 +260,9 @@ public class ConfigConstants {
     /** 点餐分类 AI 审阅与润色的 system 提示词 */
     public static final String AI_PROMPT_MEAL_CATEGORY_REVIEW_SYSTEM = "ai.prompt.meal.category.reviewSystem";
 
+    /** 一键备菜清单生成的 system 提示词 */
+    public static final String AI_PROMPT_MEAL_ORDER_PREP_SYSTEM = "ai.prompt.meal.order.prepSystem";
+
     /**
      * 点餐 App 版本发布令牌
      *

@@ -1,5 +1,6 @@
 package com.howe.common.core.redis;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -82,6 +83,71 @@ public class RedisCache
                 Collections.singletonList(key));
         return result == null ? Collections.emptyList() : result;
     }
+
+    /**
+     * 原子写入字符串缓存：先检查守卫键不存在，再写入并设置过期时间。
+     *
+     * <p>检查与写入由同一段 Lua 脚本完成，不存在「查完再写」的时间窗口。
+     * 用于业务侧「结束标记写入后不得再写回缓存」这类互斥场景。
+     * 与通知模板共用纯字符串序列化，避免对象序列化器给脚本参数加引号。</p>
+     *
+     * @param guardKey 守卫键，存在时拒绝写入
+     * @param key 目标缓存键
+     * @param value 字符串值
+     * @param timeout 过期时长
+     * @param unit 时间单位
+     * @return 实际写入返回 true；守卫键存在或执行失败返回 false
+     */
+    public boolean setStringIfGuardAbsent(final String guardKey, final String key, final String value,
+            final long timeout, final TimeUnit unit)
+    {
+        if (notificationRedisTemplate == null)
+        {
+            throw new IllegalStateException("通知 RedisTemplate 未配置");
+        }
+        Long result = (Long) notificationRedisTemplate.execute(SET_IF_GUARD_ABSENT_SCRIPT,
+                Arrays.asList(guardKey, key), value, Long.toString(unit.toSeconds(timeout)));
+        return result != null && result == 1L;
+    }
+
+    /**
+     * 原子写入守卫键并删除目标缓存。
+     *
+     * <p>用于业务侧「结束/删除后清理缓存」：守卫键与删除在同一脚本内完成，
+     * 后续通过 {@link #setStringIfGuardAbsent(String, String, String, long, TimeUnit)}
+     * 写入的线程会被立即拒绝。</p>
+     *
+     * @param guardKey 守卫键
+     * @param key 目标缓存键
+     * @param timeout 守卫键过期时长
+     * @param unit 时间单位
+     * @return 脚本执行成功返回 true
+     */
+    public boolean closeByGuard(final String guardKey, final String key, final long timeout,
+            final TimeUnit unit)
+    {
+        if (notificationRedisTemplate == null)
+        {
+            throw new IllegalStateException("通知 RedisTemplate 未配置");
+        }
+        Long result = (Long) notificationRedisTemplate.execute(CLOSE_BY_GUARD_SCRIPT,
+                Arrays.asList(guardKey, key), Long.toString(unit.toSeconds(timeout)));
+        return result != null && result == 1L;
+    }
+
+    /** 守卫键不存在时原子写入字符串缓存。 */
+    private static final DefaultRedisScript<Long> SET_IF_GUARD_ABSENT_SCRIPT = new DefaultRedisScript<>(
+            "if redis.call('EXISTS', KEYS[1]) == 1 then return 0 end\n"
+                    + "redis.call('SET', KEYS[2], ARGV[1], 'EX', ARGV[2])\n"
+                    + "return 1",
+            Long.class);
+
+    /** 原子写入守卫键并删除目标缓存。 */
+    private static final DefaultRedisScript<Long> CLOSE_BY_GUARD_SCRIPT = new DefaultRedisScript<>(
+            "redis.call('SET', KEYS[1], '1', 'EX', ARGV[1])\n"
+                    + "redis.call('DEL', KEYS[2])\n"
+                    + "return 1",
+            Long.class);
 
     /**
      * 缓存基本的对象，Integer、String、实体类等

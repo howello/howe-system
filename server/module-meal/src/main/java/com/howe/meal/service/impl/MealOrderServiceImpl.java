@@ -25,6 +25,7 @@ import com.howe.meal.service.IMealOrderService;
 import com.howe.meal.service.IMealNotifyService;
 import com.howe.meal.service.IMealWeComNotifyService;
 import com.howe.meal.service.ITransactionCommitExecutor;
+import com.howe.meal.service.MealPrepPlanService;
 import com.howe.meal.util.MealFamilyGuard;
 import com.howe.meal.util.MealScopeGuard;
 import lombok.RequiredArgsConstructor;
@@ -69,6 +70,7 @@ public class MealOrderServiceImpl implements IMealOrderService {
     private final IMealOrderCandidateService mealOrderCandidateService;
     private final MealOrderCandidateMapper mealOrderCandidateMapper;
     private final com.howe.system.mapper.SysDeptMapper sysDeptMapper;
+    private final MealPrepPlanService mealPrepPlanService;
     @DataScope(deptAlias = "d")
     public List<MealOrder> selectMealOrderList(MealOrder mealOrder) {
         return mealOrderMapper.selectMealOrderList(mealOrder);
@@ -324,6 +326,8 @@ public class MealOrderServiceImpl implements IMealOrderService {
 
         transactionCommitExecutor.afterCommit(() -> pushNewOrderToCandidates(order, candidates));
         transactionCommitExecutor.afterCommit(() -> mealWeComNotifyService.notifyNewOrder(order.getOrderId()));
+        // 一键备菜清单：事务提交后才在后台线程调用 AI，下单响应不等待生成结果
+        transactionCommitExecutor.afterCommit(() -> mealPrepPlanService.submitGenerate(order.getOrderId()));
         return order.getOrderId();
     }
 
@@ -389,6 +393,8 @@ public class MealOrderServiceImpl implements IMealOrderService {
         }
         // 取消后其余候选人一并失效，避免残留待响应记录
         mealOrderCandidateService.invalidateAll(orderId);
+        // 已取消订单不会有人备菜，提交后清理该订单的备菜清单
+        transactionCommitExecutor.afterCommit(() -> mealPrepPlanService.removePlan(orderId));
         return rows;
     }
 
@@ -566,6 +572,8 @@ public class MealOrderServiceImpl implements IMealOrderService {
                 "ORDER_COMPLETED", order.getOrderId(), "订单已完成", "您的订单已完成",
                 notificationExtra(order.getOrderNo())));
         transactionCommitExecutor.afterCommit(() -> mealWeComNotifyService.notifyOrderCompleted(order.getOrderId()));
+        // 订单结束后备菜清单不再需要，事务提交后清理该订单的 Redis 缓存
+        transactionCommitExecutor.afterCommit(() -> mealPrepPlanService.removePlan(order.getOrderId()));
         return rows;
     }
 
@@ -579,7 +587,14 @@ public class MealOrderServiceImpl implements IMealOrderService {
             MealOrder order = requireOrder(orderId);
             MealScopeGuard.assertSameDept(order.getDeptId(), "订单");
         }
-        return mealOrderMapper.deleteMealOrderByIds(orderIds);
+        int rows = mealOrderMapper.deleteMealOrderByIds(orderIds);
+        // 逻辑删除后订单不会再被使用，提交后清理其备菜清单（含墓碑，阻止异步任务写回）
+        if (rows > 0) {
+            for (Long orderId : orderIds) {
+                transactionCommitExecutor.afterCommit(() -> mealPrepPlanService.removePlan(orderId));
+            }
+        }
+        return rows;
     }
 
     /**

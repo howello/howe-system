@@ -14,6 +14,7 @@ import com.howe.meal.service.IMealNotifyService;
 import com.howe.meal.service.IMealOrderCandidateService;
 import com.howe.meal.service.IMealWeComNotifyService;
 import com.howe.meal.service.ITransactionCommitExecutor;
+import com.howe.meal.service.MealPrepPlanService;
 import com.howe.meal.util.MealScopeGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -54,6 +55,7 @@ public class MealOrderCandidateServiceImpl implements IMealOrderCandidateService
     private final IMealNotifyService mealNotifyService;
     private final IMealWeComNotifyService mealWeComNotifyService;
     private final ITransactionCommitExecutor transactionCommitExecutor;
+    private final MealPrepPlanService mealPrepPlanService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -313,6 +315,8 @@ public class MealOrderCandidateServiceImpl implements IMealOrderCandidateService
                 order.getUserName() + "，这单暂时没人接，可以重新下单",
                 notificationExtra(orderNo)));
         transactionCommitExecutor.afterCommit(() -> mealWeComNotifyService.notifyOrderUnaccepted(orderId));
+        // 无人接单同样是结束状态：清理备菜清单，避免继续保留一张没人会用到的采购单
+        transactionCommitExecutor.afterCommit(() -> mealPrepPlanService.removePlan(orderId));
         return true;
     }
 
