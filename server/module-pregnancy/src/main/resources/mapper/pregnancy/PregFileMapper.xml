@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.pregnancy.mapper.PregFileMapper">
+
+    <resultMap id="FileResult" type="com.howe.pregnancy.domain.PregFile">
+        <id     property="id"             column="id"/>
+        <result property="uploaderUserId" column="uploader_user_id"/>
+        <result property="originalName"   column="original_name"/>
+        <result property="storageKey"     column="storage_key"/>
+        <result property="mimeType"       column="mime_type"/>
+        <result property="sizeBytes"      column="size_bytes"/>
+        <result property="sha256"         column="sha256"/>
+        <result property="width"          column="width"/>
+        <result property="height"         column="height"/>
+        <result property="state"          column="state"/>
+        <result property="ownerType"      column="owner_type"/>
+        <result property="ownerId"        column="owner_id"/>
+        <result property="sortOrder"      column="sort_order"/>
+        <result property="detachedAt"     column="detached_at"/>
+        <result property="reclaimAt"      column="reclaim_at"/>
+        <result property="requestId"      column="request_id"/>
+    </resultMap>
+
+    <sql id="selectFileColumns">
+        f.id, f.uploader_user_id, f.original_name, f.storage_key, f.mime_type,
+        f.size_bytes, f.sha256, f.width, f.height, f.state, f.owner_type, f.owner_id,
+        f.sort_order, f.detached_at, f.reclaim_at, f.request_id
+    </sql>
+
+    <select id="selectById" resultMap="FileResult">
+        select <include refid="selectFileColumns"/>
+        from preg_file f
+        where f.id = #{id} and f.del_flag = '0'
+    </select>
+
+    <select id="selectByIdForUpdate" resultMap="FileResult">
+        select <include refid="selectFileColumns"/>
+        from preg_file f
+        where f.id = #{id} and f.del_flag = '0'
+        for update
+    </select>
+
+    <select id="selectByRequest" resultMap="FileResult">
+        select <include refid="selectFileColumns"/>
+        from preg_file f
+        where f.uploader_user_id = #{uploaderUserId} and f.request_id = #{requestId}
+        limit 1
+    </select>
+
+    <insert id="insert" parameterType="com.howe.pregnancy.domain.PregFile"
+            useGeneratedKeys="true" keyProperty="id">
+        insert into preg_file (
+            uploader_user_id, original_name, storage_key, mime_type, size_bytes, sha256,
+            width, height, state, sort_order, request_id, del_flag, create_time, update_time
+        ) values (
+            #{uploaderUserId}, #{originalName}, #{storageKey}, #{mimeType}, #{sizeBytes}, #{sha256},
+            #{width}, #{height}, #{state}, 0, #{requestId}, '0', now(3), now(3)
+        )
+    </insert>
+
+    <update id="bind">
+        update preg_file
+        set state       = 'BOUND',
+            owner_type  = #{ownerType},
+            owner_id    = #{ownerId},
+            sort_order  = #{sortOrder},
+            detached_at = null,
+            reclaim_at  = null,
+            update_time = now(3)
+        where id = #{id} and state in ('TEMP', 'ORPHAN') and del_flag = '0'
+    </update>
+
+    <update id="detachByOwner">
+        update preg_file
+        set state       = 'ORPHAN',
+            detached_at = now(3),
+            reclaim_at  = #{reclaimAt},
+            update_time = now(3)
+        where owner_type = #{ownerType} and owner_id = #{ownerId}
+          and state = 'BOUND' and del_flag = '0'
+    </update>
+
+    <select id="selectByOwner" resultMap="FileResult">
+        select <include refid="selectFileColumns"/>
+        from preg_file f
+        where f.owner_type = #{ownerType} and f.owner_id = #{ownerId}
+          and f.state = 'BOUND' and f.del_flag = '0'
+        order by f.sort_order asc, f.id asc
+    </select>
+
+    <select id="claimReclaimable" resultMap="FileResult">
+        select <include refid="selectFileColumns"/>
+        from preg_file f
+        where f.del_flag = '0'
+          and (
+            (f.state = 'TEMP' and f.create_time &lt;= #{tempCutoff})
+            or
+            (f.state = 'ORPHAN' and f.reclaim_at &lt;= now(3))
+          )
+        order by f.id asc
+        limit #{limit}
+        for update skip locked
+    </select>
+
+    <update id="markDeleting">
+        update preg_file
+        set state = 'DELETING', update_time = now(3)
+        where id = #{id} and del_flag = '0' and state in ('TEMP', 'ORPHAN')
+    </update>
+
+    <select id="selectByState" resultMap="FileResult">
+        select <include refid="selectFileColumns"/>
+        from preg_file f
+        where f.state = #{state} and f.del_flag = '0'
+        order by f.id asc
+        limit #{limit}
+    </select>
+
+    <delete id="deleteById">
+        delete from preg_file where id = #{id} and state = 'DELETING'
+    </delete>
+
+    <select id="selectAllStorageKeys" resultType="java.lang.String">
+        select f.storage_key from preg_file f
+    </select>
+
+</mapper>

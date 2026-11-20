@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.pregnancy.mapper.PregExpenseMapper">
+
+    <resultMap id="ExpenseResult" type="com.howe.pregnancy.domain.PregExpense">
+        <id     property="id"           column="id"/>
+        <result property="sourceType"   column="source_type"/>
+        <result property="sourceId"     column="source_id"/>
+        <result property="sourceSlot"   column="source_slot"/>
+        <result property="categoryCode" column="category_code"/>
+        <result property="label"        column="label"/>
+        <result property="amount"       column="amount"/>
+        <result property="spentDate"    column="spent_date"/>
+        <result property="actorUserId"  column="actor_user_id"/>
+        <result property="requestId"    column="request_id"/>
+        <result property="requestHash"  column="request_hash"/>
+        <result property="version"      column="version"/>
+        <result property="createBy"     column="create_by"/>
+        <result property="createTime"   column="create_time"/>
+        <result property="updateBy"     column="update_by"/>
+        <result property="updateTime"   column="update_time"/>
+        <result property="remark"       column="remark"/>
+            <result property="delFlag" column="del_flag"/>
+    </resultMap>
+
+    <sql id="selectExpenseColumns">
+        e.id, e.source_type, e.source_id, e.source_slot, e.category_code, e.label,
+        e.amount, e.spent_date, e.actor_user_id, e.request_id, e.request_hash, e.version,
+        e.create_by, e.create_time, e.update_by, e.update_time, e.remark, e.del_flag
+    </sql>
+
+    <select id="selectList" resultMap="ExpenseResult">
+        select <include refid="selectExpenseColumns"/>
+        from preg_expense e
+        where e.del_flag = '0'
+        <if test="from != null">
+            and e.spent_date &gt;= #{from}
+        </if>
+        <if test="to != null">
+            and e.spent_date &lt;= #{to}
+        </if>
+        <if test="category != null and category != ''">
+            and e.category_code = #{category}
+        </if>
+        <if test="sourceType != null and sourceType != ''">
+            and e.source_type = #{sourceType}
+        </if>
+        order by e.spent_date desc, e.id desc
+    </select>
+
+    <select id="selectBySource" resultMap="ExpenseResult">
+        select <include refid="selectExpenseColumns"/>
+        from preg_expense e
+        where e.source_type = #{sourceType} and e.source_id = #{sourceId} and e.del_flag = '0'
+        order by e.id asc
+    </select>
+
+    <select id="selectBySourceSlot" resultMap="ExpenseResult">
+        select <include refid="selectExpenseColumns"/>
+        from preg_expense e
+        where e.source_type = #{sourceType} and e.source_id = #{sourceId}
+          and e.source_slot = #{sourceSlot} and e.del_flag = '0'
+        limit 1
+    </select>
+
+    <select id="selectById" resultMap="ExpenseResult">
+        select <include refid="selectExpenseColumns"/>
+        from preg_expense e
+        where e.id = #{id} and e.del_flag = '0'
+    </select>
+
+    <select id="selectByRequest" resultMap="ExpenseResult">
+        select <include refid="selectExpenseColumns"/>
+        from preg_expense e
+        where e.actor_user_id = #{actorUserId} and e.request_id = #{requestId}
+        limit 1
+    </select>
+
+    <insert id="insert" parameterType="com.howe.pregnancy.domain.PregExpense"
+            useGeneratedKeys="true" keyProperty="id">
+        insert into preg_expense (
+            source_type, source_id, source_slot, category_code, label, amount, spent_date,
+            actor_user_id, request_id, request_hash, version, create_by, create_time
+        ) values (
+            #{sourceType}, #{sourceId}, #{sourceSlot}, #{categoryCode}, #{label}, #{amount}, #{spentDate},
+            #{actorUserId}, #{requestId}, #{requestHash}, 1, #{createBy}, now(3)
+        )
+    </insert>
+
+    <update id="update" parameterType="com.howe.pregnancy.domain.PregExpense">
+        update preg_expense
+        set category_code = #{categoryCode},
+            label         = #{label},
+            amount        = #{amount},
+            spent_date    = #{spentDate},
+            version       = version + 1,
+            update_by     = #{updateBy},
+            update_time   = now(3)
+        where id = #{id} and version = #{version} and del_flag = '0'
+    </update>
+
+    <update id="logicalDelete">
+        update preg_expense
+        set del_flag    = '2',
+            version     = version + 1,
+            update_time = now(3)
+        where id = #{id} and version = #{version} and del_flag = '0'
+    </update>
+
+    <update id="logicalDeleteBySource">
+        update preg_expense
+        set del_flag = '2', version = version + 1, update_time = now(3)
+        where source_type = #{sourceType} and source_id = #{sourceId} and del_flag = '0'
+    </update>
+
+    <select id="countByDay" resultType="java.util.Map">
+        select e.spent_date as spentDate, sum(e.amount) as total
+        from preg_expense e
+        where e.spent_date &gt;= #{from}
+          and e.spent_date &lt;= #{to}
+          and e.del_flag = '0'
+        group by e.spent_date
+    </select>
+
+    <select id="selectByDay" resultMap="ExpenseResult">
+        select <include refid="selectExpenseColumns"/>
+        from preg_expense e
+        where e.spent_date = #{date} and e.del_flag = '0'
+        order by e.id asc
+    </select>
+
+    <select id="summarize" resultType="java.util.Map">
+        select e.category_code as categoryCode,
+               e.source_type as sourceType,
+               sum(e.amount) as total
+        from preg_expense e
+        where e.del_flag = '0'
+        <if test="from != null">
+            and e.spent_date &gt;= #{from}
+        </if>
+        <if test="to != null">
+            and e.spent_date &lt;= #{to}
+        </if>
+        group by e.category_code, e.source_type
+        order by e.category_code asc, e.source_type asc
+    </select>
+
+    <select id="sumAmount" resultType="java.math.BigDecimal">
+        select sum(e.amount)
+        from preg_expense e
+        where e.del_flag = '0'
+        <if test="from != null">
+            and e.spent_date &gt;= #{from}
+        </if>
+        <if test="to != null">
+            and e.spent_date &lt;= #{to}
+        </if>
+    </select>
+
+</mapper>

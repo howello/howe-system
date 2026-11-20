@@ -43,6 +43,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectConfigList" parameterType="SysConfig" resultMap="SysConfigResult">
         <include refid="selectConfigVo"/>
         <where>
+            <if test="params != null and params.hideInternal == true">
+                AND config_key &lt;&gt; 'pregnancy.reminder.rules'
+            </if>
 			<if test="configName != null and configName != ''">
 				AND config_name like concat('%', #{configName}, '%')
 			</if>
@@ -137,13 +140,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectDistinctParamTypes" resultType="java.lang.String">
         select distinct trim(param_type)
         from sys_config
-        where param_type is not null and trim(param_type) &lt;&gt; ''
+        where param_type is not null and trim(param_type) &lt;&gt; '' and config_key &lt;&gt; 'pregnancy.reminder.rules'
         order by trim(param_type)
     </select>
 
     <!-- 是否存在空 / NULL / 纯空白的分类，用于决定要不要追加「未分类」选项 -->
     <select id="countUncategorized" resultType="int">
-        select count(1) from sys_config where param_type is null or trim(param_type) = ''
+        select count(1) from sys_config
+        where (param_type is null or trim(param_type) = '') and config_key &lt;&gt; 'pregnancy.reminder.rules'
     </select>
 
 </mapper>

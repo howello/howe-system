@@ -2,6 +2,7 @@ package com.howe.meal.service;
 
 import com.howe.common.exception.file.InvalidExtensionException;
 import com.howe.meal.domain.MealAppVersion;
+import com.howe.meal.domain.AppReleaseChannel;
 import com.howe.meal.domain.dto.AppUpdateCheckResult;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -65,7 +66,7 @@ public interface IMealAppVersionService {
      * @param versionCode 客户端当前版本序号
      * @return 检测结果
      */
-    AppUpdateCheckResult checkUpdate(String versionName, Integer versionCode);
+    AppUpdateCheckResult checkUpdate(AppReleaseChannel channel, String versionName, Integer versionCode);
 
     /**
      * 上传 wgt 资源包到对象存储（R2），返回可访问地址
@@ -75,7 +76,7 @@ public interface IMealAppVersionService {
      * @throws IOException 读取上传流出错
      * @throws InvalidExtensionException 扩展名不是 wgt
      */
-    String uploadWgt(MultipartFile file) throws IOException, InvalidExtensionException;
+    String uploadWgt(AppReleaseChannel channel, MultipartFile file) throws IOException, InvalidExtensionException;
 
     /**
      * 脚本发布：上传 wgt 到 R2 并新建一条已发布的版本记录
@@ -92,6 +93,6 @@ public interface IMealAppVersionService {
      * @throws IOException 读取上传流出错
      * @throws InvalidExtensionException 扩展名不是 wgt
      */
-    MealAppVersion publishWgt(MultipartFile file, String versionName, Integer versionCode,
+    MealAppVersion publishWgt(AppReleaseChannel channel, MultipartFile file, String versionName, Integer versionCode,
             String updateLog, String forceUpdate) throws IOException, InvalidExtensionException;
 }

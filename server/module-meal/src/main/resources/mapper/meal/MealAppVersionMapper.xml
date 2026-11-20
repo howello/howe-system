@@ -6,6 +6,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <resultMap type="MealAppVersion" id="MealAppVersionResult">
         <result property="versionId"   column="version_id"   />
+        <result property="appKey"      column="app_key"      />
         <result property="versionName" column="version_name" />
         <result property="versionCode" column="version_code" />
         <result property="wgtUrl"      column="wgt_url"      />
@@ -23,7 +24,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectMealAppVersionVo">
-        select version_id, version_name, version_code, wgt_url, wgt_size, file_name, update_log,
+        select version_id, app_key, version_name, version_code, wgt_url, wgt_size, file_name, update_log,
                force_update, status, del_flag, create_by, create_time, update_by, update_time, remark
         from meal_app_version
     </sql>
@@ -31,7 +32,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectMealAppVersionList" parameterType="MealAppVersion" resultMap="MealAppVersionResult">
         <include refid="selectMealAppVersionVo"/>
         <where>
-            del_flag = '0'
+            del_flag = '0' and app_key = #{appKey}
             <if test="versionName != null and versionName != ''">
                 AND version_name like concat('%', #{versionName}, '%')
             </if>
@@ -50,17 +51,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <!-- 已发布的最新版本：version_code 最大，并列取创建时间最新 -->
     <select id="selectLatestPublished" resultMap="MealAppVersionResult">
         <include refid="selectMealAppVersionVo"/>
-        where del_flag = '0' and status = '0'
+        where app_key = #{appKey} and del_flag = '0' and status = '0'
         order by version_code desc, create_time desc, version_id desc
         limit 1
     </select>
 
     <insert id="insertMealAppVersion" parameterType="MealAppVersion" useGeneratedKeys="true" keyProperty="versionId">
         insert into meal_app_version (
-            version_name, version_code, wgt_url, wgt_size, file_name, update_log,
+            app_key, version_name, version_code, wgt_url, wgt_size, file_name, update_log,
             force_update, status, del_flag, create_by, create_time, remark
         ) values (
-            #{versionName}, #{versionCode}, #{wgtUrl}, #{wgtSize}, #{fileName}, #{updateLog},
+            #{appKey}, #{versionName}, #{versionCode}, #{wgtUrl}, #{wgtSize}, #{fileName}, #{updateLog},
             #{forceUpdate}, #{status}, '0', #{createBy}, sysdate(), #{remark}
         )
     </insert>

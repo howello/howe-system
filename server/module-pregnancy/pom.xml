@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>server</artifactId>
+        <groupId>com.howe</groupId>
+        <version>3.9.2</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>module-pregnancy</artifactId>
+
+    <description>
+        孕期助手模块（单家庭单次孕期：账号角色、共享设置、固定指标、日历、产检、报告、饮食、待产包、费用、文件、提醒与导出）
+    </description>
+
+    <dependencies>
+
+        <!-- 通用工具、统一响应、异常、安全上下文、企微客户端与私有文件基础 -->
+        <dependency>
+            <groupId>com.howe</groupId>
+            <artifactId>module-common</artifactId>
+        </dependency>
+
+        <!-- 账号、角色与系统配置：孕期访问资格按当前数据库角色实时判定 -->
+        <dependency>
+            <groupId>com.howe</groupId>
+            <artifactId>module-system</artifactId>
+        </dependency>
+
+        <!-- 物品 AI 介绍与示意配图走统一 AI 网关 -->
+        <dependency>
+            <groupId>com.howe</groupId>
+            <artifactId>module-ai</artifactId>
+        </dependency>
+
+    </dependencies>
+
+</project>

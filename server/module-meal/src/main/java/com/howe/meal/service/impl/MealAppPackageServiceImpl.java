@@ -10,11 +10,13 @@ import com.howe.common.utils.ConfigUtils;
 import com.howe.common.utils.DateUtils;
 import com.howe.common.utils.http.RemoteFileClient;
 import com.howe.meal.domain.MealAppVersion;
+import com.howe.meal.domain.AppReleaseChannel;
 import com.howe.meal.domain.dto.AppPackageCheckRequest;
 import com.howe.meal.domain.vo.AppPackageCheckVO;
 import com.howe.meal.service.MealAppPackageService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedInputStream;
 import java.io.InputStream;
@@ -57,6 +59,12 @@ public class MealAppPackageServiceImpl implements MealAppPackageService {
 
     @Override
     public AppPackageCheckVO check(AppPackageCheckRequest request) {
+        return check(request, null, null, null);
+    }
+
+    /** 下载并校验远程资源包，可绑定到指定应用和版本。 */
+    private AppPackageCheckVO check(AppPackageCheckRequest request, AppReleaseChannel channel,
+                                    String versionName, Integer versionCode) {
         Path tempFile = null;
         try {
             long maxBytes = maxPackageBytes();
@@ -66,7 +74,7 @@ public class MealAppPackageServiceImpl implements MealAppPackageService {
             if (!result.reachable() || result.tempFile() == null) {
                 return fail(result.reason());
             }
-            String wgtError = verifyWgtStructure(result.tempFile());
+            String wgtError = verifyWgtStructure(result.tempFile(), channel, versionName, versionCode);
             if (wgtError != null) {
                 return fail(wgtError);
             }
@@ -90,15 +98,41 @@ public class MealAppPackageServiceImpl implements MealAppPackageService {
 
     @Override
     public void assertVerified(MealAppVersion version, String oldStatus) {
+        AppReleaseChannel channel = AppReleaseChannel.resolve(version.getAppKey());
         String url = version.getWgtUrl();
         if (StrUtil.isBlank(url) || !url.startsWith("https://")) {
-            // 上传生成的 R2 地址也走 https，这里只拦非 https 的手填地址
+            if (channel == AppReleaseChannel.PREGNANCY) {
+                throw new ServiceException("宝宝资源包必须使用 HTTPS 地址");
+            }
             return;
         }
         AppPackageCheckRequest request = new AppPackageCheckRequest(url);
-        AppPackageCheckVO vo = check(request);
+        AppPackageCheckVO vo = check(request, channel,
+                channel == AppReleaseChannel.PREGNANCY ? version.getVersionName() : null,
+                channel == AppReleaseChannel.PREGNANCY ? version.getVersionCode() : null);
         if (!vo.isReachable()) {
             throw new ServiceException("远程资源包校验未通过：" + vo.getReason());
+        }
+    }
+
+    @Override
+    public void assertUpload(MultipartFile file, AppReleaseChannel channel, String versionName, Integer versionCode)
+            throws java.io.IOException {
+        if (file == null || file.isEmpty()) {
+            throw new ServiceException("请选择要上传的 wgt 文件");
+        }
+        if (file.getSize() > maxPackageBytes()) {
+            throw new ServiceException("资源包超过大小上限");
+        }
+        Path temp = Files.createTempFile("wgt-upload-", ".zip");
+        try {
+            file.transferTo(temp);
+            String error = verifyWgtStructure(temp, channel, versionName, versionCode);
+            if (error != null) {
+                throw new ServiceException(error);
+            }
+        } finally {
+            FileUtil.del(temp.toFile());
         }
     }
 
@@ -108,7 +142,7 @@ public class MealAppPackageServiceImpl implements MealAppPackageService {
      * @param file 已下载的临时文件
      * @return null 表示通过，否则返回具体失败原因
      */
-    private String verifyWgtStructure(Path file) {
+    private String verifyWgtStructure(Path file, AppReleaseChannel channel, String versionName, Integer versionCode) {
         try (ZipFile zip = new ZipFile(file.toFile())) {
             // 1. ZIP 头：ZipFile 能打开就说明结构合法（打不开会在 open 时抛异常）
             Enumeration<? extends ZipEntry> entries = zip.entries();
@@ -140,14 +174,24 @@ public class MealAppPackageServiceImpl implements MealAppPackageService {
             }
             // 2. manifest 必须能解析，且含 id 与 version
             try (InputStream in = new BufferedInputStream(zip.getInputStream(manifest))) {
-                byte[] bytes = in.readAllBytes();
+                byte[] bytes = in.readNBytes(128 * 1024 + 1);
+                if (bytes.length > 128 * 1024) {
+                    return "manifest.json 超过大小上限";
+                }
                 JSONObject json = JSON.parseObject(new String(bytes, StandardCharsets.UTF_8));
                 if (json == null || StrUtil.isBlank(json.getString("id"))) {
                     return "manifest.json 缺少 id";
                 }
+                if (channel != null && !channel.getAppId().equals(json.getString("id"))) {
+                    return "资源包应用标识与发布渠道不匹配";
+                }
                 JSONObject versionObj = json.getJSONObject("version");
                 if (versionObj == null || StrUtil.isBlank(versionObj.getString("name"))) {
                     return "manifest.json 缺少 version 信息";
+                }
+                if (versionName != null && !versionName.equals(versionObj.getString("name"))
+                        || versionCode != null && !versionCode.equals(versionObj.getInteger("code"))) {
+                    return "资源包版本与发布参数不一致";
                 }
             }
             return null;

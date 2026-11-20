@@ -6,14 +6,17 @@ import com.howe.common.utils.SecurityUtils;
 import com.howe.common.utils.StringUtils;
 import com.howe.common.utils.file.FileUploadUtils;
 import com.howe.meal.domain.MealAppVersion;
+import com.howe.meal.domain.AppReleaseChannel;
 import com.howe.meal.domain.dto.AppUpdateCheckResult;
 import com.howe.meal.mapper.MealAppVersionMapper;
 import com.howe.meal.service.IMealAppVersionService;
+import com.howe.meal.service.MealAppPackageService;
 import com.howe.meal.service.IMealWeComNotifyService;
 import com.howe.meal.service.ITransactionCommitExecutor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -30,9 +33,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class MealAppVersionServiceImpl implements IMealAppVersionService {
 
-    /** wgt 资源包在对象存储上的业务目录 */
-    private static final String WGT_BIZ_DIR = "meal/app";
-
     /** 允许上传的扩展名 */
     private static final String[] WGT_ALLOWED_EXTENSION = { "wgt" };
 
@@ -44,12 +44,17 @@ public class MealAppVersionServiceImpl implements IMealAppVersionService {
 
     private final MealAppVersionMapper mealAppVersionMapper;
 
+    private final MealAppPackageService packageService;
+
     private final IMealWeComNotifyService mealWeComNotifyService;
 
     private final ITransactionCommitExecutor transactionCommitExecutor;
 
     @Override
     public List<MealAppVersion> selectMealAppVersionList(MealAppVersion mealAppVersion) {
+        AppReleaseChannel channel = AppReleaseChannel.resolve(mealAppVersion.getAppKey());
+        requireChannelManagement(channel);
+        mealAppVersion.setAppKey(channel.getKey());
         return mealAppVersionMapper.selectMealAppVersionList(mealAppVersion);
     }
 
@@ -59,11 +64,15 @@ public class MealAppVersionServiceImpl implements IMealAppVersionService {
         if (version == null) {
             throw new ServiceException("版本记录不存在");
         }
+        requireChannelManagement(AppReleaseChannel.resolve(version.getAppKey()));
         return version;
     }
 
     @Override
     public int insertMealAppVersion(MealAppVersion mealAppVersion) {
+        AppReleaseChannel channel = AppReleaseChannel.resolve(mealAppVersion.getAppKey());
+        requireChannelManagement(channel);
+        mealAppVersion.setAppKey(channel.getKey());
         if (StringUtils.isEmpty(mealAppVersion.getStatus())) {
             mealAppVersion.setStatus(STATUS_PUBLISHED);
         }
@@ -81,10 +90,7 @@ public class MealAppVersionServiceImpl implements IMealAppVersionService {
 
     @Override
     public int updateMealAppVersion(MealAppVersion mealAppVersion) {
-        MealAppVersion exist = mealAppVersionMapper.selectMealAppVersionById(mealAppVersion.getVersionId());
-        if (exist == null) {
-            throw new ServiceException("版本记录不存在");
-        }
+        MealAppVersion exist = selectMealAppVersionById(mealAppVersion.getVersionId());
         mealAppVersion.setUpdateBy(SecurityUtils.getUsername());
         int rows = mealAppVersionMapper.updateMealAppVersion(mealAppVersion);
         // 只在「非发布 → 发布」的状态迁移时通知，避免编辑已发布版本时重复打扰
@@ -106,9 +112,7 @@ public class MealAppVersionServiceImpl implements IMealAppVersionService {
             throw new ServiceException("请选择要删除的数据");
         }
         for (Long versionId : versionIds) {
-            if (mealAppVersionMapper.selectMealAppVersionById(versionId) == null) {
-                throw new ServiceException("版本记录不存在");
-            }
+            selectMealAppVersionById(versionId);
         }
         return mealAppVersionMapper.deleteMealAppVersionByIds(versionIds);
     }
@@ -122,8 +126,8 @@ public class MealAppVersionServiceImpl implements IMealAppVersionService {
      * </ul>
      */
     @Override
-    public AppUpdateCheckResult checkUpdate(String versionName, Integer versionCode) {
-        MealAppVersion latest = mealAppVersionMapper.selectLatestPublished();
+    public AppUpdateCheckResult checkUpdate(AppReleaseChannel channel, String versionName, Integer versionCode) {
+        MealAppVersion latest = mealAppVersionMapper.selectLatestPublished(channel.getKey());
         if (latest == null || latest.getVersionCode() == null) {
             return AppUpdateCheckResult.none();
         }
@@ -148,12 +152,24 @@ public class MealAppVersionServiceImpl implements IMealAppVersionService {
     }
 
     @Override
-    public String uploadWgt(MultipartFile file) throws IOException, InvalidExtensionException {
-        if (file == null || file.isEmpty()) {
-            throw new ServiceException("请选择要上传的 wgt 文件");
-        }
+    public String uploadWgt(AppReleaseChannel channel, MultipartFile file) throws IOException, InvalidExtensionException {
+        requireChannelManagement(channel);
+        packageService.assertUpload(file, channel, null, null);
+        return storeWgt(channel, file);
+    }
+
+    /** 用唯一对象键保存已通过校验的资源包。 */
+    private String storeWgt(AppReleaseChannel channel, MultipartFile file) throws IOException, InvalidExtensionException {
         // 用 UUID 命名，保证每次上传的对象键唯一，避免 R2 / CDN 边缘缓存命中旧包
-        return FileUploadUtils.uploadTo(WGT_BIZ_DIR, file, WGT_ALLOWED_EXTENSION, true);
+        return FileUploadUtils.uploadTo(channel.getDirectory(), file, WGT_ALLOWED_EXTENSION, true);
+    }
+
+    /** 原点餐授权随菜单移动，宝宝渠道的管理权限单独授予。 */
+    private void requireChannelManagement(AppReleaseChannel channel) {
+        if (channel == AppReleaseChannel.PREGNANCY && !SecurityUtils.isAdmin()
+                && !SecurityUtils.hasPermi("tool:appVersion:pregnancy")) {
+            throw new AccessDeniedException("没有管理宝宝 App 版本的权限");
+        }
     }
 
     /**
@@ -161,7 +177,7 @@ public class MealAppVersionServiceImpl implements IMealAppVersionService {
      * 参数校验放在这里，让发布接口的报错信息保持可读。
      */
     @Override
-    public MealAppVersion publishWgt(MultipartFile file, String versionName, Integer versionCode,
+    public MealAppVersion publishWgt(AppReleaseChannel channel, MultipartFile file, String versionName, Integer versionCode,
             String updateLog, String forceUpdate) throws IOException, InvalidExtensionException {
         if (file == null || file.isEmpty()) {
             throw new ServiceException("请选择要上传的 wgt 文件");
@@ -169,12 +185,20 @@ public class MealAppVersionServiceImpl implements IMealAppVersionService {
         if (StringUtils.isEmpty(versionName)) {
             throw new ServiceException("版本名称不能为空");
         }
-        if (versionCode == null) {
-            throw new ServiceException("版本序号不能为空");
+        if (versionCode == null || versionCode < 1) {
+            throw new ServiceException("版本序号必须为正数");
+        }
+        if (channel == AppReleaseChannel.PREGNANCY) {
+            MealAppVersion latest = mealAppVersionMapper.selectLatestPublished(channel.getKey());
+            if (latest != null && latest.getVersionCode() >= versionCode) {
+                throw new ServiceException("宝宝发版序号必须大于当前已发布版本");
+            }
         }
 
-        String url = uploadWgt(file);
+        packageService.assertUpload(file, channel, versionName, versionCode);
+        String url = storeWgt(channel, file);
         MealAppVersion version = new MealAppVersion();
+        version.setAppKey(channel.getKey());
         version.setVersionName(versionName);
         version.setVersionCode(versionCode);
         version.setWgtUrl(url);
@@ -200,12 +224,13 @@ public class MealAppVersionServiceImpl implements IMealAppVersionService {
      * @param version 已发布的版本记录
      */
     private void notifyPublished(MealAppVersion version) {
-        if (version == null || version.getVersionId() == null) {
+        if (version == null || version.getVersionId() == null
+                || !AppReleaseChannel.MEAL.getKey().equals(version.getAppKey())) {
             return;
         }
         transactionCommitExecutor.afterCommit(() -> {
             try {
-                MealAppVersion latest = mealAppVersionMapper.selectLatestPublished();
+                MealAppVersion latest = mealAppVersionMapper.selectLatestPublished(AppReleaseChannel.MEAL.getKey());
                 if (latest == null || !version.getVersionId().equals(latest.getVersionId())) {
                     return;
                 }

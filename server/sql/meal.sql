@@ -264,6 +264,7 @@ create table meal_category_ref (
 drop table if exists meal_app_version;
 create table meal_app_version (
   version_id   bigint(20)   not null auto_increment    comment '版本记录ID',
+  app_key      varchar(24)  not null default 'meal'    comment '应用渠道',
   version_name varchar(32)  not null                   comment '版本名称（展示用）',
   version_code int(11)      not null                   comment '版本序号（比较基准，整数递增）',
   wgt_url      varchar(500) not null                   comment 'wgt 资源包地址（R2）',
@@ -279,7 +280,8 @@ create table meal_app_version (
   update_time  datetime                                comment '更新时间',
   remark       varchar(500) default null               comment '备注',
   primary key (version_id),
-  key idx_meal_app_version_code (version_code, status, del_flag)
+  key idx_meal_app_version_code (version_code, status, del_flag),
+  key idx_app_version_channel (app_key, status, del_flag, version_code)
 ) engine=innodb auto_increment=1 comment = '点餐-App 版本（wgt 热更新）';
 
 -- ----------------------------
@@ -347,7 +349,8 @@ values ('新菜审核', @mealDirId, '5', 'proposal', 'meal/proposal/index', 1, 0
 select @mealProposalMenuId := LAST_INSERT_ID();
 
 insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-values ('App 版本管理', @mealDirId, '6', 'appversion', 'meal/appversion/index', 1, 0, 'C', '0', '0', 'meal:appVersion:list', 'download', 'admin', sysdate(), 'App 版本管理菜单（wgt 热更新）');
+select 'App 版本管理', menu_id, '6', 'appversion', 'tool/appversion/index', 1, 0, 'C', '0', '0', 'tool:appVersion:list', 'download', 'admin', sysdate(), '宝宝与吃了么的 WGT 版本管理'
+from sys_menu where path = 'tool' and parent_id = 0 and menu_type = 'M' limit 1;
 
 select @mealAppVersionMenuId := LAST_INSERT_ID();
 
@@ -406,15 +409,17 @@ values ('提案删除', @mealProposalMenuId, '3', '#', '', 1, 0, 'F', '0', '0', 
 
 -- App 版本按钮
 insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-values ('版本查询', @mealAppVersionMenuId, '1', '#', '', 1, 0, 'F', '0', '0', 'meal:appVersion:query', '#', 'admin', sysdate(), '');
+values ('版本查询', @mealAppVersionMenuId, '1', '#', '', 1, 0, 'F', '0', '0', 'tool:appVersion:query', '#', 'admin', sysdate(), '');
 insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-values ('版本新增', @mealAppVersionMenuId, '2', '#', '', 1, 0, 'F', '0', '0', 'meal:appVersion:add', '#', 'admin', sysdate(), '');
+values ('版本新增', @mealAppVersionMenuId, '2', '#', '', 1, 0, 'F', '0', '0', 'tool:appVersion:add', '#', 'admin', sysdate(), '');
 insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-values ('版本修改', @mealAppVersionMenuId, '3', '#', '', 1, 0, 'F', '0', '0', 'meal:appVersion:edit', '#', 'admin', sysdate(), '');
+values ('版本修改', @mealAppVersionMenuId, '3', '#', '', 1, 0, 'F', '0', '0', 'tool:appVersion:edit', '#', 'admin', sysdate(), '');
 insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-values ('版本删除', @mealAppVersionMenuId, '4', '#', '', 1, 0, 'F', '0', '0', 'meal:appVersion:remove', '#', 'admin', sysdate(), '');
+values ('版本删除', @mealAppVersionMenuId, '4', '#', '', 1, 0, 'F', '0', '0', 'tool:appVersion:remove', '#', 'admin', sysdate(), '');
 insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-values ('资源包上传', @mealAppVersionMenuId, '5', '#', '', 1, 0, 'F', '0', '0', 'meal:appVersion:upload', '#', 'admin', sysdate(), '上传 wgt 资源包到 R2');
+values ('资源包上传', @mealAppVersionMenuId, '5', '#', '', 1, 0, 'F', '0', '0', 'tool:appVersion:upload', '#', 'admin', sysdate(), '上传 wgt 资源包到 R2');
+insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+values ('管理宝宝渠道', @mealAppVersionMenuId, '6', '#', '', 1, 0, 'F', '0', '0', 'tool:appVersion:pregnancy', '#', 'admin', sysdate(), '允许在共用版本管理中操作宝宝渠道');
 
 -- 企业微信通知按钮
 insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
@@ -468,7 +473,9 @@ where perms in ('meal:dish:list', 'meal:dish:query', 'meal:dish:add', 'meal:dish
 insert into sys_role_menu (role_id, menu_id) values (@managerRoleId, @mealDirId);
 insert into sys_role_menu (role_id, menu_id)
 select @managerRoleId, menu_id from sys_menu
-where perms like 'meal:%';
+where perms like 'meal:%' or (perms like 'tool:appVersion:%' and perms <> 'tool:appVersion:pregnancy');
+insert ignore into sys_role_menu (role_id, menu_id)
+select @managerRoleId, menu_id from sys_menu where path = 'tool' and parent_id = 0 and menu_type = 'M';
 
 -- 家庭管理员不授予管理端的「系统管理 > 用户管理」。
 -- 2026-10-21 渗透事件的提权链正是从这里进入的：家庭角色一旦持有 system:user:*，

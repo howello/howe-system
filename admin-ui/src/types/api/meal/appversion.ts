@@ -1,7 +1,11 @@
 import type { PageDomain, BaseEntity } from "../common";
 
+/** 共用版本管理里的应用渠道。 */
+export type AppReleaseKey = 'meal' | 'pregnancy';
+
 /** App 版本分页查询参数 */
 export interface MealAppVersionQueryParams extends PageDomain {
+  appKey?: AppReleaseKey;
   /** 版本名称（模糊匹配） */
   versionName?: string;
   /** 发布状态（0已发布 1停用） */
@@ -15,6 +19,7 @@ export interface MealAppVersionQueryParams extends PageDomain {
  * 不承载整包（apk/ipa）升级。
  */
 export interface MealAppVersion extends BaseEntity {
+  appKey?: AppReleaseKey;
   /** 版本记录ID */
   versionId?: number;
   /** 版本名称（展示用） */

@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.pregnancy.mapper.PregDietMapper">
+
+    <resultMap id="DietResult" type="com.howe.pregnancy.domain.PregDietRecord">
+        <id     property="id"          column="id"/>
+        <result property="mealType"    column="meal_type"/>
+        <result property="occurredAt"  column="occurred_at"/>
+        <result property="recordDate"  column="record_date"/>
+        <result property="content"     column="content"/>
+        <result property="note"        column="note"/>
+        <result property="extraText"   column="extra_text"/>
+        <result property="actorUserId" column="actor_user_id"/>
+        <result property="requestId"   column="request_id"/>
+        <result property="requestHash" column="request_hash"/>
+        <result property="version"     column="version"/>
+        <result property="createBy"    column="create_by"/>
+        <result property="createTime"  column="create_time"/>
+        <result property="updateBy"    column="update_by"/>
+        <result property="updateTime"  column="update_time"/>
+        <result property="remark"      column="remark"/>
+            <result property="delFlag" column="del_flag"/>
+    </resultMap>
+
+    <sql id="selectDietColumns">
+        d.id, d.meal_type, d.occurred_at, d.record_date, d.content, d.note, d.extra_text,
+        d.actor_user_id, d.request_id, d.request_hash, d.version,
+        d.create_by, d.create_time, d.update_by, d.update_time, d.remark, d.del_flag
+    </sql>
+
+    <select id="selectList" resultMap="DietResult">
+        select <include refid="selectDietColumns"/>
+        from preg_diet_record d
+        where d.del_flag = '0'
+        <if test="mealType != null and mealType != ''">
+            and d.meal_type = #{mealType}
+        </if>
+        <if test="from != null">
+            and d.record_date &gt;= #{from}
+        </if>
+        <if test="to != null">
+            and d.record_date &lt;= #{to}
+        </if>
+        order by d.occurred_at desc, d.id desc
+    </select>
+
+    <select id="selectById" resultMap="DietResult">
+        select <include refid="selectDietColumns"/>
+        from preg_diet_record d
+        where d.id = #{id} and d.del_flag = '0'
+    </select>
+
+    <select id="selectByRequest" resultMap="DietResult">
+        select <include refid="selectDietColumns"/>
+        from preg_diet_record d
+        where d.actor_user_id = #{actorUserId} and d.request_id = #{requestId}
+        limit 1
+    </select>
+
+    <insert id="insert" parameterType="com.howe.pregnancy.domain.PregDietRecord"
+            useGeneratedKeys="true" keyProperty="id">
+        insert into preg_diet_record (
+            meal_type, occurred_at, record_date, content, note, extra_text,
+            actor_user_id, request_id, request_hash, version, create_by, create_time
+        ) values (
+            #{mealType}, #{occurredAt}, #{recordDate}, #{content}, #{note}, #{extraText},
+            #{actorUserId}, #{requestId}, #{requestHash}, 1, #{createBy}, now(3)
+        )
+    </insert>
+
+    <update id="update" parameterType="com.howe.pregnancy.domain.PregDietRecord">
+        update preg_diet_record
+        set meal_type   = #{mealType},
+            occurred_at = #{occurredAt},
+            record_date = #{recordDate},
+            content     = #{content},
+            note        = #{note},
+            extra_text  = #{extraText},
+            version     = version + 1,
+            update_by   = #{updateBy},
+            update_time = now(3)
+        where id = #{id} and version = #{version} and del_flag = '0'
+    </update>
+
+    <update id="logicalDelete">
+        update preg_diet_record
+        set del_flag    = '2',
+            version     = version + 1,
+            update_time = now(3)
+        where id = #{id} and version = #{version} and del_flag = '0'
+    </update>
+
+    <select id="selectByDay" resultMap="DietResult">
+        select <include refid="selectDietColumns"/>
+        from preg_diet_record d
+        where d.record_date = #{date} and d.del_flag = '0'
+        order by d.occurred_at asc, d.id asc
+    </select>
+
+    <select id="countByDay" resultType="java.util.Map">
+        select d.record_date as recordDate, count(1) as total
+        from preg_diet_record d
+        where d.record_date &gt;= #{from}
+          and d.record_date &lt;= #{to}
+          and d.del_flag = '0'
+        group by d.record_date
+    </select>
+
+</mapper>

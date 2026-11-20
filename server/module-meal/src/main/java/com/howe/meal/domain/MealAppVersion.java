@@ -21,6 +21,9 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 @Schema(description = "点餐-App 版本（wgt 热更新）")
 public class MealAppVersion extends BaseEntity {
+
+    @Schema(description = "应用渠道（meal/pregnancy）")
+    private String appKey;
     private static final long serialVersionUID = 1L;
 
     @Schema(description = "版本记录ID", example = "1")

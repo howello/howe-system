@@ -112,6 +112,15 @@ public class Constants
     public static final String CLIENT_MEAL = "meal";
 
     /**
+     * 登录客户端：孕期助手端
+     *
+     * <p>与点餐端同理，不套用管理端的角色准入规则：孕期档案的可见性由档案成员关系
+     * 决定，家庭普通账号也可能被邀请为记录者或只读成员。此处只选择准入与会话策略，
+     * 不代替任何资源授权。</p>
+     */
+    public static final String CLIENT_PREGNANCY = "pregnancy";
+
+    /**
      * 令牌前缀
      */
     public static final String LOGIN_USER_KEY = "login_user_key";
