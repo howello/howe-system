@@ -71,7 +71,7 @@ public final class BlogTalkWriteToolProvider implements BusinessToolProvider {
                 "items", Map.of("type", "string", "maxLength", 50)));
         properties.put("isTop", Map.of("type", "boolean", "default", false));
         return new ToolDefinition("blog_talk_create", "1", "创建博客说说",
-                "创建一条说说；status 必须显式选择公开或隐藏，需要浏览器确认后才生效。",
+                "创建一条说说；status 必须显式选择公开或隐藏，提交后排队执行。",
                 WRITE_GROUP, new ToolInputSchema("object", properties,
                         List.of("idempotencyKey", "content", "status"), false, null, null),
                 ToolAccess.ofPermissions(Set.of("blog:talk:add")),
@@ -102,7 +102,7 @@ public final class BlogTalkWriteToolProvider implements BusinessToolProvider {
                         "status", Map.of("type", "string", "enum", List.of("published", "unpublished")),
                         "isTop", Map.of("type", "boolean"))));
         return new ToolDefinition("blog_talk_update", "1", "更新博客说说",
-                "按版本更新说说；公开状态变化会在确认页明示。",
+                "按版本更新说说；预览会展示公开状态变化。",
                 WRITE_GROUP, new ToolInputSchema("object", properties,
                         List.of("idempotencyKey", "talkId", "expectedVersion", "patch"), false, null, null),
                 ToolAccess.ofPermissions(Set.of("blog:talk:edit")),
@@ -143,6 +143,6 @@ public final class BlogTalkWriteToolProvider implements BusinessToolProvider {
         data.put("prepareExpiresAt", receipt.prepareExpiresAt());
         data.put("summary", receipt.summary());
         return ToolResults.detail(data, receipt.state() == ToolOperationReceipt.State.PREVIEW
-                ? "已生成预览，尚未创建操作" : "操作已准备，等待浏览器确认");
+                ? "已生成预览，尚未创建操作" : "操作已提交，可查询执行状态");
     }
 }

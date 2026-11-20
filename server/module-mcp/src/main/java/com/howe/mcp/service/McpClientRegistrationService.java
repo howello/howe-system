@@ -11,17 +11,4 @@ public interface McpClientRegistrationService {
 
     /** 签发稳定随机 client_id，secret 单向编码；两个登记表在同一事务中保存。 */
     Map<String, Object> register(McpClientMetadata metadata);
-
-    /** 参数非法时关闭入口，避免错误值变成无上限。 */
-    public static int parseLimit(String value, int minimum, int maximum) {
-        try {
-            int parsed = Integer.parseInt(value);
-            if (parsed < minimum || parsed > maximum) {
-                throw new McpRegistrationException("temporarily_unavailable", 503, "客户端登记暂不可用");
-            }
-            return parsed;
-        } catch (NumberFormatException exception) {
-            throw new McpRegistrationException("temporarily_unavailable", 503, "客户端登记暂不可用");
-        }
-    }
 }

@@ -66,19 +66,9 @@ public record McpEndpointSettings(URI backendBaseUrl, URI frontendBaseUrl) {
         return frontendBaseUrl.resolve("/mcp/login").toASCIIString();
     }
 
-    /** 返回前端授权确认页面。 */
-    public String consentPage() {
-        return frontendBaseUrl.resolve("/mcp/consent").toASCIIString();
-    }
-
     /** 返回前端自助连接页面。 */
     public String connectionsPage() {
         return frontendBaseUrl.resolve("/mcp/connections").toASCIIString();
-    }
-
-    /** 返回前端写操作确认页面。 */
-    public String confirmationPage() {
-        return frontendBaseUrl.resolve("/mcp/confirm").toASCIIString();
     }
 
     /** 返回前端本人操作列表页面。 */

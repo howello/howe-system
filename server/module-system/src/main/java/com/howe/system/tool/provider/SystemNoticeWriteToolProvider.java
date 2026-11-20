@@ -97,7 +97,7 @@ public final class SystemNoticeWriteToolProvider implements BusinessToolProvider
                     data.put("prepareExpiresAt", receipt.prepareExpiresAt());
                     data.put("summary", receipt.summary());
                     ToolResult result = ToolResults.detail(data, receipt.state() == ToolOperationReceipt.State.PREVIEW
-                            ? "已生成预览，尚未创建操作" : "操作已准备，等待浏览器确认");
+                            ? "已生成预览，尚未创建操作" : "操作已提交，可查询执行状态");
                     return result;
                 });
     }

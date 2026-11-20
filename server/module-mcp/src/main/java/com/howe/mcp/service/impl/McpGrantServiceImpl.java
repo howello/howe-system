@@ -13,36 +13,32 @@ import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** 以数据库授权及同意记录为权威的调用守卫与用户撤销服务，不缓存有效状态。 */
+/** 以数据库授权记录为权威的调用守卫与用户撤销服务，不缓存有效状态。 */
 @Slf4j
 public final class McpGrantServiceImpl implements McpGrantService {
     private static final String SELECT_GRANT = """
             select g.grant_id, g.user_id, g.registered_client_id, g.resource_uri,
-                   g.status, g.authorization_version, c.client_id, e.status client_status
+                   g.status, g.authorization_version, c.client_id, c.status client_status
               from mcp_grant g join oauth2_registered_client c on c.id=g.registered_client_id
-              join mcp_client_ext e on e.registered_client_id=c.id
-             where g.grant_id=? and g.user_id=?
+             where g.grant_id=? and g.user_id=? and c.metadata_valid='Y'
             """;
     private final JdbcOperations jdbc;
     private final TransactionTemplate transactions;
-    private final OAuth2AuthorizationConsentService consents;
     private final ConfigProvider config;
     private final McpEndpointSettings endpoints;
 
-    /** 注入同一数据源上的事务与同意服务；地址使用当前进程固定的可信快照。 */
+    /** 注入同一数据源上的事务；地址使用当前进程固定的可信快照。 */
     public McpGrantServiceImpl(JdbcOperations jdbc, TransactionTemplate transactions,
-            OAuth2AuthorizationConsentService consents, ConfigProvider config, McpEndpointSettings endpoints) {
+            ConfigProvider config, McpEndpointSettings endpoints) {
         this.jdbc = Objects.requireNonNull(jdbc);
         this.transactions = Objects.requireNonNull(transactions);
-        this.consents = Objects.requireNonNull(consents);
         this.config = Objects.requireNonNull(config);
         this.endpoints = Objects.requireNonNull(endpoints);
     }
 
-    /** 每次调用按当前记录检查主体、客户端、资源、授权版本与用户当前同意范围。 */
+    /** 每次调用按当前记录检查主体、客户端、资源、授权版本与连接范围。 */
     @Override
     public void requireActive(McpInvocationContext invocation) {
         if (!"true".equalsIgnoreCase(config.getPlainValue(ConfigConstants.MCP_ENABLED))
@@ -57,22 +53,10 @@ public final class McpGrantServiceImpl implements McpGrantService {
                 || !invocation.scopes().contains(McpScopes.CONNECT)) {
             throw denied();
         }
-        var consent = consents.findById(grant.registeredClientId(), String.valueOf(invocation.userId()));
-        if (consent == null || !consent.getScopes().containsAll(invocation.scopes())) {
-            throw denied();
-        }
-    }
-
-    /** 工具缺失配置时关闭；此方法不替代总开关和授权检查。 */
-    @Override
-    public boolean toolEnabled(String name) {
-        List<String> values = jdbc.query("select enabled from mcp_tool_config where tool_name=?",
-                (row, index) -> row.getString(1), name);
-        return values.size() == 1 && "Y".equals(values.get(0));
     }
 
     /**
-     * 撤销本人在客户端上的整个资源授权；与同意和凭据索引在同一事务提交。
+     * 撤销本人在客户端上的整个资源授权；与凭据索引在同一事务提交。
      * 关闭运行开关时仍允许撤销。重复撤销保持幂等，不恢复或创建授权。
      */
     @Override
@@ -91,10 +75,6 @@ public final class McpGrantServiceImpl implements McpGrantService {
                            revoked_at=current_timestamp, update_time=current_timestamp
                      where grant_id=? and user_id=? and status='0'
                     """, grantId, userId);
-            var consent = consents.findById(grant.registeredClientId(), String.valueOf(userId));
-            if (consent != null) {
-                consents.remove(consent);
-            }
             jdbc.update("update mcp_token_index set status='REVOKED', update_time=current_timestamp where grant_id=? and status<>'REVOKED'",
                     grantId);
         });
@@ -109,7 +89,7 @@ public final class McpGrantServiceImpl implements McpGrantService {
             if (locked.isEmpty()) { return null; }
             GrantState grant = locked.get(0);
             List<GrantState> related = jdbc.query("""
-                    select c.client_id,e.status from oauth2_registered_client c join mcp_client_ext e on e.registered_client_id=c.id where c.id=?
+                    select client_id,status from oauth2_registered_client where id=?
                     """, (row, index) -> new GrantState(grant.id(), grant.userId(), grant.registeredClientId(), row.getString("client_id"),
                     grant.resource(), grant.status(), row.getString("status"), grant.version()), grant.registeredClientId());
             return related.isEmpty() ? null : related.get(0);

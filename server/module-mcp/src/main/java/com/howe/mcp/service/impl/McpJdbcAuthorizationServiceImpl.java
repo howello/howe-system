@@ -19,7 +19,6 @@ import org.springframework.security.oauth2.core.OAuth2Token;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationCode;
-import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -29,24 +28,23 @@ public final class McpJdbcAuthorizationServiceImpl implements McpJdbcAuthorizati
     private final JdbcOperations jdbc;
     private final TransactionTemplate transactions;
     private final McpAuthorizationCodec codec;
-    private final OAuth2AuthorizationConsentService consents;
     private final Clock clock;
 
     /** 注入同一数据源的事务、标准 Consent 服务与加密器。 */
     public McpJdbcAuthorizationServiceImpl(JdbcOperations jdbc, TransactionTemplate transactions,
-            McpAuthorizationCodec codec, OAuth2AuthorizationConsentService consents, Clock clock) {
+            McpAuthorizationCodec codec, Clock clock) {
         this.jdbc = Objects.requireNonNull(jdbc);
         this.transactions = Objects.requireNonNull(transactions);
         this.codec = Objects.requireNonNull(codec);
-        this.consents = Objects.requireNonNull(consents);
         this.clock = Objects.requireNonNull(clock);
     }
 
     /** 在同一事务内校验绑定、保存密文和轮换索引；旧快照不得覆盖新令牌。 */
     @Override
-    public void save(OAuth2Authorization authorization) {
-        Objects.requireNonNull(authorization);
+    public void save(OAuth2Authorization candidate) {
+        Objects.requireNonNull(candidate);
         transactions.executeWithoutResult(status -> {
+            OAuth2Authorization authorization = bindNewCode(candidate);
             Long grantId = authorization.getAttribute(McpOAuthAttributes.GRANT_ID);
             GrantBinding grant = grantId == null ? null : lockGrant(grantId);
             StoredRow previous = row(authorization.getId(), true);
@@ -91,6 +89,40 @@ public final class McpJdbcAuthorizationServiceImpl implements McpJdbcAuthorizati
             }
             syncIndexes(authorization, tokens);
         });
+    }
+
+    /** 原生授权码签发在客户端锁内创建或恢复连接，并将授权码绑定到本次版本。 */
+    private OAuth2Authorization bindNewCode(OAuth2Authorization authorization) {
+        if (authorization.getAttribute(McpOAuthAttributes.GRANT_ID) != null
+                || authorization.getAttribute(McpOAuthAttributes.STORAGE_VERSION) != null
+                || authorization.getToken(OAuth2AuthorizationCode.class) == null
+                || authorization.getAccessToken() != null || authorization.getRefreshToken() != null) {
+            return authorization;
+        }
+        org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest request =
+                authorization.getAttribute(org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest.class.getName());
+        if (request == null || !(request.getAdditionalParameters().get("resource") instanceof String resource)
+                || !clientActive(authorization.getRegisteredClientId())) {
+            throw new IllegalStateException("OAuth 授权码缺少可信客户端或资源");
+        }
+        long userId = Long.parseLong(authorization.getPrincipalName());
+        String clientId = authorization.getRegisteredClientId();
+        jdbc.update("""
+                insert into mcp_grant(user_id,registered_client_id,resource_uri) values(?,?,?)
+                on duplicate key update grant_id=grant_id
+                """, userId, clientId, resource);
+        Long grantId = jdbc.queryForObject("""
+                select grant_id from mcp_grant where user_id=? and registered_client_id=? and resource_uri=? for update
+                """, Long.class, userId, clientId, resource);
+        jdbc.update("""
+                update mcp_grant set status='0',authorization_version=authorization_version+1,
+                       revoked_at=null,update_time=current_timestamp where grant_id=? and status='1'
+                """, grantId);
+        Long version = jdbc.queryForObject("select authorization_version from mcp_grant where grant_id=?", Long.class, grantId);
+        com.howe.mcp.service.security.McpAuditContext.verified(userId, clientId, grantId);
+        return OAuth2Authorization.from(authorization).attribute(McpOAuthAttributes.GRANT_ID, grantId)
+                .attribute(McpOAuthAttributes.AUTHORIZATION_VERSION, version)
+                .attribute(McpOAuthAttributes.RESOURCE, resource).build();
     }
 
     /** 删除载荷但保留已撤销的历史哈希，避免清理导致旧凭据重新可用。 */
@@ -187,7 +219,7 @@ public final class McpJdbcAuthorizationServiceImpl implements McpJdbcAuthorizati
         });
     }
 
-    /** 校验当前授权与账户、客户端、资源及 Consent 的完整绑定，不信任旧载荷范围。 */
+    /** 校验当前授权与账户、客户端、资源的完整绑定，不信任旧载荷范围。 */
     private boolean bindingMatches(OAuth2Authorization authorization, GrantBinding grant) {
         Long version = authorization.getAttribute(McpOAuthAttributes.AUTHORIZATION_VERSION);
         String resource = authorization.getAttribute(McpOAuthAttributes.RESOURCE);
@@ -197,14 +229,13 @@ public final class McpJdbcAuthorizationServiceImpl implements McpJdbcAuthorizati
                 || !Objects.equals(version, grant.version()) || !Objects.equals(resource, grant.resource())) {
             return false;
         }
-        var consent = consents.findById(grant.client(), authorization.getPrincipalName());
-        return consent != null && consent.getScopes().containsAll(authorization.getAuthorizedScopes());
+        return authorization.getAuthorizedScopes().contains(com.howe.mcp.service.security.McpScopes.CONNECT);
     }
 
     /** 签发记录必须已经由服务端授权流程绑定有效 grant；存储接口不自行代替用户同意。 */
     private void requireBinding(OAuth2Authorization authorization, GrantBinding grant) {
         if (!bindingMatches(authorization, grant)) {
-            throw new IllegalStateException("OAuth 授权绑定或当前同意不可用");
+            throw new IllegalStateException("OAuth 授权绑定不可用");
         }
     }
 
@@ -337,14 +368,14 @@ public final class McpJdbcAuthorizationServiceImpl implements McpJdbcAuthorizati
                 row.getString("resource_uri"), row.getString("status"), null, row.getLong("authorization_version")), id);
         if (rows.isEmpty()) { return null; }
         GrantBinding grant = rows.get(0);
-        List<String> states = jdbc.query("select status from mcp_client_ext where registered_client_id=?", (row, index) -> row.getString(1), grant.client());
+        List<String> states = jdbc.query("select status from oauth2_registered_client where id=? and metadata_valid='Y'", (row, index) -> row.getString(1), grant.client());
         return new GrantBinding(grant.userId(), grant.client(), grant.resource(), grant.status(),
                 states.size() == 1 ? states.get(0) : null, grant.version());
     }
 
     /** 尚未同意的请求同样不能使用已停用客户端。 */
     private boolean clientActive(String client) {
-        List<String> states = jdbc.query("select status from mcp_client_ext where registered_client_id=?",
+        List<String> states = jdbc.query("select status from oauth2_registered_client where id=? and metadata_valid='Y'",
                 (row, index) -> row.getString(1), client);
         return states.size() == 1 && "0".equals(states.get(0));
     }

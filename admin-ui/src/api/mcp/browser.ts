@@ -1,4 +1,4 @@
-import type { McpPublicConfiguration, McpCsrf, McpConsent, McpConnection, McpCall, McpPage, CaptchaInfoResult } from '@/types'
+import type { McpPublicConfiguration, McpCsrf, McpConnection, McpPage, CaptchaInfoResult } from '@/types'
 
 /** 仅保留状态码，不在错误消息中输出凭据或服务端报文。 */
 export class McpBrowserError extends Error {
@@ -46,37 +46,15 @@ export class McpBrowserClient {
     await this.request('/oauth2/login', body)
     await this.refreshCsrf()
   }
-  /** 获取当前用户所属的待确认请求。 */
-  consent(state: string): Promise<McpConsent> { return this.request('/oauth2/self/consent-context?state=' + encodeURIComponent(state)) }
   /** 分页查询本人的连接。 */
   connections(page: number): Promise<McpPage<McpConnection>> { return this.request(`/oauth2/self/connections?page=${page}&pageSize=20`) }
-  /** 分页查询本人的事件。 */
-  calls(page: number): Promise<McpPage<McpCall>> { return this.request(`/oauth2/self/calls?page=${page}&pageSize=20`) }
   /** 撤销当前账号的一条连接。 */
   revoke(id: number): Promise<unknown> { return this.request(`/oauth2/self/connections/${id}/revoke`, {}) }
   /** 只退出 MCP 浏览器会话。 */
   logout(): Promise<unknown> { return this.request('/oauth2/self/logout', {}) }
   /** 登录后由后端恢复已缓存的 OAuth 请求，忽略页面传入的跳转地址。 */
   resume(): void { window.location.assign(this.baseUrl + '/oauth2/self/resume') }
-  /** 用顶层表单提交，允许 OAuth 服务端完成重定向并保留原生错误响应。 */
-  async submitConsent(context: McpConsent, scopes: string[]): Promise<void> {
-    const csrf = await this.refreshCsrf()
-    if (context.submitUrl !== this.baseUrl + '/oauth2/authorize' || scopes.some(scope => !context.scopes.includes(scope))) {
-      throw new Error('授权上下文无效，请从 AI 客户端重新连接')
-    }
-    const form = document.createElement('form')
-    form.method = 'POST'
-    form.action = context.submitUrl
-    const values = [[csrf.csrfParameterName, csrf.csrfToken], ['client_id', context.clientId], ['state', context.state], ...scopes.map(scope => ['scope', scope])]
-    for (const [name, value] of values) {
-      const input = document.createElement('input')
-      input.type = 'hidden'; input.name = name; input.value = value
-      form.appendChild(input)
-    }
-    document.body.appendChild(form)
-    form.submit()
-    form.remove()
-  }
+
 }
 
 /** 经现有同源 API 代理引导配置与验证码，不携带后台 Bearer。 */

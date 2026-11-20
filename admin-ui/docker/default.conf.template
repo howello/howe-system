@@ -138,16 +138,6 @@ server {
     }
 
     # 仅发送来源，阻止 state 进入 Referer，同时保留原生跨域授权表单的 Origin。
-    location = /mcp/login {
-        try_files /index.html =404;
-        add_header Referrer-Policy strict-origin always;
-        add_header Cache-Control "no-store" always;
-        access_log /var/log/nginx/mcp-access.log mcp_safe;
-        # Nginx 错误日志可能包含完整请求行；OAuth/协议入口不写此类日志，错误状态保留在安全访问日志。
-        error_log /dev/null;
-    }
-
-    # 仅发送来源，阻止 state 进入 Referer，同时保留原生跨域授权表单的 Origin。
     location = /mcp/consent {
         try_files /index.html =404;
         add_header Referrer-Policy strict-origin always;

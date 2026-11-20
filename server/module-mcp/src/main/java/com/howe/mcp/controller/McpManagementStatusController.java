@@ -5,8 +5,6 @@ import com.howe.common.constant.ConfigConstants;
 import com.howe.common.core.controller.BaseController;
 import com.howe.common.core.domain.AjaxResult;
 import com.howe.mcp.config.McpEndpointSettings;
-import com.howe.mcp.service.McpAuditService;
-import com.howe.mcp.tool.McpToolRegistry;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
@@ -26,14 +24,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class McpManagementStatusController extends BaseController {
     private final ConfigProvider config;
     private final McpEndpointSettings active;
-    private final McpAuditService audit;
-    private final McpToolRegistry tools;
     private final boolean allowLocalHttp;
 
     /** 沿用启动时相同的本机 HTTP 策略，不因查看状态改变任何快照或配置。 */
-    public McpManagementStatusController(ConfigProvider config, McpEndpointSettings active, McpAuditService audit,
-            McpToolRegistry tools, @Value("${howe.mcp.allow-local-http:false}") boolean allowLocalHttp) {
-        this.config = config; this.active = active; this.audit = audit; this.tools = tools; this.allowLocalHttp = allowLocalHttp;
+    public McpManagementStatusController(ConfigProvider config, McpEndpointSettings active, @Value("${howe.mcp.allow-local-http:false}") boolean allowLocalHttp) {
+        this.config = config; this.active = active; this.allowLocalHttp = allowLocalHttp;
     }
 
     /** 仅读取三项白名单参数；无效地址不回显原文，防止误填密码或查询串进入管理响应。 */
@@ -51,12 +46,6 @@ public class McpManagementStatusController extends BaseController {
                 configured == null || !configured.equals(active)));
     }
 
-    /** 指标不包含用户标识或请求内容；计数从当前进程启动累计，不能解释成全站集群总数。 */
-    @Operation(summary = "获取 MCP 单进程审计与工具执行指标")
-    @PreAuthorize("@ss.hasPermi('mcp:calllog:list')")
-    @GetMapping("/statistics")
-    public AjaxResult statistics() { return success(new StatisticsView(audit.statistics(), tools.statistics())); }
-
     /** 已校验公开站点转换成最小显示对象，不返回配置提供者或任意参数表项。 */
     private static AddressView addresses(McpEndpointSettings value) {
         return new AddressView(value.issuer(), value.resource(), value.frontendBaseUrl().toASCIIString());
@@ -65,6 +54,4 @@ public class McpManagementStatusController extends BaseController {
     public record AddressView(String issuer, String resource, String frontendBaseUrl) { }
     /** 在线地址修改必须重启生效，运行开关不要求重启。 */
     public record ConfigurationView(boolean enabled, AddressView active, AddressView configured, boolean configuredValid, boolean restartRequired) { }
-    /** 仅包含当前进程数量，不能通过此接口清零计数或改变并发上限。 */
-    public record StatisticsView(McpAuditService.Statistics audit, McpToolRegistry.ExecutionStatistics execution) { }
 }

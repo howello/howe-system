@@ -5,7 +5,6 @@ import com.howe.common.tool.operation.ToolOperationContext;
 import com.howe.common.tool.operation.ToolOperationHandler;
 import com.howe.common.tool.operation.ToolOperationReceipt;
 import com.howe.common.tool.operation.ToolOperationRequest;
-import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -13,23 +12,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 平台操作服务：预览、准备、确认、拒绝与查询。
+ * 平台操作服务：预览、直接入队与查询。
  *
  * <p>身份、内部客户端登记与授权版本由平台可信作用域提供；领域只提交业务参数与幂等键。
- * 本服务不接触 MCP 协议类型，也不把确认凭证交给模型或浏览器。</p>
+ * 本服务不接触 MCP 协议类型。</p>
  */
 @Slf4j
 public final class McpOperationService {
-
-    /** 准备操作有效期。 */
-    private static final Duration PREPARE_TTL = Duration.ofMinutes(15);
-
-    /** 确认上下文有效期。 */
-    private static final Duration CONFIRMATION_TTL = Duration.ofMinutes(5);
 
     /** 本地写排队截止时间。 */
     private static final Duration LOCAL_QUEUE_TTL = Duration.ofMinutes(5);
@@ -46,7 +38,6 @@ public final class McpOperationService {
 
     /** 装配完成后由收集器写入；运行期只读。 */
     private volatile Map<String, com.howe.common.tool.model.ToolAccess> accesses = Map.of();
-    private volatile Map<String, String> scopes = Map.of();
     private volatile Map<String, String> stepVersions = Map.of();
 
     /** 装配完成后写入后续步骤处理器版本，供父操作登记时冻结。 */
@@ -63,35 +54,19 @@ public final class McpOperationService {
         return stepVersions;
     }
 
-    /** 装配原工具范围。 */
-    public void scopes(Map<String, String> indexed) {
-        scopes = Map.copyOf(indexed);
-    }
-
-    /** 原工具范围缺失时拒绝执行及结果读取。 */
-    public void requireScope(McpOperationRecord record, Set<String> approved) {
-        String scope = scopes.get(record.toolName() + "@" + record.toolVersion());
-        if (scope == null || !approved.contains(scope)) {
-            throw new com.howe.common.tool.exception.ToolException("execution_denied", "缺少原工具授权范围");
-        }
-    }
-
     private final com.fasterxml.jackson.databind.ObjectMapper mapper;
-    private final String frontendBaseUrl;
     private final org.springframework.transaction.support.TransactionTemplate transactions;
 
     /**
-     * 注入账本、按工具键索引的 Handler、序列化器与固定前端基址。
+     * 注入账本、按工具键索引的 Handler、序列化器与事务。
      *
      * @param store 账本
      * @param mapper JSON 序列化器
-     * @param frontendBaseUrl 固定前端站点基址
      */
     public McpOperationService(McpOperationStore store, com.fasterxml.jackson.databind.ObjectMapper mapper,
-            String frontendBaseUrl, org.springframework.transaction.support.TransactionTemplate transactions) {
+            org.springframework.transaction.support.TransactionTemplate transactions) {
         this.store = Objects.requireNonNull(store);
         this.mapper = Objects.requireNonNull(mapper);
-        this.frontendBaseUrl = Objects.requireNonNull(frontendBaseUrl);
         this.transactions = Objects.requireNonNull(transactions);
     }
 
@@ -132,7 +107,7 @@ public final class McpOperationService {
     }
 
     /**
-     * 工具侧申请：预览或幂等准备。
+     * 工具侧申请：预览或幂等提交。
      *
      * @param request 操作申请
      * @param context 可信业务上下文
@@ -154,35 +129,7 @@ public final class McpOperationService {
         if (request.mode() == ToolOperationRequest.Mode.PREVIEW) {
             return previewReceipt(plan);
         }
-        return prepare(request, context, binding, handler, plan, operationContext);
-    }
-
-    /**
-     * 浏览器确认视图；只返回本人与原绑定一致的操作。
-     *
-     * @param operationId 操作标识
-     * @param userId 会话账号
-     * @param binding 原授权绑定
-     * @return 确认视图
-     */
-    public Map<String, Object> confirmationView(String operationId, Long userId, McpOperationBinding binding) {
-        McpOperationRecord record = bound(operationId, userId, binding);
-        Map<String, Object> view = new LinkedHashMap<>();
-        view.put("operationId", record.operationId());
-        view.put("toolName", record.toolName());
-        view.put("targetType", record.targetType());
-        view.put("targetId", record.targetId());
-        view.put("expectedVersion", record.expectedVersion());
-        view.put("state", record.state());
-        view.put("stage", record.stage());
-        view.put("rowVersion", record.rowVersion());
-        view.put("prepareExpiresAt", record.prepareExpiresAt());
-        view.put("confirmationExpiresAt", record.rowVersion() == 0 ? null : confirmationExpiry(record));
-        view.put("canConfirm", McpOperationState.PREPARED.equals(record.state())
-                && record.prepareExpiresAt() != null && record.prepareExpiresAt().isAfter(Instant.now()));
-        // 安全摘要来自加密计划，只投影白名单字段，不下发正文。
-        view.put("summary", safeSummary(record));
-        return view;
+        return enqueue(request, context, binding, handler, plan, operationContext);
     }
 
     /**
@@ -211,134 +158,6 @@ public final class McpOperationService {
     }
 
     /**
-     * 从加密计划中读取安全摘要；不可解密时拒绝确认。
-     *
-     * @param record 账本记录
-     * @return 安全摘要
-     */
-    private Map<String, Object> safeSummary(McpOperationRecord record) {
-        return plan(record).safeSummary();
-    }
-
-    /**
-     * 创建确认上下文：固定摘要与会话绑定，期限不随刷新延长。
-     *
-     * @param operationId 操作标识
-     * @param userId 会话账号
-     * @param binding 原授权绑定
-     * @param expectedRowVersion 期望行版本
-     * @param summaryHash 本工具计划的安全摘要哈希
-     * @param sessionHash 浏览器会话绑定哈希
-     * @return 确认上下文
-     */
-    public Map<String, Object> openConfirmation(String operationId, Long userId, McpOperationBinding binding,
-            long expectedRowVersion, byte[] summaryHash, byte[] sessionHash) {
-        McpOperationRecord record = bound(operationId, userId, binding);
-        if (!McpOperationState.PREPARED.equals(record.state())) {
-            throw new com.howe.common.tool.exception.ToolException("state_conflict", "操作状态已变化");
-        }
-        Instant expiresAt = confirmationExpiry(record);
-        if (expiresAt == null) {
-            expiresAt = min(Instant.now().plus(CONFIRMATION_TTL), record.prepareExpiresAt());
-        }
-        if (!store.openConfirmationContext(operationId, userId, expectedRowVersion, summaryHash, sessionHash, expiresAt)) {
-            throw new com.howe.common.tool.exception.ToolException("state_conflict", "操作状态已变化，请刷新后重试");
-        }
-        Map<String, Object> view = new LinkedHashMap<>();
-        view.put("operationId", operationId);
-        view.put("summaryHash", java.util.HexFormat.of().formatHex(summaryHash));
-        view.put("confirmationExpiresAt", expiresAt);
-        view.put("rowVersion", expectedRowVersion + 1);
-        return view;
-    }
-
-    /**
-     * 浏览器确认并原子入队。
-     *
-     * @param operationId 操作标识
-     * @param userId 会话账号
-     * @param binding 原授权绑定
-     * @param expectedRowVersion 期望行版本
-     * @param summaryHash 提交的摘要哈希
-     * @param now 当前时间
-     * @return 确认结果
-     */
-    public Map<String, Object> confirm(String operationId, Long userId, McpOperationBinding binding,
-            long expectedRowVersion, String summaryHash, byte[] sessionHash, Instant now) {
-        McpOperationRecord record = bound(operationId, userId, binding);
-        if (!McpOperationState.PREPARED.equals(record.state())) {
-            // 重复确认返回既有状态，不第二次派发。
-            return Map.of("operationId", operationId, "state", record.state());
-        }
-        byte[] hash = parseHex(summaryHash);
-        byte[] confirmationHash = new byte[32];
-        new java.security.SecureRandom().nextBytes(confirmationHash);
-        Duration queueTtl = ToolOperationHandler.QueueGroup.BLOG_PUBLICATION.name().equals(record.queueGroup())
-                ? Duration.ofMinutes(15) : LOCAL_QUEUE_TTL;
-        // 领域认领与确认状态必须在同一事务：任一步失败都不能留下半占用。
-        Boolean confirmed = transactions.execute(status -> {
-            ToolOperationHandler handler = handlers.get(record.toolName() + "@" + record.toolVersion());
-            if (handler != null) {
-                ToolOperationHandler.Plan plan = plan(record);
-                ToolOperationContext context = new ToolOperationContext(
-                        new ToolExecutionContext(String.valueOf(userId), record.preparedDeptId() == null ? null
-                                : String.valueOf(record.preparedDeptId()), "confirm-" + operationId),
-                        ToolOperationContext.Phase.CONFIRM, operationId, record.fence(), now,
-                        now.plus(queueTtl), () -> { });
-                handler.revalidate(context, plan);
-                handler.reserve(context, plan);
-            }
-            boolean changed = store.confirm(operationId, userId, expectedRowVersion, hash, confirmationHash,
-                    sessionHash, now.plus(queueTtl), now);
-            if (!changed) {
-                status.setRollbackOnly();
-            }
-            return changed;
-        });
-        if (!Boolean.TRUE.equals(confirmed)) {
-            McpOperationRecord latest = bound(operationId, userId, binding);
-            if (!McpOperationState.PREPARED.equals(latest.state())) {
-                return Map.of("operationId", operationId, "state", latest.state());
-            }
-            throw new com.howe.common.tool.exception.ToolException("confirmation_expired", "确认已过期，请重新预览");
-        }
-        return Map.of("operationId", operationId, "state", McpOperationState.QUEUED);
-    }
-
-    /**
-     * 拒绝操作；仅尚未确认的 PREPARED 可取消。
-     *
-     * @param operationId 操作标识
-     * @param userId 会话账号
-     * @param binding 原授权绑定
-     * @return 拒绝结果
-     */
-    public Map<String, Object> reject(String operationId, Long userId, McpOperationBinding binding, long expectedRowVersion) {
-        McpOperationRecord record = bound(operationId, userId, binding);
-        if (!McpOperationState.PREPARED.equals(record.state())) {
-            throw new com.howe.common.tool.exception.ToolException("state_conflict", "操作状态已变化，无法拒绝");
-        }
-        boolean rejected = store.cancelPrepared(operationId, userId, expectedRowVersion);
-        if (!rejected) {
-            throw new com.howe.common.tool.exception.ToolException("state_conflict", "操作已被处理");
-        }
-        return Map.of("operationId", operationId, "state", McpOperationState.CANCELLED);
-    }
-
-    /**
-     * 查询本人操作；结果正文是否投影由原工具权限复核决定。
-     *
-     * @param operationId 操作标识
-     * @param userId 会话账号
-     * @param binding 原授权绑定
-     * @return 操作视图
-     */
-    public Map<String, Object> operationView(String operationId, Long userId, McpOperationBinding binding) {
-        McpOperationRecord record = bound(operationId, userId, binding);
-        return view(record);
-    }
-
-    /**
      * 分页查询本人操作。
      *
      * @param userId 会话账号
@@ -359,8 +178,8 @@ public final class McpOperationService {
         return result;
     }
 
-    /** 稳定视图；列表额外提供准备期限，供页面判断是否仍可进入确认页。 */
-    private static Map<String, Object> view(McpOperationRecord record) {
+    /** 本人操作的基本状态投影。 */
+    static Map<String, Object> view(McpOperationRecord record) {
         Map<String, Object> view = new LinkedHashMap<>();
         view.put("operationId", record.operationId());
         view.put("toolName", record.toolName());
@@ -369,9 +188,6 @@ public final class McpOperationService {
         view.put("resultCode", record.resultCode());
         view.put("createdAt", record.createdAt());
         view.put("finishedAt", record.finishedAt());
-        view.put("prepareExpiresAt", record.prepareExpiresAt());
-        view.put("canConfirm", McpOperationState.PREPARED.equals(record.state())
-                && record.prepareExpiresAt() != null && record.prepareExpiresAt().isAfter(Instant.now()));
         return view;
     }
 
@@ -381,8 +197,8 @@ public final class McpOperationService {
                 Instant.now(), null, null, plan.safeSummary(), null, null);
     }
 
-    /** 幂等准备。 */
-    private ToolOperationReceipt prepare(ToolOperationRequest request, ToolExecutionContext context,
+    /** 入队与领域资源预留在同一事务完成，重复提交沿用原记录。 */
+    private ToolOperationReceipt enqueue(ToolOperationRequest request, ToolExecutionContext context,
             McpOperationBinding binding, ToolOperationHandler handler, ToolOperationHandler.Plan plan,
             ToolOperationContext operationContext) {
         byte[] idempotencyHash = McpOperationStoreImpl.sha256(request.idempotencyKey());
@@ -393,18 +209,27 @@ public final class McpOperationService {
         }
         Instant now = operationContext.evaluationTime();
         String operationId = McpOperationStoreImpl.newOperationId();
+        Duration queueTtl = plan.queueGroup() == ToolOperationHandler.QueueGroup.BLOG_PUBLICATION
+                ? Duration.ofMinutes(15) : LOCAL_QUEUE_TTL;
+        Instant deadline = now.plus(queueTtl);
         McpOperationRecord record = new McpOperationRecord(operationId, binding.userId(),
                 binding.registeredClientId(), binding.grantId(), binding.grantVersion(), binding.resourceUri(),
-                String.join(",", binding.scopes()), context.deptId() == null ? null : Long.valueOf(context.deptId()),
+                context.deptId() == null ? null : Long.valueOf(context.deptId()),
                 binding.accountContextHash(), request.toolName(),
                 request.toolVersion(), plan.executionKind().name(), plan.queueGroup().name(), idempotencyHash,
                 argumentsHash, McpOperationStoreImpl.sha256(plan.configurationDigest() == null ? ""
                         : plan.configurationDigest()), plan.targetType(), plan.targetId(), plan.expectedVersion(),
-                McpOperationState.PREPARED, "PREPARED", null, null, null, now.plus(PREPARE_TTL), null, now, null,
+                McpOperationState.QUEUED, "QUEUED", deadline, now, null,
                 null, 0, 0, null, null, 0, now.plus(PAYLOAD_RETAIN), now.plus(RETAIN), null, now, now);
         try {
-            store.insertPrepared(record, canonical(request.toolName(), plan));
-        } catch (IllegalStateException exception) {
+            transactions.executeWithoutResult(status -> {
+                store.insertQueued(record, canonical(request.toolName(), plan));
+                var reservation = new ToolOperationContext(context, ToolOperationContext.Phase.CONFIRM,
+                        operationId, record.fence(), now, deadline, () -> { });
+                handler.revalidate(reservation, plan);
+                handler.reserve(reservation, plan);
+            });
+        } catch (org.springframework.dao.DuplicateKeyException exception) {
             // 唯一键并发冲突：回到幂等查询，绝不复用不同参数。
             return existing(request, binding)
                     .map(found -> existingReceipt(request, binding, handler, context, found))
@@ -457,15 +282,9 @@ public final class McpOperationService {
     /** 账本记录投影为回执。 */
     private ToolOperationReceipt receipt(McpOperationRecord record, ToolOperationHandler.Plan plan) {
         return new ToolOperationReceipt(record.operationId(), ToolOperationReceipt.State.valueOf(record.state()),
-                record.stage(), McpOperationState.PREPARED.equals(record.state()), confirmationUri(record.operationId()),
-                record.prepareExpiresAt(), record.createdAt(), record.finishedAt(), record.resultCode(),
+                record.stage(), false, null,
+                null, record.createdAt(), record.finishedAt(), record.resultCode(),
                 plan.safeSummary(), null, null);
-    }
-
-    /** 确认页地址始终来自固定前端站点。 */
-    private URI confirmationUri(String operationId) {
-        String base = frontendBaseUrl.replaceAll("/+$", "");
-        return URI.create(base + "/mcp/confirm?operationId=" + operationId);
     }
 
     /** 按工具键查 Handler，缺失即安装期问题，运行期拒绝。 */
@@ -475,13 +294,6 @@ public final class McpOperationService {
             throw new com.howe.common.tool.exception.ToolException("tool_unavailable", "工具不可用");
         }
         return handler;
-    }
-
-    /** 读取本人且与原绑定一致的操作。 */
-    private McpOperationRecord bound(String operationId, Long userId, McpOperationBinding binding) {
-        return store.findBound(operationId, userId, binding.grantId(), binding.registeredClientId())
-                .orElseThrow(() -> new com.howe.common.tool.exception.ToolException("not_found_or_forbidden",
-                        "操作不存在或无权访问"));
     }
 
     /** 规范化计划：键排序 JSON，用于摘要与加密载荷。 */
@@ -540,24 +352,5 @@ public final class McpOperationService {
         return value instanceof Map<?, ?> map ? (Map<String, Object>) map : Map.of();
     }
 
-    /** 已固定确认期限时不再延长。 */
-    private static Instant confirmationExpiry(McpOperationRecord record) {
-        return record.confirmationExpiresAt();
-    }
 
-    /** 取较早时间。 */
-    private static Instant min(Instant left, Instant right) {
-        if (right == null) {
-            return left;
-        }
-        return left.isBefore(right) ? left : right;
-    }
-
-    /** 十六进制摘要解析。 */
-    private static byte[] parseHex(String value) {
-        if (value == null || !value.matches("[0-9a-f]{64}")) {
-            throw new com.howe.common.tool.exception.ToolException("invalid_arguments", "摘要格式不正确");
-        }
-        return java.util.HexFormat.of().parseHex(value);
-    }
 }

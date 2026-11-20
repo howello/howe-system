@@ -31,7 +31,7 @@ public class McpOAuthMetadataController {
     @GetMapping("/.well-known/oauth-protected-resource/mcp")
     public Map<String, Object> resource() {
         return Map.of("resource", endpoints.resource(), "authorization_servers", List.of(endpoints.issuer()),
-                "scopes_supported", List.copyOf(McpScopes.SUPPORTED), "bearer_methods_supported", List.of("header"),
+                "scopes_supported", List.copyOf(McpScopes.PROTOCOL), "bearer_methods_supported", List.of("header"),
                 "resource_name", "Howe MCP");
     }
 }

@@ -5,7 +5,7 @@ import java.time.Instant;
 /**
  * 操作账本的最小内存投影。
  *
- * <p>只包含平台内部派发、确认与查询需要的字段；不包含加密载荷正文、确认凭证原文
+ * <p>只包含平台内部派发与查询需要的字段；不包含加密载荷正文
  * 或任何令牌。加密请求/结果由存储层按需单独解密，避免敏感内容在对象间传播。</p>
  *
  * @param operationId 操作标识
@@ -14,7 +14,6 @@ import java.time.Instant;
  * @param grantId 原授权主键
  * @param grantVersion 准备时的授权版本
  * @param resourceUri 授权资源
- * @param approvedScopes 准备时已批准的范围，逗号分隔
  * @param preparedDeptId 准备时的部门
  * @param accountContextHash 账号上下文摘要
  * @param toolName 原工具名
@@ -29,10 +28,6 @@ import java.time.Instant;
  * @param expectedVersion 目标版本
  * @param state 当前状态
  * @param stage 当前阶段
- * @param confirmedBy 确认账号
- * @param confirmedAt 确认时间
- * @param confirmationExpiresAt 确认上下文到期时间
- * @param prepareExpiresAt 准备到期时间
  * @param executionDeadlineAt 执行截止时间
  * @param nextAttemptAt 下次可尝试时间
  * @param leaseOwner 租约持有者
@@ -49,11 +44,10 @@ import java.time.Instant;
  * @param updatedAt 更新时间
  */
 public record McpOperationRecord(String operationId, Long userId, String registeredClientId, Long grantId,
-        long grantVersion, String resourceUri, String approvedScopes, Long preparedDeptId, byte[] accountContextHash,
+        long grantVersion, String resourceUri, Long preparedDeptId, byte[] accountContextHash,
         String toolName, String toolVersion, String executionKind, String queueGroup, byte[] idempotencyHash,
         byte[] argumentsHash, byte[] configurationHash, String targetType, String targetId, String expectedVersion,
-        String state, String stage, Long confirmedBy, Instant confirmedAt, Instant confirmationExpiresAt,
-        Instant prepareExpiresAt, Instant executionDeadlineAt, Instant nextAttemptAt, String leaseOwner,
+        String state, String stage, Instant executionDeadlineAt, Instant nextAttemptAt, String leaseOwner,
         Instant leaseUntil, long fence, int attempt, String resultCode, Integer resultBytes, long rowVersion,
         Instant payloadRetainUntil, Instant retainUntil, Instant finishedAt, Instant createdAt, Instant updatedAt) {
 

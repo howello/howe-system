@@ -1,4 +1,4 @@
-import type { McpOperationContext, McpOperationPage, McpOperationView } from '@/types/api/mcp-operation'
+import type { McpOperationPage, McpOperationView } from '@/types/api/mcp-operation'
 import type { McpBrowserClient } from './browser'
 
 /**
@@ -18,23 +18,9 @@ export class McpOperationClient {
     return this.browser.request(`/oauth2/self/operations?page=${page}&pageSize=20${query}`)
   }
 
-  /** 读取确认详情；只接受 operationId。 */
+  /** 读取操作详情；只接受 operationId。 */
   view(operationId: string): Promise<McpOperationView> {
     return this.browser.request(`/oauth2/self/operations/${encodeURIComponent(operationId)}`)
   }
 
-  /** 创建确认上下文；期限由服务端固定。 */
-  context(operationId: string, rowVersion: number): Promise<McpOperationContext> {
-    return this.browser.request(`/oauth2/self/operations/${encodeURIComponent(operationId)}/confirmation-context`, { rowVersion })
-  }
-
-  /** 提交确认；请求体只含行版本与服务端摘要哈希。 */
-  confirm(operationId: string, rowVersion: number, summaryHash: string): Promise<McpOperationView> {
-    return this.browser.request(`/oauth2/self/operations/${encodeURIComponent(operationId)}/confirm`, { rowVersion, summaryHash })
-  }
-
-  /** 拒绝操作。 */
-  reject(operationId: string, rowVersion: number): Promise<McpOperationView> {
-    return this.browser.request(`/oauth2/self/operations/${encodeURIComponent(operationId)}/reject`, { rowVersion })
-  }
 }

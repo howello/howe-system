@@ -56,17 +56,12 @@ public final class McpOperationCollector implements SmartInitializingSingleton {
         Map<String, ToolAccess> accesses = new LinkedHashMap<>();
         providers.orderedStream().forEach(provider -> provider.definitions().forEach(definition ->
                 accesses.put(definition.name() + "@" + definition.version(), definition.access())));
-        Map<String, String> scopes = new LinkedHashMap<>();
-        providers.orderedStream().forEach(provider -> provider.definitions().forEach(definition ->
-                scopes.put(definition.name() + "@" + definition.version(),
-                        com.howe.mcp.service.security.McpToolScopeBindings.resolve(definition.capabilityGroup()))));
         Map<String, String> stepVersions = new LinkedHashMap<>();
         stepHandlers.orderedStream().forEach(handler -> {
             if (stepVersions.putIfAbsent(handler.stepKey(), handler.stepVersion()) != null) {
                 throw new IllegalStateException("后续步骤处理器重复注册：" + handler.stepKey());
             }
         });
-        operations.scopes(scopes);
         operations.handlers(indexed);
         operations.accesses(accesses);
         operations.stepVersions(stepVersions);

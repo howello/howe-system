@@ -10,7 +10,6 @@ import com.howe.mcp.service.impl.McpToolPolicyServiceImpl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.howe.common.config.ConfigProvider;
-import com.howe.common.constant.ConfigConstants;
 import com.howe.common.utils.crypto.SecretCipher;
 import com.howe.mcp.service.security.McpExecutionIdentity;
 import com.howe.mcp.service.McpAuthorizationCodec;
@@ -23,7 +22,6 @@ import com.howe.mcp.service.McpCredentialCleanupService;
 import com.howe.mcp.service.McpToolPolicyService;
 import com.howe.mcp.service.spi.McpToolExecutionBridge;
 import com.howe.common.tool.spi.BusinessToolProvider;
-import com.howe.mcp.service.security.McpToolScopeBindings;
 import com.howe.mcp.operation.McpOperationBindingService;
 import com.howe.mcp.operation.McpOperationDispatchTask;
 import com.howe.mcp.operation.McpOperationExecutor;
@@ -52,7 +50,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.client.JdbcRegisteredClientRepository;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -75,13 +72,12 @@ public class McpModuleConfiguration {
     @Bean
     public Persistence mcpPersistence(DataSource source, PlatformTransactionManager transactionManager) {
         JdbcTemplate jdbc = new JdbcTemplate(source);
-        for (String table : List.of("oauth2_registered_client", "mcp_client_ext", "oauth2_authorization_consent",
-                "mcp_grant", "oauth2_authorization", "mcp_token_index", "mcp_tool_config", "mcp_call_log",
-                "mcp_operation", "mcp_operation_event", "mcp_operation_step")) {
+        for (String table : List.of("oauth2_registered_client", "mcp_grant", "oauth2_authorization",
+                "mcp_token_index", "mcp_operation", "mcp_operation_step")) {
             // 表名为代码固定白名单，安装时缺表立即失败；未安装时不执行任何这些查询。
             jdbc.queryForList("select 1 from " + table + " where 1=0");
         }
-        jdbc.queryForList("select metadata_version,metadata_valid from mcp_client_ext where 1=0");
+        jdbc.queryForList("select metadata_version,metadata_valid from oauth2_registered_client where 1=0");
         return new Persistence(jdbc, new TransactionTemplate(transactionManager));
     }
 
@@ -89,12 +85,6 @@ public class McpModuleConfiguration {
     @Bean
     public JdbcRegisteredClientRepository mcpRegisteredClients(Persistence persistence) {
         return new JdbcRegisteredClientRepository(persistence.jdbc());
-    }
-
-    /** 用户同意范围只有这一份权威存储。 */
-    @Bean
-    public JdbcOAuth2AuthorizationConsentService mcpConsents(Persistence persistence, JdbcRegisteredClientRepository clients) {
-        return new JdbcOAuth2AuthorizationConsentService(persistence.jdbc(), clients);
     }
 
     /** 显式安装时验证主密钥可用，不允许首次请求时再退化成明文保存。 */
@@ -106,40 +96,38 @@ public class McpModuleConfiguration {
 
     /** 授权与令牌索引采用已经验证的同一数据源事务。 */
     @Bean
-    public McpJdbcAuthorizationService mcpAuthorizations(Persistence persistence, McpAuthorizationCodec codec,
-            JdbcOAuth2AuthorizationConsentService consents) {
-        return new McpJdbcAuthorizationServiceImpl(persistence.jdbc(), persistence.transactions(), codec, consents, Clock.systemUTC());
+    public McpJdbcAuthorizationService mcpAuthorizations(Persistence persistence, McpAuthorizationCodec codec) {
+        return new McpJdbcAuthorizationServiceImpl(persistence.jdbc(), persistence.transactions(), codec, Clock.systemUTC());
     }
 
     /** 当前授权守卫与用户所有权撤销服务，不缓存有效授权。 */
     @Bean
-    public McpGrantService mcpGrants(Persistence persistence, JdbcOAuth2AuthorizationConsentService consents,
-            ConfigProvider config, McpEndpointSettings endpoints) {
-        return new McpGrantServiceImpl(persistence.jdbc(), persistence.transactions(), consents, config, endpoints);
+    public McpGrantService mcpGrants(Persistence persistence, ConfigProvider config, McpEndpointSettings endpoints) {
+        return new McpGrantServiceImpl(persistence.jdbc(), persistence.transactions(), config, endpoints);
     }
 
     /** 仅以本人账号主键查询自助连接和调用元数据。 */
     @Bean
-    public McpSelfService mcpSelfService(Persistence persistence, JdbcOAuth2AuthorizationConsentService consents) {
-        return new McpSelfServiceImpl(persistence.jdbc(), consents);
+    public McpSelfService mcpSelfService(Persistence persistence) {
+        return new McpSelfServiceImpl(persistence.jdbc());
     }
 
     /** 后台管理复用相同存储和撤销事务，不创建另一个授权源。 */
     @Bean
     public McpManagementService mcpManagementService(Persistence persistence, JdbcRegisteredClientRepository clients,
-            McpGrantService grants, McpToolRegistry tools) {
-        return new McpManagementServiceImpl(persistence.jdbc(), persistence.transactions(), clients, grants, tools);
+            McpGrantService grants) {
+        return new McpManagementServiceImpl(persistence.jdbc(), persistence.transactions(), clients, grants);
     }
 
     /** 清理事务使用当前提交视图和独立超时，避免候选读取快照覆盖并发轮换结果。 */
     @Bean
-    public McpCredentialCleanupService mcpCredentialCleanup(DataSource source, PlatformTransactionManager manager, ConfigProvider config) {
+    public McpCredentialCleanupService mcpCredentialCleanup(DataSource source, PlatformTransactionManager manager) {
         var jdbc = new JdbcTemplate(source);
         jdbc.setQueryTimeout(2);
         var transactions = new TransactionTemplate(manager);
         transactions.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_READ_COMMITTED);
         transactions.setTimeout(5);
-        return new McpCredentialCleanupServiceImpl(jdbc, transactions, config, Clock.systemUTC());
+        return new McpCredentialCleanupServiceImpl(jdbc, transactions, Clock.systemUTC());
     }
 
     /** 显式安装才注册定时任务，运行开关关闭不阻止过期清理。 */
@@ -180,10 +168,9 @@ public class McpModuleConfiguration {
      * 避免 Provider → Gateway → OperationService → Provider 的构造期循环依赖。</p>
      */
     @Bean
-    public McpOperationService mcpOperationService(McpOperationStore store, McpEndpointSettings endpoints,
-            ObjectMapper mapper, Persistence persistence) {
-        return new McpOperationService(store, mapper, endpoints.frontendBaseUrl().toASCIIString(),
-                persistence.transactions());
+    public McpOperationService mcpOperationService(McpOperationStore store, ObjectMapper mapper,
+            Persistence persistence) {
+        return new McpOperationService(store, mapper, persistence.transactions());
     }
 
     /**
@@ -232,7 +219,7 @@ public class McpModuleConfiguration {
     @Bean(destroyMethod = "close")
     public McpOperationExecutor mcpOperationExecutor(McpOperationStore store, McpOperationService operations,
             McpOperationBindingService bindings, McpExecutionIdentity identity,
-            ObjectProvider<McpToolExecutionBridge> bridges, ObjectMapper mapper, ConfigProvider config,
+            ObjectProvider<McpToolExecutionBridge> bridges, ObjectMapper mapper,
             Persistence persistence, McpToolPolicyService policy,
             com.howe.mcp.operation.McpOperationStepStore stepStore) {
         McpToolExecutionBridge bridge = bridges.getIfAvailable();
@@ -247,7 +234,7 @@ public class McpModuleConfiguration {
             };
         }
         McpOperationExecutor executor = new McpOperationExecutor(store, operations, bindings, identity, bridge,
-                policy, mapper, config, persistence.transactions(), stepStore);
+                policy, mapper, persistence.transactions(), stepStore);
         executor.start();
         return executor;
     }
@@ -258,7 +245,7 @@ public class McpModuleConfiguration {
             com.howe.mcp.operation.McpOperationStepStore stepStore, McpOperationStore store,
             McpOperationService operationService, McpOperationBindingService bindings,
             McpExecutionIdentity identity, ObjectProvider<McpToolExecutionBridge> bridges,
-            McpToolPolicyService policy, ObjectMapper mapper, ConfigProvider config,
+            McpToolPolicyService policy, ObjectMapper mapper,
             com.howe.mcp.operation.McpOperationCollector collector, Persistence persistence,
             McpOperationExecutor operationExecutor) {
         McpToolExecutionBridge bridge = bridges.getIfAvailable();
@@ -272,11 +259,9 @@ public class McpModuleConfiguration {
                 }
             };
         }
-        String configured = config.getPlainValue(ConfigConstants.MCP_OPERATION_MEAL_AUDIT_CONCURRENCY);
-        int concurrency = configured == null || configured.isBlank() ? 1 : Integer.parseInt(configured);
         com.howe.mcp.operation.McpOperationStepExecutor executor =
                 new com.howe.mcp.operation.McpOperationStepExecutor(stepStore, store, operationService, bindings,
-                        identity, bridge, policy, collector.stepHandlerIndex(), mapper, concurrency, persistence.transactions(),
+                        identity, bridge, policy, collector.stepHandlerIndex(), mapper, 1, persistence.transactions(),
                         operationExecutor.executionLimiter());
         executor.start();
         return executor;
@@ -302,28 +287,20 @@ public class McpModuleConfiguration {
      * 存在业务 Provider 却缺少框架权限桥接时启动失败，防止迁移漏装桥接后静默失去数据权限保障。</p>
      */
     @Bean(destroyMethod = "close")
-    public McpToolRegistry mcpTools(McpExecutionIdentity identity, McpGrantService grants, ConfigProvider config,
+    public McpToolRegistry mcpTools(McpExecutionIdentity identity, McpGrantService grants,
             ObjectMapper mapper, McpAuditService audit, McpToolPolicyService policy,
             ObjectProvider<BusinessToolProvider> providers, ObjectProvider<McpToolExecutionBridge> bridges,
             ObjectProvider<com.howe.common.tool.operation.ToolOperationGateway> gateways) {
-        String configured = config.getPlainValue(ConfigConstants.MCP_TOOL_CONCURRENCY);
-        int concurrency = configured == null || configured.isBlank() ? 8 : Integer.parseInt(configured);
-        String configuredUser = config.getPlainValue(ConfigConstants.MCP_TOOL_USER_CONCURRENCY);
-        int userConcurrency = configuredUser == null || configuredUser.isBlank() ? 2 : Integer.parseInt(configuredUser);
-        McpToolScopeBindings.validateTable();
         List<BusinessToolProvider> businessProviders = providers.orderedStream().toList();
-        McpToolScopeBindings.validate(businessProviders);
         List<McpToolDefinition> definitions = new ArrayList<>();
         businessProviders.forEach(provider -> provider.definitions().forEach(definition ->
-                definitions.add(McpToolDefinitionAdapter.adapt(definition,
-                        McpToolScopeBindings.resolve(definition.capabilityGroup())))));
+                definitions.add(McpToolDefinitionAdapter.adapt(definition))));
         com.howe.common.tool.operation.ToolOperationGateway gateway = gateways.getIfAvailable();
         if (gateway != null) {
             new com.howe.mcp.operation.McpOperationGetToolProvider(gateway).definitions().forEach(definition ->
-                    definitions.add(McpToolDefinitionAdapter.adapt(definition,
-                            McpToolScopeBindings.resolve(definition.capabilityGroup()))));
+                    definitions.add(McpToolDefinitionAdapter.adapt(definition)));
         }
-        definitions.add(McpConnectionCheck.definition(McpToolScopeBindings::resolve));
+        definitions.add(McpConnectionCheck.definition());
         McpToolExecutionBridge bridge = bridges.getIfAvailable();
         if (bridge == null) {
             if (!businessProviders.isEmpty()) {
@@ -339,7 +316,7 @@ public class McpModuleConfiguration {
             };
         }
         return new McpToolRegistry(definitions, identity, grants::requireActive,
-                grants::toolEnabled, policy, bridge, mapper, concurrency, userConcurrency, audit::tool, gateway);
+                policy, bridge, mapper, 8, 2, audit::tool, gateway);
     }
 
     /** 仅供本模块装配使用的辅助组件，不向全局发布另一个事务管理器。 */

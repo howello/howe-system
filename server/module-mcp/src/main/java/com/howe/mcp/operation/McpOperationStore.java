@@ -47,17 +47,6 @@ public interface McpOperationStore {
     Optional<McpOperationRecord> findById(String operationId);
 
     /**
-     * 按内部绑定读取操作，用于确认入口复核原 grant 与客户端。
-     *
-     * @param operationId 操作标识
-     * @param userId 账号
-     * @param grantId 原授权
-     * @param registeredClientId 内部客户端登记主键
-     * @return 操作记录
-     */
-    Optional<McpOperationRecord> findBound(String operationId, Long userId, Long grantId, String registeredClientId);
-
-    /**
      * 分页查询本人操作。
      *
      * @param userId 账号
@@ -78,51 +67,12 @@ public interface McpOperationStore {
     long countOwned(Long userId, String state);
 
     /**
-     * 插入准备态操作；唯一键冲突时抛出受控冲突，由调用方复核是否同摘要。
+     * 插入已排队操作；唯一键冲突时抛出受控冲突，由调用方复核是否同摘要。
      *
      * @param record 待插入记录
      * @param encryptedRequest 加密后的规范化请求
      */
-    void insertPrepared(McpOperationRecord record, String encryptedRequest);
-
-    /**
-     * 写入确认上下文：固定确认摘要哈希、会话哈希与确认期限，并递增行版本。
-     *
-     * @param operationId 操作标识
-     * @param userId 账号
-     * @param expectedRowVersion 期望行版本
-     * @param summaryHash 确认摘要哈希
-     * @param sessionHash 浏览器会话绑定哈希
-     * @param confirmationExpiresAt 确认到期时间
-     * @return 成功时返回 true
-     */
-    boolean openConfirmationContext(String operationId, Long userId, long expectedRowVersion, byte[] summaryHash,
-            byte[] sessionHash, Instant confirmationExpiresAt);
-
-    /**
-     * 浏览器确认：PREPARED → QUEUED，写确认主体、凭证哈希与执行截止时间。
-     *
-     * @param operationId 操作标识
-     * @param userId 账号
-     * @param expectedRowVersion 期望行版本
-     * @param summaryHash 提交的摘要哈希
-     * @param confirmationHash 一次性凭证哈希
-     * @param executionDeadlineAt 执行截止时间
-     * @param now 当前时间
-     * @return 成功时返回 true
-     */
-    boolean confirm(String operationId, Long userId, long expectedRowVersion, byte[] summaryHash,
-            byte[] confirmationHash, byte[] sessionHash, Instant executionDeadlineAt, Instant now);
-
-    /**
-     * 派发消费确认凭证：QUEUED → RUNNING 前清除凭证哈希并记录使用时间。
-     *
-     * @param operationId 操作标识
-     * @param fence 当前围栏
-     * @param now 当前时间
-     * @return 成功时返回 true
-     */
-    boolean consumeConfirmation(String operationId, String owner, long fence, Instant now);
+    void insertQueued(McpOperationRecord record, String encryptedRequest);
 
     /**
      * 领取一条到期的 QUEUED 操作，写入租约并递增围栏。
@@ -282,9 +232,6 @@ public interface McpOperationStore {
 
     /** 在业务事务中锁定当前有效执行许可；锁持有到业务与账本一起提交。 */
     boolean lockForExecution(String operationId, String owner, long fence);
-
-    /** 按本人及行版本取消准备态操作，与确认并发时只有一个动作成功。 */
-    boolean cancelPrepared(String operationId, Long userId, long rowVersion);
 
     /**
      * 读取并解密规范化请求；调用方必须已完成授权复核。

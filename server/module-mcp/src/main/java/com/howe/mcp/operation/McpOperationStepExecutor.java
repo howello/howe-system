@@ -188,9 +188,6 @@ public final class McpOperationStepExecutor {
                 return;
             }
             McpOperationBinding binding = bindings.dispatchBinding(operation);
-            bindings.requireToolEnabled(operation);
-            // 步骤继承父工具的授权范围与业务权限，不能只凭父操作存在就继续执行。
-            operationService.requireScope(operation, binding.scopes());
             McpInvocationContext invocation = new McpInvocationContext(operation.userId(), null,
                     operation.preparedDeptId(), bindings.externalClientId(operation), operation.grantId(),
                     operation.grantVersion(), binding.scopes(), operation.resourceUri(),
@@ -303,9 +300,7 @@ public final class McpOperationStepExecutor {
                     /** 每次调用都重新加载授权，并确认仍持有当前步骤租约。 */
                     @Override
                     public void check() {
-                        McpOperationBinding current = bindings.binding(operation);
-                        bindings.requireToolEnabled(operation);
-                        operationService.requireScope(operation, current.scopes());
+                        bindings.binding(operation);
                         identity.execute(invocation, () -> {
                             if (!policy.allowed(access(operation))) {
                                 throw new ToolException("authorization_changed", "当前账号权限已变化");

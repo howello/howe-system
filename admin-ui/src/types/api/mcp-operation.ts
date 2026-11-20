@@ -13,7 +13,7 @@ export interface McpOperationStepView {
   updateTime?: string | null
 }
 
-/** 确认详情；summary 只含服务端白名单字段。 */
+/** 操作详情；summary 只含服务端白名单字段。 */
 export interface McpOperationView {
   operationId: string
   toolName?: string
@@ -22,12 +22,7 @@ export interface McpOperationView {
   expectedVersion?: string | null
   state: McpOperationState
   stage?: string | null
-  rowVersion?: number
-  prepareExpiresAt?: string | null
-  confirmationExpiresAt?: string | null
-  canConfirm?: boolean
   summary?: Record<string, unknown> | null
-  summaryHash?: string
   resultCode?: string | null
   createdAt?: string | null
   finishedAt?: string | null
@@ -42,12 +37,4 @@ export interface McpOperationPage {
   total: number
   page: number
   pageSize: number
-}
-
-/** 确认上下文响应。 */
-export interface McpOperationContext {
-  operationId: string
-  summaryHash: string
-  confirmationExpiresAt: string
-  rowVersion: number
 }

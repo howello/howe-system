@@ -1,7 +1,6 @@
 package com.howe.mcp.service.impl;
 
 import com.howe.mcp.service.McpCimdClientService;
-import com.howe.mcp.service.McpClientRegistrationService;
 
 import cn.hutool.core.util.IdUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -100,7 +99,7 @@ public final class McpCimdClientServiceImpl implements McpCimdClientService {
         return result;
     }
 
-    /** 所有客户端的授权请求和同意都持有客户端行锁，与元数据更新、管理员停用串行。 */
+    /** 所有客户端的授权请求都持有客户端行锁，与元数据更新、管理员停用串行。 */
     @Override
     public <T> T withClientLock(String clientId, Supplier<T> action) {
         return transactions.execute(status -> {
@@ -108,8 +107,7 @@ public final class McpCimdClientServiceImpl implements McpCimdClientService {
             T result = action.get();
             // 合法初始请求即使正在等待浏览器登录，也不再视为长期无人使用的登记。
             jdbc.update("""
-                    update mcp_client_ext set last_used_at=current_timestamp
-                     where registered_client_id in(select id from oauth2_registered_client where client_id=?)
+                    update oauth2_registered_client set last_used_at=current_timestamp where client_id=?
                     """, clientId);
             return result;
         });
@@ -125,7 +123,7 @@ public final class McpCimdClientServiceImpl implements McpCimdClientService {
 
     /** 使用数据库版本比较网络开始前的快照；不在任何行锁中等待 DNS 或 HTTP。 */
     private RegisteredClient persist(String clientId, State expected, McpClientMetadata metadata, String snapshot, Instant expires) {
-        int maximum = lockQuota();
+        McpClientLifecycle.lockRegistration(jdbc);
         State current = state(clientId, true);
         if (current != null && !"0".equals(current.status())) { throw new McpMetadataException(false); }
         if (current != null && !"CIMD".equals(current.source())) { return clients.findById(current.id()); }
@@ -135,24 +133,17 @@ public final class McpCimdClientServiceImpl implements McpCimdClientService {
         }
         RegisteredClient previous = current == null ? null : clients.findById(current.id());
         if (current == null) {
-            Long count = jdbc.queryForObject("select count(*) from mcp_client_ext", Long.class);
-            if (count == null || count >= maximum) { throw new McpMetadataException(true); }
+            Long count = jdbc.queryForObject("select count(*) from oauth2_registered_client", Long.class);
+            if (count == null || count >= McpClientLifecycle.MAX_CLIENTS) { throw new McpMetadataException(true); }
         } else if (!McpTokenHash.of(snapshot).equals(current.digest())) { invalidate(current.id()); }
         RegisteredClient registered = registered(clientId, metadata, previous);
         clients.save(registered);
-        if (current == null) {
-            jdbc.update("""
-                    insert into mcp_client_ext(registered_client_id,registration_source,metadata_uri,metadata_digest,
-                                              metadata_json,metadata_expires_at,metadata_version,metadata_valid)
-                    values(?,'CIMD',?,?,?,?,1,'Y')
-                    """, registered.getId(), clientId, McpTokenHash.of(snapshot), snapshot, Timestamp.from(expires));
-        } else {
-            jdbc.update("""
-                    update mcp_client_ext set metadata_uri=?,metadata_digest=?,metadata_json=?,metadata_expires_at=?,
-                           metadata_version=metadata_version+1,metadata_valid='Y',update_time=current_timestamp
-                     where registered_client_id=?
-                    """, clientId, McpTokenHash.of(snapshot), snapshot, Timestamp.from(expires), registered.getId());
-        }
+        jdbc.update("""
+                update oauth2_registered_client set registration_source='CIMD',
+                       metadata_uri=?,metadata_digest=?,metadata_json=?,metadata_expires_at=?,
+                       metadata_version=metadata_version+1,metadata_valid='Y',update_time=current_timestamp
+                 where id=?
+                """, clientId, McpTokenHash.of(snapshot), snapshot, Timestamp.from(expires), registered.getId());
         return registered;
     }
 
@@ -163,23 +154,15 @@ public final class McpCimdClientServiceImpl implements McpCimdClientService {
             if (current == null || current.version() != expected.version() || !"CIMD".equals(current.source())) { return; }
             invalidate(current.id());
             jdbc.update("""
-                    update mcp_client_ext set metadata_valid='N',metadata_expires_at=null,
-                           metadata_version=metadata_version+1,update_time=current_timestamp where registered_client_id=?
+                    update oauth2_registered_client set metadata_valid='N',metadata_expires_at=null,
+                           metadata_version=metadata_version+1,update_time=current_timestamp where id=?
                     """, current.id());
         });
     }
 
-    /** 固定顺序锁定 grant、授权载荷和凭据；连待确认 state 一起失效，载荷继续加密保存。 */
+    /** 固定顺序锁定 grant、授权载荷和凭据；载荷继续加密保存。 */
     private void invalidate(String registeredClientId) {
         McpClientLifecycle.invalidate(jdbc, registeredClientId);
-    }
-
-    /** DCR/CIMD 创建共用配额互斥行；更新也短暂串行，管理员调限额不会产生双创建。 */
-    private int lockQuota() {
-        List<String> rows = jdbc.query("select config_value from sys_config where config_key=? for update",
-                (row, index) -> row.getString(1), ConfigConstants.MCP_REGISTRATION_MAX_CLIENTS);
-        if (rows.size() != 1) { throw new McpMetadataException(true); }
-        return McpClientRegistrationService.parseLimit(rows.get(0), 1, 100000);
     }
 
     /** 固定顺序的白名单 JSON 使摘要不受 JVM Map 迭代顺序或远端无关字段影响。 */
@@ -195,7 +178,7 @@ public final class McpCimdClientServiceImpl implements McpCimdClientService {
         var builder = RegisteredClient.withId(previous == null ? IdUtil.fastSimpleUUID() : previous.getId())
                 .clientId(clientId).clientIdIssuedAt(previous == null ? clock.instant() : previous.getClientIdIssuedAt())
                 .clientName(metadata.name()).clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
-                .clientSettings(ClientSettings.builder().requireProofKey(true).requireAuthorizationConsent(true).build())
+                .clientSettings(ClientSettings.builder().requireProofKey(true).requireAuthorizationConsent(false).build())
                 .tokenSettings(TokenSettings.builder().authorizationCodeTimeToLive(Duration.ofMinutes(2))
                         .accessTokenTimeToLive(Duration.ofMinutes(15)).accessTokenFormat(OAuth2TokenFormat.REFERENCE)
                         .refreshTokenTimeToLive(Duration.ofDays(30)).reuseRefreshTokens(false).build());
@@ -212,22 +195,13 @@ public final class McpCimdClientServiceImpl implements McpCimdClientService {
 
     /** 行锁只在调用方短事务中使用，不在元数据获取过程中持有。 */
     private State state(String clientId, boolean lock) {
-        String statement = "select e.* from oauth2_registered_client c join mcp_client_ext e on c.id=e.registered_client_id where c.client_id=?";
-        String parameter = clientId;
-        if (lock) {
-            // 显式锁定 registered_client→ext，不能让 JOIN 执行计划改变与登记删除的锁顺序。
-            List<String> identifiers = jdbc.query("select id from oauth2_registered_client where client_id=? for update",
-                    (row, index) -> row.getString(1), clientId);
-            if (identifiers.isEmpty()) { return null; }
-            parameter = identifiers.get(0);
-            statement = "select * from mcp_client_ext where registered_client_id=? for update";
-        }
+        String statement = "select * from oauth2_registered_client where client_id=?" + (lock ? " for update" : "");
         List<State> rows = jdbc.query(statement, (row, index) -> {
                     Timestamp expiry = row.getTimestamp("metadata_expires_at");
-                    return new State(row.getString("registered_client_id"), row.getString("registration_source"), row.getString("status"),
+                    return new State(row.getString("id"), row.getString("registration_source"), row.getString("status"),
                             row.getLong("metadata_version"), row.getString("metadata_valid"), row.getString("metadata_digest"),
                             expiry == null ? null : expiry.toInstant());
-                }, parameter);
+                }, clientId);
         return rows.isEmpty() ? null : rows.get(0);
     }
 

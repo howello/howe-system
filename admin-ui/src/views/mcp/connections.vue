@@ -37,16 +37,6 @@
           <div class="mcp-summary__value">{{ connectionTotal }}</div>
           <div class="mcp-summary__hint">本页有效 {{ activeOnPage }} 条</div>
         </div>
-        <div class="mcp-summary__item">
-          <div class="mcp-summary__label">调用记录</div>
-          <div class="mcp-summary__value">{{ callTotal }}</div>
-          <div class="mcp-summary__hint">仅元数据，不含请求正文</div>
-        </div>
-        <div class="mcp-summary__item">
-          <div class="mcp-summary__label">最近调用</div>
-          <div class="mcp-summary__value mcp-summary__value--time">{{ latestCall }}</div>
-          <div class="mcp-summary__hint">本页最近一条记录</div>
-        </div>
       </div>
 
       <section class="mcp-section">
@@ -76,20 +66,6 @@
                 </span>
               </template>
             </el-table-column>
-            <el-table-column label="授权范围" min-width="200">
-              <template #default="{ row }">
-                <div class="mcp-scope-chips">
-                  <span v-for="scope in row.scopes" :key="scope" class="mcp-scope-chip" :title="scopeDesc(scope)">
-                    {{ scopeLabel(scope) }}
-                    <span class="mcp-scope-desc">{{ scopeDesc(scope) }}</span>
-                  </span>
-                  <span v-if="!row.scopes.length" class="mcp-muted">无</span>
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column label="最近调用" min-width="170">
-              <template #default="{ row }"><span class="mcp-time">{{ formatTime(row.lastUsedAt) }}</span></template>
-            </el-table-column>
             <el-table-column label="操作" width="90" align="center">
               <template #default="{ row }">
                 <el-button
@@ -115,47 +91,7 @@
         </div>
       </section>
 
-      <section class="mcp-section">
-        <div class="mcp-section__head">
-          <div>
-            <h2 class="mcp-section__title">调用记录</h2>
-            <p class="mcp-section__desc">只记录事件、工具与结果码，不保存入参和返回正文。</p>
-          </div>
-        </div>
-        <div class="mcp-section__body">
-          <el-table :data="calls" v-loading="busy" empty-text="暂无调用记录" row-key="logId">
-            <el-table-column label="时间" min-width="170">
-              <template #default="{ row }"><span class="mcp-time">{{ formatTime(row.createdAt) }}</span></template>
-            </el-table-column>
-            <el-table-column label="事件" min-width="120">
-              <template #default="{ row }"><span class="mcp-scope-chip">{{ eventLabel(row.eventType) }}</span></template>
-            </el-table-column>
-            <el-table-column label="工具" min-width="170">
-              <template #default="{ row }"><span class="mcp-mono">{{ row.toolName || '—' }}</span></template>
-            </el-table-column>
-            <el-table-column label="结果" min-width="150">
-              <template #default="{ row }">
-                <el-tag :type="resultType(row.resultCode)" effect="plain" size="small">{{ row.resultCode }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="耗时" width="100" align="right">
-              <template #default="{ row }"><span class="mcp-mono">{{ row.elapsedMs }} ms</span></template>
-            </el-table-column>
-          </el-table>
-        </div>
-        <div v-if="callTotal > 20" class="mcp-section__foot">
-          <el-pagination
-            v-model:current-page="callPage"
-            :total="callTotal"
-            :page-size="20"
-            layout="prev, pager, next"
-            background
-            @current-change="load"
-          />
-        </div>
-      </section>
     </section>
-    <p class="mcp-page__foot">撤销连接不会删除历史调用记录，便于后续追溯。</p>
   </main>
 </template>
 
@@ -165,58 +101,34 @@ import { useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { CircleClose, Connection, Refresh, SwitchButton } from '@element-plus/icons-vue'
 import { createMcpBrowserClient, mcpErrorMessage, McpBrowserError, type McpBrowserClient } from '@/api/mcp/browser'
-import type { McpConnection, McpCall } from '@/types'
+import type { McpConnection } from '@/types'
 import McpBrand from './components/McpBrand.vue'
 import './style.css'
 
-import { mcpScopeDescription, mcpScopeLabel } from '@/utils/mcpScopes'
 const router = useRouter()
-const connections = ref<McpConnection[]>([]), calls = ref<McpCall[]>([])
-const connectionPage = ref(1), callPage = ref(1), connectionTotal = ref(0), callTotal = ref(0)
+const connections = ref<McpConnection[]>([])
+const connectionPage = ref(1), connectionTotal = ref(0)
 const username = ref(''), error = ref(''), busy = ref(false), disabled = ref(false)
 let client: McpBrowserClient | undefined
-/** 固定事件类型使用中文展示，未知类型保留原始代码。 */
-const EVENT_LABELS: Record<string, string> = {
-  AUTHORIZE: '授权确认', TOKEN_EXCHANGE: '换取令牌', TOKEN_REVOKE: '撤销令牌', GRANT_REVOKE: '撤销授权',
-  CLIENT_REGISTER: '客户端登记', LOGIN: '登录', LOGOUT: '退出', PROTOCOL: '协议请求', TOOL_CALL: '工具调用'
-}
 /** 账号头像占位取首个字符。 */
 const avatarText = computed(() => (username.value || 'M').slice(0, 1).toUpperCase())
 /** 当前页仍有效的连接数量。 */
 const activeOnPage = computed(() => connections.value.filter(isActive).length)
-/** 本页最近的调用时间，空列表显示占位。 */
-const latestCall = computed(() => calls.value.length ? formatTime(calls.value[0].createdAt) : '暂无')
 /** 连接与客户端都正常才算有效。 */
 function isActive(connection: McpConnection): boolean { return connection.status === '0' && connection.clientStatus === '0' }
-/** 已知范围使用中文含义。 */
-function scopeLabel(scope: string): string { return mcpScopeLabel(scope) }
-/** 每个范围的用途说明，和授权确认页使用同一份映射。 */
-function scopeDesc(scope: string): string { return mcpScopeDescription(scope) }
-/** 已知事件给出中文含义。 */
-function eventLabel(event: string): string { return EVENT_LABELS[event] || event }
-/** 结果码只按语义分组着色。 */
-function resultType(code: string): 'success' | 'warning' | 'danger' | 'info' {
-  if (code === 'OK' || code === 'ACCEPTED') return 'success'
-  if (code === 'PENDING') return 'info'
-  if (['RATE_LIMITED', 'SERVER_BUSY', 'USER_BUSY', 'TOOL_TIMEOUT', 'UNAVAILABLE'].includes(code)) return 'warning'
-  return 'danger'
-}
-/** 日期为空时保留无记录语义。 */
-function formatTime(value: string | null): string { return value ? new Date(value).toLocaleString() : '暂无' }
 /** 会话失效只清空当前页面并转到独立登录。 */
 async function handleError(cause: unknown): Promise<void> {
   if (cause instanceof McpBrowserError && cause.status === 401) {
-    connections.value = []; calls.value = []; await router.replace('/mcp/login')
+    connections.value = []; await router.replace('/mcp/login')
   } else error.value = mcpErrorMessage(cause)
 }
-/** 两个列表始终由服务器根据本人会话查询。 */
+/** 服务器根据本人会话查询连接。 */
 async function load(): Promise<void> {
   if (!client || busy.value) return
   busy.value = true; error.value = ''
   try {
-    const [connectionResult, callResult] = await Promise.all([client.connections(connectionPage.value), client.calls(callPage.value)])
+    const connectionResult = await client.connections(connectionPage.value)
     connections.value = connectionResult.items; connectionTotal.value = connectionResult.total
-    calls.value = callResult.items; callTotal.value = callResult.total
   } catch (cause) { await handleError(cause) }
   finally { busy.value = false }
 }

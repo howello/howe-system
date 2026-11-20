@@ -2,7 +2,6 @@ package com.howe.mcp.config;
 
 import com.howe.mcp.service.impl.McpProtocolAdmissionImpl;
 
-import com.howe.common.config.ConfigProvider;
 import com.howe.mcp.service.McpProtocolAdmission;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -18,7 +17,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 public class McpAdmissionConfiguration {
     /** 使用已有 Redis 连接，窗口状态在多个应用实例间共享。 */
     @Bean
-    public McpProtocolAdmission mcpProtocolAdmission(RedisConnectionFactory connections, ConfigProvider config) {
-        return new McpProtocolAdmissionImpl(new StringRedisTemplate(connections), config);
+    public McpProtocolAdmission mcpProtocolAdmission(RedisConnectionFactory connections) {
+        return new McpProtocolAdmissionImpl(new StringRedisTemplate(connections));
     }
 }

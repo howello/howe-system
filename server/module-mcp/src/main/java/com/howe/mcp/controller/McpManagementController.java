@@ -55,45 +55,6 @@ public class McpManagementController extends BaseController {
         return success();
     }
 
-    /** 目录由实际代码定义，不发布未实现业务工具；查询与分页只在服务端内存目录执行。 */
-    @Operation(summary = "分页查询 MCP 工具目录")
-    @PreAuthorize("@ss.hasPermi('mcp:tool:list')")
-    @GetMapping("/tool/list")
-    public TableDataInfo tools(@ModelAttribute McpManagementService.ToolQuery query) {
-        return table(service.tools(query));
-    }
-
-    /** 全量统计与筛选项用于页面工具栏，不受当前查询条件影响。 */
-    @Operation(summary = "查询 MCP 工具目录统计")
-    @PreAuthorize("@ss.hasPermi('mcp:tool:list')")
-    @GetMapping("/tool/summary")
-    public AjaxResult toolsSummary() { return success(service.toolsSummary()); }
-
-    /** 查看固定工具契约不授予调用权限。 */
-    @Operation(summary = "获取 MCP 工具契约")
-    @PreAuthorize("@ss.hasPermi('mcp:tool:query')")
-    @GetMapping("/tool/{name}")
-    public AjaxResult tool(@PathVariable String name) { return success(service.tool(name)); }
-
-    /** 工具状态修改采用后台当前账号作为更新者。 */
-    @Operation(summary = "修改 MCP 工具开放状态")
-    @PreAuthorize("@ss.hasPermi('mcp:tool:edit')")
-    @Log(title = "MCP 工具状态", businessType = BusinessType.UPDATE, isSaveRequestData = false, isSaveResponseData = false)
-    @PutMapping("/tool/{name}/status")
-    public AjaxResult toolStatus(@PathVariable String name, @Valid @RequestBody ToolStatus body) {
-        service.toolStatus(name, body.enabled(), getUsername());
-        return success();
-    }
-
-    /** 全局开关固定作用于代码目录全部工具，不接受筛选、分页或工具名列表作为范围。 */
-    @Operation(summary = "全局切换 MCP 工具开放状态", description = "范围固定为代码目录全部工具，不受查询条件影响")
-    @PreAuthorize("@ss.hasPermi('mcp:tool:edit')")
-    @Log(title = "MCP 工具全局状态", businessType = BusinessType.UPDATE, isSaveRequestData = false, isSaveResponseData = false)
-    @PutMapping("/tool/status")
-    public AjaxResult toolStatusAll(@Valid @RequestBody ToolStatus body) {
-        return success(service.toolStatusAll(body.enabled(), getUsername()));
-    }
-
     /** 此处是全站授权列表，普通用户仅可使用独立 self 接口。 */
     @Operation(summary = "分页查询 MCP 用户授权")
     @PreAuthorize("@ss.hasPermi('mcp:grant:list')")
@@ -113,18 +74,6 @@ public class McpManagementController extends BaseController {
     @PostMapping("/grant/{id}/revoke")
     public AjaxResult revoke(@PathVariable Long id) { service.revoke(id); return success(); }
 
-    /** 固定元数据查询，不开放协议原始报文。 */
-    @Operation(summary = "分页查询 MCP 调用记录")
-    @PreAuthorize("@ss.hasPermi('mcp:calllog:list')")
-    @GetMapping("/calllog/list")
-    public TableDataInfo calls(@ModelAttribute McpManagementService.Query query) { return table(service.calls(query)); }
-
-    /** 详情采用同一字段白名单，不返回敏感摘要。 */
-    @Operation(summary = "获取 MCP 调用记录详情")
-    @PreAuthorize("@ss.hasPermi('mcp:calllog:query')")
-    @GetMapping("/calllog/{id}")
-    public AjaxResult call(@PathVariable Long id) { return success(service.call(id)); }
-
     /** JDBC 分页结果显式转换为后台约定，不把 PageHelper 放在 JDBC 查询之前。 */
     private static TableDataInfo table(McpManagementService.Page<?> page) {
         TableDataInfo result = new TableDataInfo(page.rows(), page.total());
@@ -133,6 +82,4 @@ public class McpManagementController extends BaseController {
     }
     /** 状态请求只有单个管理状态字段。 */
     public record ClientStatus(@Pattern(regexp = "[01]") @jakarta.validation.constraints.NotNull String status) { }
-    /** 工具状态不能包含动态实现、权限或 schema。 */
-    public record ToolStatus(@Pattern(regexp = "[YN]") @jakarta.validation.constraints.NotNull String enabled) { }
 }

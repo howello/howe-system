@@ -22,44 +22,6 @@ public class ConfigConstants {
     public static final String MCP_PUBLIC_BASE_URL = "mcp.publicBaseUrl";
     /** MCP 前端授权页面基址，在线保存后重启生效。 */
     public static final String MCP_FRONTEND_BASE_URL = "mcp.frontendBaseUrl";
-    /** MCP OAuth 参数前缀。 */
-    public static final String MCP_OAUTH_PREFIX = "mcp.oauth.";
-    /** MCP 工具执行参数前缀。 */
-    public static final String MCP_TOOL_PREFIX = "mcp.tool.";
-    /** MCP 工具最大执行并发（启动时读取，默认 8）。 */
-    public static final String MCP_TOOL_CONCURRENCY = "mcp.tool.concurrency";
-    /** MCP 单进程内同一用户跨客户端共享的工具执行并发（启动读取，默认 2）。 */
-    public static final String MCP_TOOL_USER_CONCURRENCY = "mcp.tool.userConcurrency";
-    /** MCP 本地写操作执行并发（启动读取，默认 4）。 */
-    public static final String MCP_OPERATION_LOCAL_CONCURRENCY = "mcp.operation.localConcurrency";
-    /** MCP 博客发布执行并发（启动读取，默认 1）。 */
-    public static final String MCP_OPERATION_PUBLISH_CONCURRENCY = "mcp.operation.publishConcurrency";
-
-    /** 点餐写执行并发；启动时读取，修改后重启生效。 */
-    public static final String MCP_OPERATION_MEAL_CONCURRENCY = "mcp.operation.mealConcurrency";
-
-    /** 点餐提案自动审核步骤并发；启动时读取，修改后重启生效。 */
-    public static final String MCP_OPERATION_MEAL_AUDIT_CONCURRENCY = "mcp.operation.mealAuditConcurrency";
-
-    /** 写操作进程内总并发；启动时读取，修改后重启生效。 */
-    public static final String MCP_OPERATION_TOTAL_CONCURRENCY = "mcp.operation.totalConcurrency";
-
-    /** 写操作进程内单账号并发；启动时读取，修改后重启生效。 */
-    public static final String MCP_OPERATION_USER_CONCURRENCY = "mcp.operation.userConcurrency";
-    /** MCP 操作账本元数据保留天数（默认 30）。 */
-    public static final String MCP_OPERATION_RETAIN_DAYS = "mcp.operation.retainDays";
-    /** MCP 自动客户端登记的 IP 每分钟限额。 */
-    public static final String MCP_REGISTRATION_IP_PER_MINUTE = "mcp.registration.ipPerMinute";
-    /** 自动登记总量上限，同时作为数据库登记配额互斥行。 */
-    public static final String MCP_REGISTRATION_MAX_CLIENTS = "mcp.registration.maxClients";
-    /** MCP 调用记录保留天数。 */
-    public static final String MCP_LOG_RETENTION_DAYS = "mcp.log.retentionDays";
-    /** 凭据全部过期后的额外清理宽限分钟数，默认 60。 */
-    public static final String MCP_CREDENTIAL_CLEANUP_GRACE_MINUTES = "mcp.cleanup.credentialGraceMinutes";
-    /** 从未授权且未停用的客户端登记保留天数，默认 30。 */
-    public static final String MCP_CLIENT_UNUSED_RETENTION_DAYS = "mcp.cleanup.unusedClientRetentionDays";
-    /** MCP 共享协议限流参数前缀，在线修改后后续请求读取新额度。 */
-    public static final String MCP_RATE_PREFIX = "mcp.rate.";
     /** AI 受理次数及并发参数前缀，后接能力名和限制类型。 */
     public static final String AI_USAGE_PREFIX = "ai.usage.";
     /** 存储类型：r2 对象存储 / local 本地磁盘 */

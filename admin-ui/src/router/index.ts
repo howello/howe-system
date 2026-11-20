@@ -26,13 +26,11 @@ import Layout from '@/layout/index.vue'
 
 // 公共路由
 export const constantRoutes = [
-  ...['login', 'consent', 'connections', 'confirm', 'operations'].map(page => ({
+  ...['login', 'connections', 'operations'].map(page => ({
     path: `/mcp/${page}`,
     component: page === 'login' ? () => import('@/views/mcp/login.vue')
-      : page === 'consent' ? () => import('@/views/mcp/consent.vue')
-        : page === 'confirm' ? () => import('@/views/mcp/confirm.vue')
-          : page === 'operations' ? () => import('@/views/mcp/operations.vue')
-            : () => import('@/views/mcp/connections.vue'),
+      : page === 'operations' ? () => import('@/views/mcp/operations.vue')
+        : () => import('@/views/mcp/connections.vue'),
     hidden: true,
     meta: { title: 'MCP 授权与连接' }
   })),

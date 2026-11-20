@@ -74,9 +74,7 @@ public final class McpToolOperationGateway implements ToolOperationGateway {
         if (!Objects.equals(bound.grantId(), record.grantId())) {
             throw new ToolException("not_found_or_forbidden", "操作不存在或无权访问");
         }
-        McpOperationBinding resolved = bindings.binding(record);
-        bindings.requireToolEnabled(record);
-        operations.requireScope(record, resolved.scopes());
+        bindings.resultBinding(record);
         String key = record.toolName() + "@" + record.toolVersion();
         var handler = operations.handlers().get(key);
         var access = operations.accesses().get(key);
@@ -89,7 +87,7 @@ public final class McpToolOperationGateway implements ToolOperationGateway {
                     com.howe.common.tool.operation.ToolOperationContext.Phase.RESULT_READ,
                     operationId, record.fence(), java.time.Instant.now(), null, () -> { }), plan);
             return new ToolOperationReceipt(record.operationId(), ToolOperationReceipt.State.valueOf(record.state()),
-                    record.stage(), false, null, record.prepareExpiresAt(), record.createdAt(), record.finishedAt(),
+                    record.stage(), false, null, null, record.createdAt(), record.finishedAt(),
                     record.resultCode(), plan.safeSummary(), operations.safeResult(record), null);
         });
     }

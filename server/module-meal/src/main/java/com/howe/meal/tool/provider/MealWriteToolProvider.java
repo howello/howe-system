@@ -91,7 +91,7 @@ public final class MealWriteToolProvider implements BusinessToolProvider {
         properties.put("assignUserId", idProperty());
         return new ToolDefinition("meal_order_submit", "1", "提交家庭点餐订单",
                 "按菜品下单选定的菜并可选指派厨师；服务端回查菜名、封面与上架状态后落成订单快照，"
-                        + "需要浏览器确认后才创建订单并通知家人。",
+                        + "提交后排队创建订单并通知家人。",
                 WRITE_GROUP, new ToolInputSchema("object", properties,
                         List.of("idempotencyKey", "items"), false, null, null),
                 ToolAccess.authenticated(),
@@ -172,7 +172,7 @@ public final class MealWriteToolProvider implements BusinessToolProvider {
     /** 拒单。 */
     private ToolDefinition orderRefuse() {
         return candidateTool("meal_order_refuse", "厨师拒单",
-                "以当前待响应候选人身份拒单；确认后按家庭配置转公开或关闭，"
+                "以当前待响应候选人身份拒单；执行时按家庭配置转公开或关闭，"
                         + "转公开会重置接单截止时间并通知其他厨师。",
                 KITCHEN_WRITE_GROUP, "meal:order:dispatch");
     }
@@ -210,7 +210,7 @@ public final class MealWriteToolProvider implements BusinessToolProvider {
         properties.put("content", Map.of("type", "string", "maxLength", 1000));
         properties.put("anonymous", Map.of("type", "boolean", "default", false));
         return new ToolDefinition("meal_review_submit", "1", "评价已完成的订单",
-                "只能评价本人已完成且尚未评价的订单，一单一评；确认后写入评价并通知实际接单厨师。",
+                "只能评价本人已完成且尚未评价的订单，一单一评；提交后写入评价并通知实际接单厨师。",
                 WRITE_GROUP, new ToolInputSchema("object", properties,
                         List.of("idempotencyKey", "orderId", "score"), false, null, null),
                 ToolAccess.authenticated(),
@@ -310,7 +310,7 @@ public final class MealWriteToolProvider implements BusinessToolProvider {
             data.put("prepareExpiresAt", receipt.prepareExpiresAt());
             data.put("summary", receipt.summary());
             return ToolResults.detail(data, receipt.state() == ToolOperationReceipt.State.PREVIEW
-                    ? "已生成预览，尚未创建操作" : "操作已准备，等待浏览器确认");
+                    ? "已生成预览，尚未创建操作" : "操作已提交，可查询执行状态");
         } catch (ToolException exception) {
             throw exception;
         } catch (ServiceException exception) {

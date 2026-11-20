@@ -8,7 +8,6 @@ import com.howe.mcp.service.security.McpAccessTokenCustomizer;
 import com.howe.mcp.service.security.McpAuthorizationRequestConverter;
 import com.howe.mcp.service.security.McpAuthorizationRequestValidator;
 import com.howe.mcp.service.security.McpAuthorizationResponseHandler;
-import com.howe.mcp.service.security.McpConsentAuthenticationProvider;
 import com.howe.mcp.service.security.McpOAuthProtocolFilter;
 import com.howe.mcp.service.security.McpPublicClientAuthenticationProvider;
 import com.howe.mcp.service.security.McpPublicRefreshAuthenticationConverter;
@@ -40,7 +39,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
-import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.authentication.ClientSecretAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationProvider;
@@ -53,12 +51,10 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Acce
 import org.springframework.security.oauth2.server.authorization.web.authentication.ClientSecretBasicAuthenticationConverter;
 import org.springframework.security.oauth2.server.authorization.web.authentication.ClientSecretPostAuthenticationConverter;
 import org.springframework.security.oauth2.server.authorization.web.authentication.OAuth2AuthorizationCodeAuthenticationConverter;
-import org.springframework.security.oauth2.server.authorization.web.authentication.OAuth2AuthorizationConsentAuthenticationConverter;
 import org.springframework.security.oauth2.server.authorization.web.authentication.OAuth2RefreshTokenAuthenticationConverter;
 import org.springframework.security.oauth2.server.authorization.web.authentication.PublicClientAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.NullSecurityContextRepository;
-import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.savedrequest.NullRequestCache;
 import org.springframework.web.cors.CorsConfiguration;
@@ -74,7 +70,6 @@ public class McpAuthorizationServerConfiguration {
     private final McpEndpointSettings endpoints;
     private final McpModuleConfiguration.Persistence persistence;
     private final JdbcRegisteredClientRepository clients;
-    private final JdbcOAuth2AuthorizationConsentService consents;
     private final McpJdbcAuthorizationService authorizations;
     private final McpAccountBridge accounts;
     private final ConfigProvider config;
@@ -90,23 +85,17 @@ public class McpAuthorizationServerConfiguration {
         return McpAuthorizationNavigation.create();
     }
 
-    /** 浏览器只在授权端点读取 Session，POST 同意另加实际执行的 CSRF 过滤器。 */
+    /** 浏览器只在授权端点读取 Session。 */
     @Bean
     @Order(6)
     public SecurityFilterChain mcpAuthorizationSecurity(HttpSecurity http, McpAuthorizationNavigation navigation) throws Exception {
         var gate = new McpOAuthProtocolFilter(mapper, config, admission, cimd);
-        var csrf = new CsrfFilter(browser.csrf());
-        csrf.setBeanName("mcpAuthorizationCsrf");
-        csrf.setRequestHandler(new CsrfTokenRequestAttributeHandler());
-        csrf.setRequireCsrfProtectionMatcher(request -> "POST".equals(request.getMethod()));
-        csrf.setAccessDeniedHandler((request, response, exception) -> gate.error(response, 403, "request_rejected"));
         var responses = new McpAuthorizationResponseHandler(endpoints, mapper, clients);
         var server = server(http);
-        server.authorizationEndpoint(endpoint -> endpoint.consentPage(endpoints.consentPage())
+        server.authorizationEndpoint(endpoint -> endpoint
                 .authorizationRequestConverters(converters -> {
                     converters.clear();
                     converters.add(new McpAuthorizationRequestConverter());
-                    converters.add(new OAuth2AuthorizationConsentAuthenticationConverter());
                 }).authorizationResponseHandler(responses).errorResponseHandler(responses));
         http.securityMatcher("/oauth2/authorize")
                 .cors(cors -> cors.configurationSource(browserCors()))
@@ -120,7 +109,7 @@ public class McpAuthorizationServerConfiguration {
                 }).accessDeniedHandler((request, response, exception) -> gate.error(response, 403, "request_rejected")))
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
                 .formLogin(AbstractHttpConfigurer::disable).httpBasic(AbstractHttpConfigurer::disable).logout(AbstractHttpConfigurer::disable);
-        http.addFilterAfter(gate, CorsFilter.class).addFilterAfter(csrf, McpOAuthProtocolFilter.class);
+        http.addFilterAfter(gate, CorsFilter.class);
         http.addFilterBefore(new McpAuditFilter(audit), CorsFilter.class);
         return http.build();
     }
@@ -150,7 +139,7 @@ public class McpAuthorizationServerConfiguration {
             claims.put("grant_types_supported", List.of("authorization_code", "refresh_token"));
             claims.put("token_endpoint_auth_methods_supported", List.of("none", "client_secret_basic", "client_secret_post"));
             claims.put("code_challenge_methods_supported", List.of("S256"));
-            claims.put("scopes_supported", List.copyOf(McpScopes.SUPPORTED));
+            claims.put("scopes_supported", List.copyOf(McpScopes.PROTOCOL));
             claims.put("authorization_response_iss_parameter_supported", true);
         })));
         http.securityMatcher("/oauth2/**", "/.well-known/oauth-authorization-server", "/.well-known/oauth-protected-resource/mcp")
@@ -168,12 +157,11 @@ public class McpAuthorizationServerConfiguration {
     /** 所有链使用可信 issuer 和 opaque 生成器；默认 JWT/JWK 与隐式 Agent 能力不参与。 */
     private OAuth2AuthorizationServerConfigurer server(HttpSecurity http) throws Exception {
         var server = OAuth2AuthorizationServerConfigurer.authorizationServer();
-        var requests = new OAuth2AuthorizationCodeRequestAuthenticationProvider(clients, authorizations, consents);
+        var requests = new OAuth2AuthorizationCodeRequestAuthenticationProvider(clients, authorizations,
+                new org.springframework.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationConsentService());
         requests.setAuthenticationValidator(new McpAuthorizationRequestValidator(endpoints));
-        requests.setAuthorizationConsentRequired(context -> true);
-        var confirmations = new McpConsentAuthenticationProvider(persistence.jdbc(), persistence.transactions(),
-                clients, authorizations, consents, accounts, config, endpoints, cimd);
-        var initial = new McpCimdAuthorizationProvider(requests, cimd);
+        requests.setAuthorizationConsentRequired(context -> false);
+        var initial = new McpCimdAuthorizationProvider(requests, cimd, accounts);
         var secrets = new ClientSecretAuthenticationProvider(clients, authorizations);
         secrets.setPasswordEncoder(PasswordEncoderFactories.createDelegatingPasswordEncoder());
         var publicClients = new McpPublicClientAuthenticationProvider(clients, authorizations);
@@ -182,14 +170,13 @@ public class McpAuthorizationServerConfiguration {
         var revocations = new McpTokenRevocationAuthenticationProvider(
                 new McpTokenRevocationServiceImpl(persistence.jdbc(), persistence.transactions()));
         // 显式无父级管理器：ProviderManager 的认证异常不能继续回退到原后台全局管理器。
-        http.authenticationManager(new ProviderManager(List.of(secrets, publicClients, initial, confirmations, codes, refreshes, revocations)));
-        http.with(server, value -> value.registeredClientRepository(clients).authorizationService(authorizations).authorizationConsentService(consents)
+        http.authenticationManager(new ProviderManager(List.of(secrets, publicClients, initial, codes, refreshes, revocations)));
+        http.with(server, value -> value.registeredClientRepository(clients).authorizationService(authorizations)
                 .authorizationServerSettings(AuthorizationServerSettings.builder().issuer(endpoints.issuer()).build())
                 .tokenGenerator(generators()));
         server.authorizationEndpoint(endpoint -> endpoint.authenticationProviders(providers -> {
             providers.clear();
             providers.add(initial);
-            providers.add(confirmations);
         }));
         server.tokenEndpoint(endpoint -> endpoint.authenticationProviders(providers -> {
             providers.clear();

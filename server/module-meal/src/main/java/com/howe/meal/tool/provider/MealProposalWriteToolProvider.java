@@ -22,7 +22,7 @@ import java.util.Set;
 /**
  * 新菜提案写工具提供者。
  *
- * <p>只发布提案提交与人工审核两个工具。提交工具的确认页必须明确
+ * <p>只发布提案提交与人工审核两个工具。提交工具的预览会说明
  * 「可能自动创建并上架菜品」；AI 调用与封面生成由平台登记的固定后续步骤执行，
  * 不在工具请求中暴露任何模型、路由或任务控制参数。</p>
  */
@@ -78,7 +78,7 @@ public final class MealProposalWriteToolProvider implements BusinessToolProvider
         properties.put("categoryId", Map.of("type", "string", "pattern", "^[1-9][0-9]{0,18}$"));
         return new ToolDefinition("meal_proposal_submit", "1", "提交新菜提案",
                 "提交家庭新菜提案；提交后可能由 AI 自动审核，通过时自动创建并上架菜品，"
-                        + "驳回时菜品不会创建。需要浏览器确认后才提交。",
+                        + "驳回时菜品不会创建。提交后排队执行。",
                 WRITE_GROUP, new ToolInputSchema("object", properties,
                         List.of("idempotencyKey", "name"), false, null, null),
                 ToolAccess.authenticated(),
@@ -109,7 +109,7 @@ public final class MealProposalWriteToolProvider implements BusinessToolProvider
         properties.put("reason", Map.of("type", "string", "maxLength", 500));
         return new ToolDefinition("meal_proposal_audit", "1", "人工审核新菜提案",
                 "对提案做出通过或驳回决定，允许对已通过/已驳回改判；"
-                        + "通过与驳回会同步创建、上架或下架关联菜品，确认页会展示实际影响。",
+                        + "通过与驳回会同步创建、上架或下架关联菜品，预览会展示实际影响。",
                 AUDIT_GROUP, new ToolInputSchema("object", properties,
                         List.of("idempotencyKey", "proposalId", "expectedVersion", "expectedStatus", "decision"),
                         false, null, null),
@@ -172,7 +172,7 @@ public final class MealProposalWriteToolProvider implements BusinessToolProvider
             data.put("prepareExpiresAt", receipt.prepareExpiresAt());
             data.put("summary", receipt.summary());
             return ToolResults.detail(data, receipt.state() == ToolOperationReceipt.State.PREVIEW
-                    ? "已生成预览，尚未创建操作" : "操作已准备，等待浏览器确认");
+                    ? "已生成预览，尚未创建操作" : "操作已提交，可查询执行状态");
         } catch (ToolException exception) {
             throw exception;
         } catch (ServiceException exception) {

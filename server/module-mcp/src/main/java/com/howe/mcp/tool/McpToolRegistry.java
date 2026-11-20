@@ -27,7 +27,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 import lombok.extern.slf4j.Slf4j;
 
 /** 显式工具目录和统一执行入口；授权检查由持久化状态守卫提供，默认不自行信任历史目录。 */
@@ -40,7 +39,6 @@ public final class McpToolRegistry implements AutoCloseable {
     private final Map<String, McpToolDefinition> definitions;
     private final McpExecutionIdentity identity;
     private final Consumer<McpInvocationContext> authorizationGuard;
-    private final Predicate<String> enabled;
     private final McpToolPolicyService policy;
     private final McpToolExecutionBridge executionBridge;
     private final com.howe.common.tool.operation.ToolOperationGateway operationGateway;
@@ -48,7 +46,6 @@ public final class McpToolRegistry implements AutoCloseable {
     private final ThreadPoolExecutor workers;
     private final Semaphore slots;
     private final Observer observer;
-    private final int concurrency;
     private final int userConcurrency;
     private final Map<Long, Integer> userSlots = new HashMap<>();
     private boolean closed;
@@ -59,7 +56,6 @@ public final class McpToolRegistry implements AutoCloseable {
      * @param definitions 允许发布的代码定义
      * @param identity 当前账号身份加载器
      * @param authorizationGuard 当前平台、账号、客户端、授权版本及资源状态复核
-     * @param enabled 当前工具开放状态，缺失配置应返回 false
      * @param policy 工具级权限与角色判定
      * @param executionBridge 业务权限上下文桥接
      * @param mapper 结果序列化器
@@ -68,7 +64,7 @@ public final class McpToolRegistry implements AutoCloseable {
      * @param observer 工具结果观察器，只接收固定元数据，不接收参数或结果正文
      */
     public McpToolRegistry(Collection<McpToolDefinition> definitions, McpExecutionIdentity identity,
-            Consumer<McpInvocationContext> authorizationGuard, Predicate<String> enabled,
+            Consumer<McpInvocationContext> authorizationGuard,
             McpToolPolicyService policy, McpToolExecutionBridge executionBridge,
             ObjectMapper mapper, int concurrency, int userConcurrency, Observer observer,
             com.howe.common.tool.operation.ToolOperationGateway operationGateway) {
@@ -85,13 +81,11 @@ public final class McpToolRegistry implements AutoCloseable {
         this.definitions = Map.copyOf(indexed);
         this.identity = Objects.requireNonNull(identity);
         this.authorizationGuard = Objects.requireNonNull(authorizationGuard);
-        this.enabled = Objects.requireNonNull(enabled);
         this.policy = Objects.requireNonNull(policy);
         this.executionBridge = Objects.requireNonNull(executionBridge);
         this.operationGateway = operationGateway;
         this.mapper = Objects.requireNonNull(mapper);
         this.observer = Objects.requireNonNull(observer);
-        this.concurrency = concurrency;
         this.userConcurrency = userConcurrency;
         this.slots = new Semaphore(concurrency);
         this.workers = new ThreadPoolExecutor(concurrency, concurrency, 0, TimeUnit.SECONDS,
@@ -111,7 +105,7 @@ public final class McpToolRegistry implements AutoCloseable {
     public List<McpSchema.Tool> visibleTools(McpInvocationContext invocation) {
         return identity.execute(invocation, () -> {
             authorizationGuard.accept(invocation);
-            return definitions.values().stream().filter(tool -> allowed(invocation, tool))
+            return definitions.values().stream().filter(tool -> allowed(tool))
                     .map(McpToolDefinition::schema).sorted(java.util.Comparator.comparing(McpSchema.Tool::name)).toList();
         });
     }
@@ -162,7 +156,7 @@ public final class McpToolRegistry implements AutoCloseable {
         if (rejected != null) { return failure(rejected, busyMessage(rejected)); }
         FutureTask<McpSchema.CallToolResult> future = task(invocation.userId(), () -> identity.execute(invocation, () -> {
             authorizationGuard.accept(invocation);
-            if (!allowed(invocation, definition)) {
+            if (!allowed(definition)) {
                 return failure("tool_unavailable", "工具不可用");
             }
             Map<String, Object> input;
@@ -262,18 +256,9 @@ public final class McpToolRegistry implements AutoCloseable {
         slots.release();
     }
 
-    /** 只提供容量指标，不向监控接口暴露用户 ID 或工具参数。 */
-    public synchronized ExecutionStatistics statistics() {
-        return new ExecutionStatistics(concurrency, userConcurrency, concurrency - slots.availablePermits(), userSlots.size(), closed);
-    }
-
-    /** 并发上限按当前进程统计；共享 Redis 请求频率由协议入口独立控制。 */
-    public record ExecutionStatistics(int limit, int perUserLimit, int running, int activeUsers, boolean closed) { }
-
-    /** 同时检查工具开关、获授 scope、当前账号业务权限/角色。 */
-    private boolean allowed(McpInvocationContext invocation, McpToolDefinition definition) {
-        return enabled.test(definition.schema().name()) && invocation.scopes().contains(definition.resolvedScope())
-                && policy.allowed(definition.access());
+    /** 按当前账号的业务权限和角色判断工具可用性。 */
+    private boolean allowed(McpToolDefinition definition) {
+        return policy.allowed(definition.access());
     }
 
     /** 在工具线程绑定操作网关作用域；网关缺失时写工具自行拒绝。 */

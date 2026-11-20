@@ -48,8 +48,8 @@ public class McpRegistrationConfiguration {
 
     /** 每 IP 配额共享 Redis，不向全局发布另一个 RedisTemplate Bean。 */
     @Bean
-    public McpRegistrationAdmission mcpRegistrationAdmission(RedisConnectionFactory connections, ConfigProvider config) {
-        return new McpRegistrationAdmissionImpl(new StringRedisTemplate(connections), config, Clock.systemUTC());
+    public McpRegistrationAdmission mcpRegistrationAdmission(RedisConnectionFactory connections) {
+        return new McpRegistrationAdmissionImpl(new StringRedisTemplate(connections), Clock.systemUTC());
     }
 
     /** 公开协议请求不使用用户会话，无 CSRF Cookie 认证；仅允许 POST 登记和必要预检。 */

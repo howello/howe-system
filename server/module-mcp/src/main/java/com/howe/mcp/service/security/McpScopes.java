@@ -8,6 +8,7 @@ import java.util.Set;
 public final class McpScopes {
     public static final String CONNECT = "mcp:connect";
     public static final String OFFLINE_ACCESS = "offline_access";
+    public static final Set<String> PROTOCOL = Set.of(CONNECT, OFFLINE_ACCESS);
     public static final String BLOG_READ = "blog:read";
     public static final String SYSTEM_SELF_READ = "system:self:read";
     public static final String MEAL_READ = "meal:read";
@@ -24,7 +25,7 @@ public final class McpScopes {
     public static final String MEAL_PROPOSAL_AUDIT = "meal:proposal:audit";
     public static final String MEAL_MEMBER_READ = "meal:member:read";
 
-    /** 按阶段增量放开；只有本阶段真正发布工具使用的 scope 才加入，顺序稳定便于元数据展示。 */
+    /** 兼容旧版客户端仍提交的 scope；业务权限由当前账号决定。 */
     public static final Set<String> SUPPORTED = Collections.unmodifiableSet(new LinkedHashSet<>(Set.of(
             CONNECT, OFFLINE_ACCESS, BLOG_READ, SYSTEM_SELF_READ,
             MEAL_READ, SHARE_READ, AI_CATALOG_READ, AI_LOGS_READ, SYSTEM_NOTICE_READ, SYSTEM_AUDIT_READ,

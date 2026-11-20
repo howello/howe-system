@@ -4,7 +4,7 @@ import com.howe.mcp.service.security.McpInvocationContext;
 import java.time.Instant;
 
 /** 有界辅助审计服务接口。 */
-public interface McpAuditService extends AutoCloseable {
+public interface McpAuditService {
     /** 固定事件种类，不使用原始路径或用户输入作为审计分类。 */
     public enum Kind { AUTHORIZE, TOKEN_EXCHANGE, TOKEN_REVOKE, GRANT_REVOKE, CLIENT_REGISTER, LOGIN, LOGOUT, PROTOCOL, TOOL_CALL }
 
@@ -65,15 +65,7 @@ public interface McpAuditService extends AutoCloseable {
     /** 工具事件只复制已认证上下文中的主键，不让队列持有完整账号或模型参数。 */
     void tool(McpInvocationContext invocation, String knownName, Result result, long elapsedMs);
 
-    /** 提交只执行有界内存操作，队列饱和或服务关闭不阻塞业务线程。 */
+    /** 写入应用日志，仅包含固定分类和已验证标识。 */
     void record(Event event);
 
-    /** 提供明确的积压、失败和丢弃指标，供管理监控使用。 */
-    Statistics statistics();
-
-    /** 不包含事件正文或账号信息的审计运行指标。 */
-    public record Statistics(long submitted, long written, long failed, long dropped, int queued, int active) { }
-
-    /** 关闭时最多等待两秒排空，之后中断工作并记录未执行数量，不无界阻塞应用停止。 */
-    void close();
 }

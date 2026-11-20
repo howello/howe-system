@@ -4,13 +4,8 @@
       <McpBrand badge="安全授权" />
 
       <h1 id="mcp-title">登录 MCP 授权中心</h1>
-      <p class="mcp-intro">使用系统账号登录，随后确认 AI 客户端申请的访问范围。此处只建立 MCP 页面的独立会话，不影响后台登录状态。</p>
-
-      <div class="mcp-steps" aria-hidden="true">
-        <span class="mcp-step"><b>1</b>登录系统账号</span>
-        <span class="mcp-step"><b>2</b>确认授权范围</span>
-        <span class="mcp-step"><b>3</b>客户端开始连接</span>
-      </div>
+      <p class="mcp-intro">使用系统账号登录后，客户端可以调用你当前权限范围内的工具。</p>
+      <p v-if="clientName" class="mcp-hint">正在连接 {{ clientName }}<br v-if="clientId" /><span v-if="clientId" class="mcp-mono">{{ clientId }}</span></p>
 
       <el-alert v-if="error" :title="error" type="error" :closable="false" class="mcp-error" role="alert" show-icon />
       <el-alert
@@ -107,6 +102,8 @@ import { createMcpBrowserClient, mcpCaptcha, mcpErrorMessage, McpBrowserError, t
 import McpBrand from './components/McpBrand.vue'
 import './style.css'
 
+const clientName = ref('')
+const clientId = ref('')
 const form = reactive({ username: '', password: '', code: '', uuid: '', turnstileToken: '' })
 const busy = ref(false), ready = ref(false), enabled = ref(false), error = ref('')
 const captchaEnabled = ref(true), turnstileEnabled = ref(false), siteKey = ref(''), codeUrl = ref('')
@@ -145,7 +142,9 @@ async function initialize(): Promise<void> {
   ready.value = false; error.value = ''
   try {
     const result = await createMcpBrowserClient(); client = result.client; enabled.value = result.configuration.enabled
-    await client.refreshCsrf()
+    const context = await client.refreshCsrf()
+    clientName.value = context.clientName ?? ''
+    clientId.value = context.clientId ?? ''
     try { await client.session(); client.resume(); return }
     catch (cause) { if (!(cause instanceof McpBrowserError) || cause.status !== 401) throw cause }
     await refreshCaptcha()

@@ -2,8 +2,6 @@ package com.howe.mcp.service.impl;
 
 import com.howe.mcp.service.McpProtocolAdmission;
 
-import com.howe.common.config.ConfigProvider;
-import com.howe.common.constant.ConfigConstants;
 import com.howe.mcp.service.security.McpTokenHash;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +25,6 @@ public final class McpProtocolAdmissionImpl implements McpProtocolAdmission {
             return 0
             """, Long.class);
     private final StringRedisTemplate redis;
-    private final ConfigProvider config;
 
     /** 消耗请求额度；仅存主体哈希，不保存原始 IP 或任何令牌。 */
     @Override
@@ -36,9 +33,7 @@ public final class McpProtocolAdmissionImpl implements McpProtocolAdmission {
             if (subject == null || subject.isBlank() || subject.length() > 256) {
                 throw new IllegalArgumentException("限流主体无效");
             }
-            String configured = config.getPlainValue(ConfigConstants.MCP_RATE_PREFIX + bucket.key() + "PerMinute");
-            int maximum = configured == null || configured.isBlank() ? bucket.maximum() : Integer.parseInt(configured);
-            if (maximum < 1 || maximum > 100000) { throw new IllegalArgumentException("限流额度无效"); }
+            int maximum = bucket.maximum();
             Long retry = redis.execute(SCRIPT, List.of("howe:mcp:rate:" + bucket.key() + ":" + McpTokenHash.of(subject)),
                     Integer.toString(maximum));
             if (retry == null || retry < 0 || retry > 60) { throw new IllegalStateException("限流响应无效"); }

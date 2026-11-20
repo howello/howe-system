@@ -20,7 +20,6 @@ import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -30,13 +29,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Slf4j
 @RequiredArgsConstructor
 public final class McpOAuthProtocolFilter extends OncePerRequestFilter {
-    private static final Set<String> CONSENT_FIELDS = Set.of("client_id", "state", "scope", "_csrf");
     private final ObjectMapper mapper;
     private final ConfigProvider config;
     private final McpProtocolAdmission admission;
     private final McpCimdClientService cimd;
 
-    /** 只允许初始授权、用户确认、令牌及两类元数据；其它 OAuth 路径返回协议 JSON。 */
+    /** 只允许初始授权、令牌及两类元数据；其它 OAuth 路径返回协议 JSON。 */
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws IOException, ServletException {
@@ -51,7 +49,7 @@ public final class McpOAuthProtocolFilter extends OncePerRequestFilter {
             error(response, 404, "unsupported_endpoint");
             return;
         }
-        if (!(authorize && ("GET".equals(method) || "POST".equals(method)))
+        if (!(authorize && "GET".equals(method))
                 && !((token || revoke) && "POST".equals(method)) && !(metadata && "GET".equals(method))) {
             error(response, 405, "invalid_request");
             return;
@@ -90,10 +88,7 @@ public final class McpOAuthProtocolFilter extends OncePerRequestFilter {
             if (body.length > 16384) {
                 throw new IllegalArgumentException();
             }
-            Map<String, String[]> parameters = parameters(body, authorize);
-            if (authorize && !CONSENT_FIELDS.containsAll(parameters.keySet())) {
-                throw new IllegalArgumentException();
-            }
+            Map<String, String[]> parameters = parameters(body);
             if (token && "authorization_code".equals(first(parameters, "grant_type"))) {
                 String verifier = first(parameters, "code_verifier");
                 if (verifier == null || !verifier.matches("[A-Za-z0-9._~-]{43,128}")) {
@@ -107,7 +102,7 @@ public final class McpOAuthProtocolFilter extends OncePerRequestFilter {
                     return first(parameters, name);
                 }
 
-                /** 用户同意范围允许多选，返回独立数组避免下游修改共享值。 */
+                /** 返回独立数组，避免下游修改共享值。 */
                 @Override
                 public String[] getParameterValues(String name) {
                     String[] values = parameters.get(name);
@@ -132,7 +127,7 @@ public final class McpOAuthProtocolFilter extends OncePerRequestFilter {
             error(response, 400, "invalid_request");
             return;
         }
-        if ((authorize || token) && !cimd(wrapped, response)) { return; }
+        if (token && !cimd(wrapped, response)) { return; }
         forward(wrapped, response, chain);
     }
 
@@ -173,8 +168,8 @@ public final class McpOAuthProtocolFilter extends OncePerRequestFilter {
         }
     }
 
-    /** 表单参数按标准加号及百分号规则解码，只允许同意提交的 scope 重复。 */
-    private static Map<String, String[]> parameters(byte[] body, boolean consent) {
+    /** 表单参数按标准加号及百分号规则解码，拒绝重复参数。 */
+    private static Map<String, String[]> parameters(byte[] body) {
         Map<String, List<String>> values = new LinkedHashMap<>();
         for (String part : new String(body, StandardCharsets.UTF_8).split("&")) {
             if (part.isEmpty()) {
@@ -187,7 +182,7 @@ public final class McpOAuthProtocolFilter extends OncePerRequestFilter {
                 throw new IllegalArgumentException();
             }
             List<String> entries = values.computeIfAbsent(name, key -> new ArrayList<>());
-            if (!entries.isEmpty() && !(consent && "scope".equals(name))) {
+            if (!entries.isEmpty()) {
                 throw new IllegalArgumentException();
             }
             entries.add(value);

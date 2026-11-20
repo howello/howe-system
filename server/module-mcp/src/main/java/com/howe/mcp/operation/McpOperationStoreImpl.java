@@ -12,7 +12,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -28,10 +27,10 @@ public final class McpOperationStoreImpl implements McpOperationStore {
 
     /** 账本列投影，避免多处查询字段漂移。 */
     private static final String COLUMNS = """
-            operation_id,user_id,registered_client_id,grant_id,grant_version,resource_uri,approved_scopes,
+            operation_id,user_id,registered_client_id,grant_id,grant_version,resource_uri,
             prepared_dept_id,account_context_hash,tool_name,tool_version,execution_kind,queue_group,
             idempotency_hash,arguments_hash,configuration_hash,target_type,target_id,expected_version,
-            state,stage,confirmed_by,confirmed_at,confirmation_expires_at,prepare_expires_at,execution_deadline_at,
+            state,stage,execution_deadline_at,
             next_attempt_at,lease_owner,lease_until,fence,attempt,result_code,result_bytes,row_version,
             payload_retain_until,retain_until,finished_at,create_time,update_time
             """;
@@ -78,16 +77,6 @@ public final class McpOperationStoreImpl implements McpOperationStore {
         return find("select " + COLUMNS + " from mcp_operation where operation_id=?", operationId);
     }
 
-    /** 按操作、账号、原授权与内部客户端联合读取。 */
-    @Override
-    public Optional<McpOperationRecord> findBound(String operationId, Long userId, Long grantId,
-            String registeredClientId) {
-        return find("select " + COLUMNS + """
-                 from mcp_operation
-                 where operation_id=? and user_id=? and grant_id=? and registered_client_id=?
-                """, operationId, userId, grantId, registeredClientId);
-    }
-
     /** 分页查询本人操作，固定按创建时间倒序与主键兜底。 */
     @Override
     public List<McpOperationRecord> pageOwned(Long userId, String state, long offset, int limit) {
@@ -113,79 +102,27 @@ public final class McpOperationStoreImpl implements McpOperationStore {
         return total == null ? 0 : total;
     }
 
-    /** 插入准备态；唯一键冲突不静默覆盖。 */
+    /** 插入排队操作；唯一键冲突不静默覆盖。 */
     @Override
-    public void insertPrepared(McpOperationRecord record, String encryptedRequest) {
+    public void insertQueued(McpOperationRecord record, String encryptedRequest) {
         Objects.requireNonNull(record);
         String cipherText = cipher.encrypt(encryptedRequest);
-        try {
-            jdbc.update("""
-                    insert into mcp_operation (
-                        operation_id,user_id,registered_client_id,grant_id,grant_version,resource_uri,approved_scopes,
+        jdbc.update("""
+                insert into mcp_operation (
+                        operation_id,user_id,registered_client_id,grant_id,grant_version,resource_uri,
                         prepared_dept_id,account_context_hash,tool_name,tool_version,execution_kind,queue_group,
                         idempotency_hash,arguments_hash,configuration_hash,target_type,target_id,expected_version,
-                        encrypted_request,state,stage,prepare_expires_at,execution_deadline_at,next_attempt_at,
+                        encrypted_request,state,stage,execution_deadline_at,next_attempt_at,
                         payload_retain_until,retain_until)
-                    values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     """, record.operationId(), record.userId(), record.registeredClientId(), record.grantId(),
-                    record.grantVersion(), record.resourceUri(), record.approvedScopes(), record.preparedDeptId(),
+                    record.grantVersion(), record.resourceUri(), record.preparedDeptId(),
                     record.accountContextHash(), record.toolName(), record.toolVersion(), record.executionKind(),
                     record.queueGroup(), record.idempotencyHash(), record.argumentsHash(), record.configurationHash(),
                     record.targetType(), record.targetId(), record.expectedVersion(), cipherText,
-                    McpOperationState.PREPARED, "PREPARED", timestamp(record.prepareExpiresAt()),
+                    record.state(), record.stage(),
                     timestamp(record.executionDeadlineAt()), timestamp(record.nextAttemptAt()),
                     timestamp(record.payloadRetainUntil()), timestamp(record.retainUntil()));
-        } catch (DuplicateKeyException exception) {
-            throw new IllegalStateException("操作幂等键冲突", exception);
-        }
-    }
-
-    /** 写入确认上下文，固定摘要与会话绑定并递增版本。 */
-    @Override
-    public boolean openConfirmationContext(String operationId, Long userId, long expectedRowVersion, byte[] summaryHash,
-            byte[] sessionHash, Instant confirmationExpiresAt) {
-        return jdbc.update("""
-                update mcp_operation
-                   set confirmation_summary_hash=?, confirmation_session_hash=?, confirmation_expires_at=?,
-                       row_version=row_version+1, update_time=current_timestamp(3)
-                 where operation_id=? and user_id=? and state=? and row_version=?
-                   and prepare_expires_at>current_timestamp(3)
-                """, summaryHash, sessionHash, timestamp(confirmationExpiresAt), operationId, userId,
-                McpOperationState.PREPARED, expectedRowVersion) == 1;
-    }
-
-    /** 确认：PREPARED → QUEUED，凭证哈希只在此处写入。 */
-    @Override
-    public boolean confirm(String operationId, Long userId, long expectedRowVersion, byte[] summaryHash,
-            byte[] confirmationHash, byte[] sessionHash, Instant executionDeadlineAt, Instant now) {
-        return jdbc.update("""
-                update mcp_operation
-                   set state=?, confirmed_by=?, confirmed_at=?, confirmation_hash=?, execution_deadline_at=?,
-                       row_version=row_version+1, update_time=current_timestamp(3)
-                 where operation_id=? and user_id=? and state=? and row_version=?
-                   and prepare_expires_at>? and confirmation_summary_hash=? and confirmation_session_hash=?
-                   and confirmation_used_at is null
-                   and (confirmation_expires_at is null or confirmation_expires_at>?)
-                """, McpOperationState.QUEUED, userId, timestamp(now), confirmationHash,
-                timestamp(executionDeadlineAt), operationId, userId, McpOperationState.PREPARED, expectedRowVersion,
-                timestamp(now), summaryHash, sessionHash, timestamp(now)) == 1;
-    }
-
-    /** 派发时消费确认凭证：领取已把状态改为 RUNNING，按 owner/fence/租约消费。 */
-    @Override
-    public boolean consumeConfirmation(String operationId, String owner, long fence, Instant now) {
-        return jdbc.update("""
-                update mcp_operation
-                   set confirmation_hash=null, confirmation_used_at=coalesce(confirmation_used_at,?),
-                       update_time=current_timestamp(3)
-                 where operation_id=? and fence=? and state=? and lease_owner=?
-                   and (confirmation_hash is not null or confirmation_used_at is not null)
-                   and confirmed_by=user_id and confirmed_at is not null
-                   and (execution_deadline_at>?
-                        or (execution_kind='REMOTE_RECONCILABLE'
-                            and stage in ('REMOTE_SEND_INTENT','REMOTE_COMMITTED_LOCAL_PENDING')))
-                   and lease_until>current_timestamp(3)
-                """, timestamp(now), operationId, fence, McpOperationState.RUNNING, owner, timestamp(now)) == 1;
     }
 
     /**
@@ -306,8 +243,6 @@ public final class McpOperationStoreImpl implements McpOperationStore {
             if (changed != 1) {
                 return false;
             }
-            event(operationId, McpOperationState.RUNNING, McpOperationState.RUNNING, toStage, null,
-                    "STAGE", "worker", fence);
             return true;
         }));
     }
@@ -332,8 +267,6 @@ public final class McpOperationStoreImpl implements McpOperationStore {
             if (changed != 1) {
                 return false;
             }
-            event(operationId, McpOperationState.RUNNING, McpOperationState.RUNNING,
-                    "REMOTE_COMMITTED_LOCAL_PENDING", "remote_committed", "REMOTE_COMMITTED", "worker", fence);
             return true;
         }));
     }
@@ -352,8 +285,6 @@ public final class McpOperationStoreImpl implements McpOperationStore {
             if (changed != 1) {
                 return false;
             }
-            event(operationId, McpOperationState.RUNNING, McpOperationState.RUNNING,
-                    "REMOTE_COMMITTED_LOCAL_PENDING", "reconciled", "REMOTE_COMMITTED", "recovery", fence);
             return true;
         }));
     }
@@ -367,7 +298,7 @@ public final class McpOperationStoreImpl implements McpOperationStore {
                 """, timestamp(leaseUntil), owner, McpOperationState.RUNNING);
     }
 
-    /** 围栏匹配时推进状态与阶段，并写一条版本事件。 */
+    /** 围栏匹配时推进状态与阶段。 */
     @Override
     public boolean transition(String operationId, long fence, String from, String to, String stage, String resultCode,
             String encryptedResult, String eventType, String requestId, String owner) {
@@ -386,7 +317,6 @@ public final class McpOperationStoreImpl implements McpOperationStore {
             if (changed != 1) {
                 return false;
             }
-            event(operationId, from, to, stage, resultCode, eventType, requestId, fence);
             return true;
         }));
     }
@@ -415,26 +345,6 @@ public final class McpOperationStoreImpl implements McpOperationStore {
                 McpOperationState.RUNNING).isEmpty();
     }
 
-    /** 取消准备态不依赖执行租约，仍需本人、状态及行版本同时匹配。 */
-    @Override
-    public boolean cancelPrepared(String operationId, Long userId, long rowVersion) {
-        return Boolean.TRUE.equals(transactions.execute(status -> {
-            int changed = jdbc.update("""
-                    update mcp_operation set state='CANCELLED', result_code='rejected',
-                           row_version=row_version+1, finished_at=current_timestamp(3),
-                           update_time=current_timestamp(3)
-                     where operation_id=? and user_id=? and row_version=? and state='PREPARED'
-                       and lease_owner is null
-                    """, operationId, userId, rowVersion);
-            if (changed != 1) {
-                return false;
-            }
-            event(operationId, McpOperationState.PREPARED, McpOperationState.CANCELLED, "PREPARED",
-                    "rejected", "REJECTED", "browser", 0);
-            return true;
-        }));
-    }
-
     /** 读取并解密规范化请求。 */
     @Override
     public String decryptedRequest(String operationId) {
@@ -451,7 +361,7 @@ public final class McpOperationStoreImpl implements McpOperationStore {
         return rows.isEmpty() || rows.get(0) == null ? null : cipher.decrypt(rows.get(0));
     }
 
-    /** 清理已知终态过期账本；UNKNOWN/RUNNING/QUEUED/PREPARED 不按保留期删除。 */
+    /** 清理已知终态过期账本；UNKNOWN/RUNNING/QUEUED 不按保留期删除。 */
     @Override
     public int cleanupExpired(Instant now, int limit) {
         return cleanupExpired(now, limit, operationId -> false);
@@ -474,7 +384,6 @@ public final class McpOperationStoreImpl implements McpOperationStore {
                 continue;
             }
             Integer deleted = transactions.execute(status -> {
-                jdbc.update("delete from mcp_operation_event where operation_id=?", operationId);
                 return jdbc.update("""
                         delete from mcp_operation where operation_id=? and retain_until<?
                           and state in (?,?,?)
@@ -484,19 +393,6 @@ public final class McpOperationStoreImpl implements McpOperationStore {
             removed += deleted == null ? 0 : deleted;
         }
         return removed;
-    }
-
-    /** 写状态事件；事件类型与阶段必须由代码白名单提供。 */
-    private void event(String operationId, String from, String to, String stage, String resultCode, String eventType,
-            String requestId, long fence) {
-        Long version = jdbc.queryForObject("select row_version from mcp_operation where operation_id=?",
-                Long.class, operationId);
-        jdbc.update("""
-                insert into mcp_operation_event (operation_id,operation_version,event_type,from_state,to_state,
-                    stage,result_code,request_id,fence)
-                values (?,?,?,?,?,?,?,?,?)
-                """, operationId, version == null ? 0 : version, eventType, from, to, stage, resultCode,
-                requestId == null ? "internal" : requestId, fence);
     }
 
     /** 按主键读取，不限制账号；仅平台内部派发使用。 */
@@ -528,15 +424,13 @@ public final class McpOperationStoreImpl implements McpOperationStore {
     private static McpOperationRecord map(ResultSet row, int index) throws SQLException {
         return new McpOperationRecord(row.getString("operation_id"), row.getLong("user_id"),
                 row.getString("registered_client_id"), row.getLong("grant_id"), row.getLong("grant_version"),
-                row.getString("resource_uri"), row.getString("approved_scopes"),
+                row.getString("resource_uri"),
                 row.getObject("prepared_dept_id", Long.class), row.getBytes("account_context_hash"),
                 row.getString("tool_name"), row.getString("tool_version"), row.getString("execution_kind"),
                 row.getString("queue_group"), row.getBytes("idempotency_hash"), row.getBytes("arguments_hash"),
                 row.getBytes("configuration_hash"), row.getString("target_type"), row.getString("target_id"),
                 row.getString("expected_version"), row.getString("state"), row.getString("stage"),
-                row.getObject("confirmed_by", Long.class), instant(row.getTimestamp("confirmed_at")),
-                instant(row.getTimestamp("confirmation_expires_at")),
-                instant(row.getTimestamp("prepare_expires_at")), instant(row.getTimestamp("execution_deadline_at")),
+                instant(row.getTimestamp("execution_deadline_at")),
                 instant(row.getTimestamp("next_attempt_at")), row.getString("lease_owner"),
                 instant(row.getTimestamp("lease_until")), row.getLong("fence"), row.getInt("attempt"),
                 row.getString("result_code"), row.getObject("result_bytes", Integer.class), row.getLong("row_version"),

@@ -38,15 +38,32 @@ import org.springframework.web.bind.annotation.RestController;
 public class McpBrowserController {
     private final McpAccountBridge accounts;
     private final McpBrowserState state;
+    private final com.howe.mcp.config.McpAuthorizationNavigation navigation;
+    private final org.springframework.security.oauth2.server.authorization.client.JdbcRegisteredClientRepository clients;
 
     /** 建立短期会话及 CSRF，不返回任何用户授权记录或凭据。 */
     @Anonymous
     @RateLimiter(count = 60, time = 60, limitType = LimitType.IP)
     @Operation(summary = "获取 MCP 登录 CSRF 上下文")
     @GetMapping("/oauth2/login/context")
-    public Map<String, String> loginContext(HttpServletRequest request) {
+    public Map<String, String> loginContext(HttpServletRequest request, HttpServletResponse response) {
         CsrfToken csrf = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
-        return Map.of("csrfToken", csrf.getToken(), "csrfHeaderName", csrf.getHeaderName(), "csrfParameterName", csrf.getParameterName());
+        var context = new java.util.LinkedHashMap<String, String>();
+        context.put("csrfToken", csrf.getToken());
+        context.put("csrfHeaderName", csrf.getHeaderName());
+        context.put("csrfParameterName", csrf.getParameterName());
+        var saved = navigation.requests().getRequest(request, response);
+        if (saved != null) {
+            String[] clientIds = saved.getParameterValues("client_id");
+            if (clientIds != null && clientIds.length == 1) {
+                var client = clients.findByClientId(clientIds[0]);
+                if (client != null) {
+                    context.put("clientName", client.getClientName());
+                    context.put("clientId", client.getClientId());
+                }
+            }
+        }
+        return context;
     }
 
     /** 保留账号校验并轮换会话 ID 和 CSRF；身份只保存为稳定用户主键。 */

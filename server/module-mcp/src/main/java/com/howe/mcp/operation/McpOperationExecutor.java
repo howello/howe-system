@@ -2,8 +2,6 @@ package com.howe.mcp.operation;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.howe.common.config.ConfigProvider;
-import com.howe.common.constant.ConfigConstants;
 import com.howe.common.tool.exception.ToolException;
 import com.howe.common.tool.model.ToolAccess;
 import com.howe.common.tool.model.ToolExecutionContext;
@@ -79,14 +77,13 @@ public final class McpOperationExecutor {
      * @param executionBridge 业务权限桥接
      * @param policy 工具访问策略
      * @param mapper JSON 序列化器
-     * @param config 配置读取
      * @param transactions 事务模板
      * @param stepStore 后续步骤账本，用于父操作成功事务内登记步骤
      */
     public McpOperationExecutor(McpOperationStore store, McpOperationService operations,
             McpOperationBindingService bindings, McpExecutionIdentity identity,
             McpToolExecutionBridge executionBridge, com.howe.mcp.service.McpToolPolicyService policy,
-            ObjectMapper mapper, ConfigProvider config,
+            ObjectMapper mapper,
             org.springframework.transaction.support.TransactionTemplate transactions,
             McpOperationStepStore stepStore) {
         this.store = Objects.requireNonNull(store);
@@ -98,22 +95,22 @@ public final class McpOperationExecutor {
         this.mapper = Objects.requireNonNull(mapper);
         this.transactions = Objects.requireNonNull(transactions);
         this.stepStore = Objects.requireNonNull(stepStore);
-        this.localPool = pool(parameter(config, ConfigConstants.MCP_OPERATION_LOCAL_CONCURRENCY, 4, 1, 32),
+        this.localPool = pool(4,
                 "mcp-op-local");
-        this.publicationPool = pool(parameter(config, ConfigConstants.MCP_OPERATION_PUBLISH_CONCURRENCY, 1, 1, 8),
+        this.publicationPool = pool(1,
                 "mcp-op-publish");
-        this.mealPool = pool(parameter(config, ConfigConstants.MCP_OPERATION_MEAL_CONCURRENCY, 2, 1, 8),
+        this.mealPool = pool(2,
                 "mcp-op-meal");
         // 进程内总/单账号/分组并发：只作为单进程容量控制，不宣称集群总容量。
         this.limiter = new McpOperationExecutionLimiter(
-                parameter(config, ConfigConstants.MCP_OPERATION_TOTAL_CONCURRENCY, 4, 1, 32),
-                parameter(config, ConfigConstants.MCP_OPERATION_USER_CONCURRENCY, 1, 1, 4),
+                4,
+                1,
                 Map.of(QueueGroup.LOCAL_WRITE.name(),
-                        parameter(config, ConfigConstants.MCP_OPERATION_LOCAL_CONCURRENCY, 4, 1, 32),
+                        4,
                         QueueGroup.BLOG_PUBLICATION.name(),
-                        parameter(config, ConfigConstants.MCP_OPERATION_PUBLISH_CONCURRENCY, 1, 1, 8),
+                        1,
                         QueueGroup.MEAL_WRITE.name(),
-                        parameter(config, ConfigConstants.MCP_OPERATION_MEAL_CONCURRENCY, 2, 1, 8)));
+                        2));
         this.heartbeat = new ScheduledThreadPoolExecutor(1, task -> {
             Thread thread = new Thread(task, "mcp-op-heartbeat");
             thread.setDaemon(true);
@@ -261,13 +258,7 @@ public final class McpOperationExecutor {
             return;
         }
         try {
-            if (!store.consumeConfirmation(record.operationId(), owner, record.fence(), Instant.now())) {
-                failOrDeferSent(record, "confirmation_expired");
-                return;
-            }
             McpOperationBinding binding = bindings.dispatchBinding(record);
-            bindings.requireToolEnabled(record);
-            operations.requireScope(record, binding.scopes());
             Plan plan = operations.plan(record);
             executeWithIdentity(record, handler, binding, plan);
         } catch (ToolException exception) {
@@ -526,7 +517,7 @@ public final class McpOperationExecutor {
     }
 
     /**
-     * 业务异常：确认凭证已在此线程消费，不能回 QUEUED 重放（会导致 confirmation_expired）。
+     * 业务异常：根据外部效果及重试属性推进操作状态。
      *
      * <p>可重试且未产生外部效果时转入 UNKNOWN，由恢复任务以新 fence 重新执行；
      * 其余直接终态失败。已存在发送意图的远端操作一律不重排。</p>
@@ -560,7 +551,7 @@ public final class McpOperationExecutor {
 
     /** 发送意图及其后续阶段都不能按“未执行”过期。 */
     private static boolean hasSendIntentStage(String stage) {
-        return stage != null && !"PREPARED".equals(stage) && !"FAILED".equals(stage);
+        return stage != null && !"QUEUED".equals(stage) && !"PREPARED".equals(stage) && !"FAILED".equals(stage);
     }
 
     /** 过期终态。 */
@@ -623,20 +614,6 @@ public final class McpOperationExecutor {
             thread.setDaemon(true);
             return thread;
         }, new ThreadPoolExecutor.AbortPolicy());
-    }
-
-    /** 读取有界配置。 */
-    private static int parameter(ConfigProvider config, String key, int fallback, int min, int max) {
-        String value = config.getPlainValue(key);
-        if (value == null || value.isBlank()) {
-            return fallback;
-        }
-        try {
-            int parsed = Integer.parseInt(value.trim());
-            return parsed < min || parsed > max ? fallback : parsed;
-        } catch (NumberFormatException exception) {
-            return fallback;
-        }
     }
 
     /** 类型安全的 Map 转换。 */

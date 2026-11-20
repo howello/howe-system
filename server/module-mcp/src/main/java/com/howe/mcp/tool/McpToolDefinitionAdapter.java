@@ -25,16 +25,12 @@ public final class McpToolDefinitionAdapter {
      * 把通用定义转换为 MCP 内部包装。
      *
      * @param definition 通用工具定义
-     * @param resolvedScope 由能力分组解析出的 OAuth scope
      * @return MCP 内部工具定义
      */
-    public static McpToolDefinition adapt(ToolDefinition definition, String resolvedScope) {
+    public static McpToolDefinition adapt(ToolDefinition definition) {
         Objects.requireNonNull(definition, "通用工具定义不能为空");
-        if (resolvedScope == null || resolvedScope.isBlank()) {
-            throw new IllegalArgumentException("工具缺少已解析的授权范围：" + definition.name());
-        }
         McpSchema.Tool schema = schema(definition);
-        return new McpToolDefinition(schema, definition.version(), definition.capabilityGroup(), resolvedScope,
+        return new McpToolDefinition(schema, definition.version(),
                 definition.access(), definition.timeout(), definition.maxResultBytes(), definition.validate(),
                 (invocation, arguments) -> McpToolResultAdapter.toProtocol(
                         definition.handler().handle(context(invocation), arguments)));

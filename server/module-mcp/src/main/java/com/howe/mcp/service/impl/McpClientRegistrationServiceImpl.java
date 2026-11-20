@@ -68,7 +68,7 @@ public final class McpClientRegistrationServiceImpl implements McpClientRegistra
                 .clientId("mcp_" + UUID.randomUUID().toString().replace("-", ""))
                 .clientIdIssuedAt(clock.instant()).clientName(metadata.name())
                 .clientAuthenticationMethod(new ClientAuthenticationMethod(metadata.authenticationMethod()))
-                .clientSettings(ClientSettings.builder().requireProofKey(true).requireAuthorizationConsent(true).build())
+                .clientSettings(ClientSettings.builder().requireProofKey(true).requireAuthorizationConsent(false).build())
                 .tokenSettings(TokenSettings.builder().authorizationCodeTimeToLive(Duration.ofMinutes(2))
                         .accessTokenTimeToLive(Duration.ofMinutes(15)).accessTokenFormat(OAuth2TokenFormat.REFERENCE)
                         .refreshTokenTimeToLive(Duration.ofDays(30)).reuseRefreshTokens(false).build());
@@ -86,20 +86,14 @@ public final class McpClientRegistrationServiceImpl implements McpClientRegistra
             throw unavailable();
         }
         transactions.executeWithoutResult(status -> {
-            // 固定在线参数行充当登记配额互斥锁，管理员调整配额与并发登记保持串行。
-            var values = jdbc.query("select config_value from sys_config where config_key=? for update",
-                    (row, index) -> row.getString(1), ConfigConstants.MCP_REGISTRATION_MAX_CLIENTS);
-            if (values.size() != 1) {
-                throw unavailable();
-            }
-            int maximum = McpClientRegistrationService.parseLimit(values.get(0), 1, 100000);
-            Long current = jdbc.queryForObject("select count(*) from mcp_client_ext", Long.class);
-            if (current == null || current >= maximum) {
+            McpClientLifecycle.lockRegistration(jdbc);
+            Long current = jdbc.queryForObject("select count(*) from oauth2_registered_client", Long.class);
+            if (current == null || current >= McpClientLifecycle.MAX_CLIENTS) {
                 throw unavailable();
             }
             clients.save(client);
-            jdbc.update("insert into mcp_client_ext(registered_client_id,registration_source,status,metadata_json) values(?,'DCR','0',?)",
-                    client.getId(), publicMetadata);
+            jdbc.update("update oauth2_registered_client set registration_source='DCR',metadata_json=? where id=?",
+                    publicMetadata, client.getId());
         });
         com.howe.mcp.service.security.McpAuditContext.verified(null, client.getId(), null);
         Map<String, Object> response = new LinkedHashMap<>(metadata.publicValues());

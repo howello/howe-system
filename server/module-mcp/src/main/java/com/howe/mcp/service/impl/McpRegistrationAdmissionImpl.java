@@ -1,10 +1,7 @@
 package com.howe.mcp.service.impl;
 
-import com.howe.mcp.service.McpClientRegistrationService;
 import com.howe.mcp.service.McpRegistrationAdmission;
 
-import com.howe.common.config.ConfigProvider;
-import com.howe.common.constant.ConfigConstants;
 import com.howe.mcp.service.security.McpRegistrationException;
 import com.howe.mcp.service.security.McpTokenHash;
 import java.time.Clock;
@@ -24,14 +21,12 @@ public final class McpRegistrationAdmissionImpl implements McpRegistrationAdmiss
             return count
             """, Long.class);
     private final StringRedisTemplate redis;
-    private final ConfigProvider config;
     private final Clock clock;
 
     /** 在读取登记文档之前消耗每 IP 每分钟配额，键中不保存原始 IP。 */
     @Override
     public void acquire(String ip) {
-        String configured = config.getPlainValue(ConfigConstants.MCP_REGISTRATION_IP_PER_MINUTE);
-        int maximum = McpClientRegistrationService.parseLimit(configured == null || configured.isBlank() ? "10" : configured, 1, 1000);
+        int maximum = 10;
         String key = "howe:mcp:registration:" + McpTokenHash.of(ip) + ":" + clock.instant().getEpochSecond() / 60;
         Long count;
         try {
