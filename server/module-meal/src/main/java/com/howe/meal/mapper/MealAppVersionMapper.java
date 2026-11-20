@@ -1,6 +1,7 @@
 package com.howe.meal.mapper;
 
 import com.howe.meal.domain.MealAppVersion;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -37,7 +38,7 @@ public interface MealAppVersionMapper {
      *
      * @return 最新已发布版本；没有时返回 {@code null}
      */
-    MealAppVersion selectLatestPublished();
+    MealAppVersion selectLatestPublished(@Param("appKey") String appKey);
 
     /**
      * 新增版本

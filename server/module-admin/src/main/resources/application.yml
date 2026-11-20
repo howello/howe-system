@@ -12,6 +12,10 @@ howe:
   profile: ${PROFILE_PATH:D:/howe/uploadPath}
   # 临时缓存目录：AI 生成图转存补偿的字节暂存等。容器部署必须挂持久卷，重建不丢
   cacheDir: ${CACHE_PATH:D:/howe/cachePath}
+  # 孕期私有原图目录：不得与 howe.profile 重叠（/profile/** 是匿名可读的公开映射）。
+  # 容器部署必须挂持久卷，并与数据库一起备份。
+  pregnancy:
+    privateDir: ${HOWE_PREGNANCY_PRIVATE_DIR:D:/howe/pregnancyPrivate}
   # 获取ip地址开关
   addressEnabled: false
   # 验证码类型 math 数字计算 char 字符验证
@@ -69,10 +73,10 @@ spring:
   # 文件上传
   servlet:
     multipart:
-      # 单个文件大小
-      max-file-size: 10MB
+      # 单个文件大小：孕期私有原图默认上限 50 MiB，其余入口在业务层校验各自限制
+      max-file-size: 52MB
       # 设置总上传的文件大小
-      max-request-size: 20MB
+      max-request-size: 56MB
   # 服务模块
   devtools:
     restart:
@@ -114,6 +118,9 @@ token:
   # 管理端不受影响；配合「剩余不足 TTL 三分之一就续期」的滑动策略，
   # 只要 20 天内打开过一次就不会掉线。
   mealExpireTime: ${JWT_MEAL_EXPIRATION:43200}
+  # 孕期助手端令牌有效期（默认43200分钟 = 30天）。登录时传 client=pregnancy 才会用到，
+  # 与点餐端策略一致；管理端与点餐端不受影响。
+  pregnancyExpireTime: ${JWT_PREGNANCY_EXPIRATION:43200}
 
 # MyBatis配置
 mybatis:

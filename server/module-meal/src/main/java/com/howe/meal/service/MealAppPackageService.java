@@ -3,6 +3,10 @@ package com.howe.meal.service;
 import com.howe.meal.domain.dto.AppPackageCheckRequest;
 import com.howe.meal.domain.vo.AppPackageCheckVO;
 import com.howe.meal.domain.MealAppVersion;
+import com.howe.meal.domain.AppReleaseChannel;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 
 /**
  * APP 资源包远程链接校验服务
@@ -13,6 +17,10 @@ import com.howe.meal.domain.MealAppVersion;
  * @author howe
  */
 public interface MealAppPackageService {
+
+    /** 上传前检查 ZIP 结构、应用标识及可选版本信息。 */
+    void assertUpload(MultipartFile file, AppReleaseChannel channel, String versionName, Integer versionCode)
+            throws IOException;
 
     /**
      * 校验远程 wgt 链接

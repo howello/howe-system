@@ -15,6 +15,9 @@ import lombok.Data;
 @Schema(description = "App 热更新检测结果")
 public class AppUpdateCheckResult {
 
+    @Schema(description = "应用渠道")
+    private String appKey;
+
     @Schema(description = "是否有更新", example = "true")
     private Boolean update;
 

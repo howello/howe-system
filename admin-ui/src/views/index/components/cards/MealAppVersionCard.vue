@@ -5,7 +5,7 @@
     icon-class="ci-aqua"
     layer-tag="模块层 · meal"
     link-text="版本列表"
-    link-to="/meal/appversion"
+    link-to="/tool/appversion"
     link-icon-name="version"
     link-title="进入 App 版本列表"
   >

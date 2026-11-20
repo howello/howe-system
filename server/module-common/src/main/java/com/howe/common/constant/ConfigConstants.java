@@ -272,6 +272,9 @@ public class ConfigConstants {
      */
     public static final String MEAL_APP_PUBLISH_TOKEN = "meal.app.publishToken";
 
+    /** 宝宝 App 专用 WGT 发布令牌。 */
+    public static final String PREGNANCY_APP_PUBLISH_TOKEN = "pregnancy.app.publishToken";
+
     /**
      * APP 远程资源包大小上限（字节）
      *
@@ -363,6 +366,7 @@ public class ConfigConstants {
             BLOG_WEBHOOK_SECRET,
             BLOG_OPEN_TOKEN,
             MEAL_APP_PUBLISH_TOKEN,
+            PREGNANCY_APP_PUBLISH_TOKEN,
             TURNSTILE_SECRET_KEY)));
 
     /**

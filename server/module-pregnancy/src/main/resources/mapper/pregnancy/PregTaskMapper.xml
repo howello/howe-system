@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.pregnancy.mapper.PregTaskMapper">
+
+    <resultMap id="TaskResult" type="com.howe.pregnancy.domain.PregTask">
+        <id     property="id"               column="id"/>
+        <result property="kind"             column="kind"/>
+        <result property="businessId"       column="business_id"/>
+        <result property="businessVersion"  column="business_version"/>
+        <result property="requesterUserId"  column="requester_user_id"/>
+        <result property="dedupKey"         column="dedup_key"/>
+        <result property="payloadJson"      column="payload_json"/>
+        <result property="stageJson"        column="stage_json"/>
+        <result property="status"           column="status"/>
+        <result property="attempt"          column="attempt"/>
+        <result property="maxAttempts"      column="max_attempts"/>
+        <result property="nextRunAt"        column="next_run_at"/>
+        <result property="leaseToken"       column="lease_token"/>
+        <result property="leaseUntil"       column="lease_until"/>
+        <result property="errorCode"        column="error_code"/>
+        <result property="resultRef"        column="result_ref"/>
+        <result property="expiresAt"        column="expires_at"/>
+        <result property="sentAt"           column="sent_at"/>
+        <result property="createTime"       column="create_time"/>
+        <result property="updateTime"       column="update_time"/>
+    </resultMap>
+
+    <sql id="selectTaskColumns">
+        t.id, t.kind, t.business_id, t.business_version, t.requester_user_id, t.dedup_key,
+        t.payload_json, t.stage_json, t.status, t.attempt, t.max_attempts, t.next_run_at,
+        t.lease_token, t.lease_until, t.error_code, t.result_ref, t.expires_at, t.sent_at,
+        t.create_time, t.update_time
+    </sql>
+
+    <select id="selectDueIds" resultType="java.lang.Long">
+        select t.id
+        from preg_task t
+        where t.del_flag = '0'
+          and t.status in ('PENDING', 'RETRY_WAIT')
+          and t.next_run_at &lt;= #{now}
+          and t.attempt &lt; t.max_attempts
+        order by t.next_run_at asc, t.id asc
+        limit #{limit}
+    </select>
+
+    <update id="claim">
+        update preg_task
+        set status      = 'RUNNING',
+            attempt     = attempt + 1,
+            lease_token = #{leaseToken},
+            lease_until = #{leaseUntil},
+            update_time = now(3)
+        where id = #{id}
+          and status in ('PENDING', 'RETRY_WAIT')
+          and attempt &lt; max_attempts
+          and next_run_at &lt;= #{now}
+          and del_flag = '0'
+    </update>
+
+    <update id="updateStage">
+        update preg_task
+        set stage_json  = #{stageJson}, update_time = now(3)
+        where id = #{id} and status = 'RUNNING' and lease_token = #{leaseToken}
+          and lease_until &gt; #{now} and del_flag = '0'
+    </update>
+
+    <update id="reschedulePending">
+        update preg_task
+        set business_version = #{businessVersion},
+            payload_json     = coalesce(#{payloadJson}, payload_json),
+            next_run_at      = #{nextRunAt},
+            update_time      = now(3)
+        where id = #{id} and status in ('PENDING', 'RETRY_WAIT') and del_flag = '0'
+    </update>
+
+    <update id="renewLease">
+        update preg_task
+        set lease_until = #{leaseUntil}, update_time = now(3)
+        where id = #{id} and status = 'RUNNING'
+          and lease_token = #{leaseToken} and lease_until &gt; #{now}
+    </update>
+
+    <select id="selectById" resultMap="TaskResult">
+        select <include refid="selectTaskColumns"/>
+        from preg_task t
+        where t.id = #{id} and t.del_flag = '0'
+    </select>
+
+    <select id="selectByDedupKey" resultMap="TaskResult">
+        select <include refid="selectTaskColumns"/>
+        from preg_task t
+        where t.dedup_key = #{dedupKey}
+        limit 1
+    </select>
+
+    <insert id="insert" parameterType="com.howe.pregnancy.domain.PregTask"
+            useGeneratedKeys="true" keyProperty="id">
+        insert into preg_task (
+            kind, business_id, business_version, requester_user_id, dedup_key,
+            payload_json, stage_json, status, attempt, max_attempts, next_run_at,
+            del_flag, create_time, update_time
+        ) values (
+            #{kind}, #{businessId}, #{businessVersion}, #{requesterUserId}, #{dedupKey},
+            #{payloadJson}, #{stageJson}, #{status}, 0, #{maxAttempts}, #{nextRunAt},
+            '0', now(3), now(3)
+        )
+    </insert>
+
+    <update id="complete">
+        update preg_task
+        set status      = #{status},
+            stage_json  = coalesce(#{stageJson}, stage_json),
+            result_ref  = #{resultRef},
+            expires_at  = #{expiresAt},
+            sent_at     = #{sentAt},
+            lease_token = null,
+            lease_until = null,
+            error_code  = null,
+            update_time = now(3)
+        where id = #{id} and status = 'RUNNING' and lease_token = #{leaseToken}
+          and lease_until &gt; #{now} and del_flag = '0'
+    </update>
+
+    <update id="fail">
+        update preg_task
+        set status       = #{status},
+            error_code   = #{errorCode},
+            attempt      = #{attempt},
+            max_attempts = #{maxAttempts},
+            next_run_at  = #{nextRunAt},
+            stage_json   = coalesce(#{stageJson}, stage_json),
+            lease_token  = null,
+            lease_until  = null,
+            update_time  = now(3)
+        where id = #{id} and status = 'RUNNING' and lease_token = #{leaseToken}
+          and lease_until &gt; #{now} and del_flag = '0'
+    </update>
+
+    <update id="extendAttempts">
+        update preg_task
+        set max_attempts = #{maxAttempts}, update_time = now(3)
+        where id = #{id} and del_flag = '0'
+    </update>
+
+    <update id="updateStatus">
+        update preg_task
+        set status      = #{status},
+            error_code  = #{errorCode},
+            lease_token = null,
+            lease_until = null,
+            update_time = now(3)
+        where id = #{id} and del_flag = '0'
+          and status in ('PENDING', 'RETRY_WAIT', 'RUNNING')
+    </update>
+
+    <update id="cancelByBusiness">
+        update preg_task
+        set status      = 'CANCELLED',
+            lease_token = null,
+            lease_until = null,
+            update_time = now(3)
+        where kind = #{kind} and business_id = #{businessId}
+          and del_flag = '0'
+          and status in ('PENDING', 'RETRY_WAIT')
+    </update>
+
+    <select id="selectExpiredRunning" resultMap="TaskResult">
+        select <include refid="selectTaskColumns"/>
+        from preg_task t
+        where t.status = 'RUNNING' and t.lease_until &lt;= #{now} and t.del_flag = '0'
+        order by t.id asc
+        limit #{limit}
+    </select>
+
+    <update id="recoverExpired">
+        update preg_task
+        set status      = #{status},
+            error_code  = #{errorCode},
+            lease_token = null,
+            lease_until = null,
+            update_time = now(3)
+        where id = #{id} and status = 'RUNNING' and lease_token = #{leaseToken}
+          and lease_until &lt;= #{now} and del_flag = '0'
+    </update>
+
+    <select id="selectExportsByRequester" resultMap="TaskResult">
+        select <include refid="selectTaskColumns"/>
+        from preg_task t
+        where t.kind = 'EXPORT' and t.requester_user_id = #{requesterUserId} and t.del_flag = '0'
+        order by t.id desc
+    </select>
+
+    <select id="selectLatestByBusiness" resultMap="TaskResult">
+        select <include refid="selectTaskColumns"/>
+        from preg_task t
+        where t.kind = #{kind} and t.business_id = #{businessId} and t.del_flag = '0'
+        order by t.id desc
+        limit 1
+    </select>
+
+    <select id="selectLatestReminder" resultMap="TaskResult">
+        select <include refid="selectTaskColumns"/>
+        from preg_task t
+        where t.kind = 'REMINDER' and t.del_flag = '0'
+        order by t.id desc
+        limit 1
+    </select>
+
+    <update id="expireFinishedExports">
+        update preg_task
+        set result_ref = null, update_time = now(3)
+        where kind = 'EXPORT' and status = 'SUCCEEDED'
+          and result_ref is not null and expires_at is not null and expires_at &lt;= #{now}
+          and del_flag = '0'
+    </update>
+
+</mapper>

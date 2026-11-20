@@ -56,6 +56,7 @@ public class SysConfigController extends BaseController
             config.getParams().put("uncategorized", Boolean.TRUE);
         }
         startPage();
+        config.getParams().put("hideInternal", true);
         List<SysConfig> list = configService.selectConfigList(config);
         return getDataTable(list);
     }
@@ -80,6 +81,7 @@ public class SysConfigController extends BaseController
     @PostMapping("/export")
     public void export(HttpServletResponse response, SysConfig config)
     {
+        config.getParams().put("hideInternal", true);
         List<SysConfig> list = configService.selectConfigList(config);
         ExcelUtil<SysConfig> util = new ExcelUtil<SysConfig>(SysConfig.class);
         util.exportExcel(response, list, "参数数据");

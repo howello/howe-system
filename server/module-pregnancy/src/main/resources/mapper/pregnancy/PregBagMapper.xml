@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.pregnancy.mapper.PregBagMapper">
+
+    <resultMap id="BagResult" type="com.howe.pregnancy.domain.PregBag">
+        <id     property="id"        column="id"/>
+        <result property="seedKey"   column="seed_key"/>
+        <result property="name"      column="name"/>
+        <result property="note"      column="note"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <resultMap id="ItemResult" type="com.howe.pregnancy.domain.PregBagItem">
+        <id     property="id"                   column="id"/>
+        <result property="bagId"                column="bag_id"/>
+        <result property="seedKey"              column="seed_key"/>
+        <result property="category"             column="category"/>
+        <result property="name"                 column="name"/>
+        <result property="quantity"             column="quantity"/>
+        <result property="unit"                 column="unit"/>
+        <result property="purpose"              column="purpose"/>
+        <result property="brand"                column="brand"/>
+        <result property="channel"              column="channel"/>
+        <result property="purchaseDate"         column="purchase_date"/>
+        <result property="sortOrder"            column="sort_order"/>
+        <result property="prepared"             column="prepared"/>
+        <result property="actorUserId"          column="actor_user_id"/>
+        <result property="aiText"               column="ai_text"/>
+        <result property="aiImageKey"           column="ai_image_key"/>
+        <result property="currentContentTaskId" column="current_content_task_id"/>
+        <result property="requestId"            column="request_id"/>
+        <result property="requestHash"          column="request_hash"/>
+        <result property="version"              column="version"/>
+        <result property="createBy"             column="create_by"/>
+        <result property="createTime"           column="create_time"/>
+        <result property="updateBy"             column="update_by"/>
+        <result property="updateTime"           column="update_time"/>
+        <result property="remark"               column="remark"/>
+            <result property="delFlag" column="del_flag"/>
+    </resultMap>
+
+    <sql id="selectBagColumns">
+        b.id, b.seed_key, b.name, b.note, b.sort_order, b.create_time, b.update_time
+    </sql>
+
+    <sql id="selectItemColumns">
+        i.id, i.bag_id, i.seed_key, i.category, i.name, i.quantity, i.unit, i.purpose,
+        i.brand, i.channel, i.purchase_date, i.sort_order, i.prepared, i.actor_user_id,
+        i.ai_text, i.ai_image_key, i.current_content_task_id,
+        i.request_id, i.request_hash, i.version,
+        i.create_by, i.create_time, i.update_by, i.update_time, i.remark, i.del_flag
+    </sql>
+
+    <select id="selectBags" resultMap="BagResult">
+        select <include refid="selectBagColumns"/>
+        from preg_bag b
+        where b.del_flag = '0'
+        order by b.sort_order asc, b.id asc
+    </select>
+
+    <select id="selectBagById" resultMap="BagResult">
+        select <include refid="selectBagColumns"/>
+        from preg_bag b
+        where b.id = #{id} and b.del_flag = '0'
+    </select>
+
+    <select id="selectBagBySeed" resultMap="BagResult">
+        select <include refid="selectBagColumns"/>
+        from preg_bag b
+        where b.seed_key = #{seedKey}
+        limit 1
+    </select>
+
+    <insert id="insertBag" parameterType="com.howe.pregnancy.domain.PregBag"
+            useGeneratedKeys="true" keyProperty="id">
+        insert into preg_bag (seed_key, name, note, sort_order, del_flag, create_time, update_time)
+        values (#{seedKey}, #{name}, #{note}, #{sortOrder}, '0', now(3), now(3))
+    </insert>
+
+    <select id="selectItems" resultMap="ItemResult">
+        select <include refid="selectItemColumns"/>
+        from preg_bag_item i
+        where i.del_flag = '0'
+        <if test="bagId != null">
+            and i.bag_id = #{bagId}
+        </if>
+        <if test="category != null and category != ''">
+            and i.category = #{category}
+        </if>
+        <if test="prepared != null">
+            and i.prepared = #{prepared}
+        </if>
+        order by i.sort_order asc, i.id asc
+    </select>
+
+    <select id="selectItemById" resultMap="ItemResult">
+        select <include refid="selectItemColumns"/>
+        from preg_bag_item i
+        where i.id = #{id} and i.del_flag = '0'
+    </select>
+
+    <select id="selectItemByIdForUpdate" resultMap="ItemResult">
+        select <include refid="selectItemColumns"/>
+        from preg_bag_item i
+        where i.id = #{id} and i.del_flag = '0'
+        for update
+    </select>
+
+    <select id="selectItemBySeed" resultMap="ItemResult">
+        select <include refid="selectItemColumns"/>
+        from preg_bag_item i
+        where i.bag_id = #{bagId} and i.seed_key = #{seedKey}
+        limit 1
+    </select>
+
+    <select id="selectItemByRequest" resultMap="ItemResult">
+        select <include refid="selectItemColumns"/>
+        from preg_bag_item i
+        where i.request_id = #{requestId}
+        limit 1
+    </select>
+
+    <insert id="insertItem" parameterType="com.howe.pregnancy.domain.PregBagItem"
+            useGeneratedKeys="true" keyProperty="id">
+        insert into preg_bag_item (
+            bag_id, seed_key, category, name, quantity, unit, purpose, brand, channel, purchase_date,
+            sort_order, prepared, actor_user_id, request_id, request_hash, version,
+            create_by, create_time
+        ) values (
+            #{bagId}, #{seedKey}, #{category}, #{name}, #{quantity}, #{unit}, #{purpose},
+            #{brand}, #{channel}, #{purchaseDate}, #{sortOrder}, #{prepared}, #{actorUserId},
+            #{requestId}, #{requestHash}, 1, #{createBy}, now(3)
+        )
+    </insert>
+
+    <update id="updateItem" parameterType="com.howe.pregnancy.domain.PregBagItem">
+        update preg_bag_item
+        set category    = #{category},
+            name        = #{name},
+            quantity    = #{quantity},
+            unit        = #{unit},
+            purpose     = #{purpose},
+            brand       = #{brand},
+            channel     = #{channel},
+            purchase_date = #{purchaseDate},
+            sort_order  = #{sortOrder},
+            prepared    = #{prepared},
+            version     = version + 1,
+            update_by   = #{updateBy},
+            update_time = now(3)
+        where id = #{id} and version = #{version} and del_flag = '0'
+    </update>
+
+    <update id="updateAiContent">
+        update preg_bag_item
+        set ai_text               = coalesce(#{aiText}, ai_text),
+            ai_image_key          = coalesce(#{aiImageKey}, ai_image_key),
+            update_time           = now(3)
+        where id = #{id} and current_content_task_id = #{taskId} and del_flag = '0'
+    </update>
+
+    <update id="updateCurrentTask">
+        update preg_bag_item
+        set current_content_task_id = #{taskId}, update_time = now(3)
+        where id = #{id} and del_flag = '0'
+    </update>
+
+    <update id="logicalDeleteItem">
+        update preg_bag_item
+        set del_flag    = '2',
+            version     = version + 1,
+            update_by   = #{updateBy},
+            update_time = now(3)
+        where id = #{id} and version = #{version} and del_flag = '0'
+    </update>
+
+    <select id="summary" resultType="java.util.Map">
+        select count(1) as total,
+               coalesce(sum(case when i.prepared = 1 then 1 else 0 end), 0) as preparedCount
+        from preg_bag_item i
+        where i.del_flag = '0'
+        <if test="bagId != null">
+            and i.bag_id = #{bagId}
+        </if>
+        <if test="category != null and category != ''">
+            and i.category = #{category}
+        </if>
+    </select>
+
+</mapper>

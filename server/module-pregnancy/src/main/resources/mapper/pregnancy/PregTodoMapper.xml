@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.pregnancy.mapper.PregTodoMapper">
+
+    <resultMap id="TodoResult" type="com.howe.pregnancy.domain.PregTodo">
+        <id     property="id"        column="id"/>
+        <result property="title"     column="title"/>
+        <result property="dueDate"   column="due_date"/>
+        <result property="dueTime"   column="due_time"/>
+        <result property="note"      column="note"/>
+        <result property="done"      column="done"/>
+        <result property="doneAt"    column="done_at"/>
+        <result property="doneBy"    column="done_by"/>
+        <result property="requestId" column="request_id"/>
+        <result property="requestHash" column="request_hash"/>
+        <result property="version"   column="version"/>
+        <result property="createBy"  column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy"  column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark"    column="remark"/>
+            <result property="delFlag" column="del_flag"/>
+    </resultMap>
+
+    <sql id="selectTodoColumns">
+        t.id, t.title, t.due_date, t.due_time, t.note, t.done, t.done_at, t.done_by,
+        t.request_id, t.request_hash, t.version,
+        t.create_by, t.create_time, t.update_by, t.update_time, t.remark, t.del_flag
+    </sql>
+
+    <select id="selectList" resultMap="TodoResult">
+        select <include refid="selectTodoColumns"/>
+        from preg_todo t
+        where t.del_flag = '0'
+        <if test="done != null">
+            and t.done = #{done}
+        </if>
+        <if test="from != null">
+            and t.due_date &gt;= #{from}
+        </if>
+        <if test="to != null">
+            and t.due_date &lt;= #{to}
+        </if>
+        order by t.done asc, t.due_date asc, t.due_time asc, t.id asc
+    </select>
+
+    <select id="selectById" resultMap="TodoResult">
+        select <include refid="selectTodoColumns"/>
+        from preg_todo t
+        where t.id = #{id} and t.del_flag = '0'
+    </select>
+
+    <select id="selectByRequest" resultMap="TodoResult">
+        select <include refid="selectTodoColumns"/>
+        from preg_todo t
+        where t.request_id = #{requestId}
+        limit 1
+    </select>
+
+    <insert id="insert" parameterType="com.howe.pregnancy.domain.PregTodo"
+            useGeneratedKeys="true" keyProperty="id">
+        insert into preg_todo (
+            title, due_date, due_time, note, done, request_id, request_hash, version,
+            create_by, create_time
+        ) values (
+            #{title}, #{dueDate}, #{dueTime}, #{note}, #{done}, #{requestId}, #{requestHash}, 1,
+            #{createBy}, now(3)
+        )
+    </insert>
+
+    <update id="update" parameterType="com.howe.pregnancy.domain.PregTodo">
+        update preg_todo
+        set title       = #{title},
+            due_date    = #{dueDate},
+            due_time    = #{dueTime},
+            note        = #{note},
+            done        = #{done},
+            done_at     = #{doneAt},
+            done_by     = #{doneBy},
+            version     = version + 1,
+            update_by   = #{updateBy},
+            update_time = now(3)
+        where id = #{id} and version = #{version} and del_flag = '0'
+    </update>
+
+    <update id="logicalDelete">
+        update preg_todo
+        set del_flag    = '2',
+            version     = version + 1,
+            update_by   = #{updateBy},
+            update_time = now(3)
+        where id = #{id} and version = #{version} and del_flag = '0'
+    </update>
+
+    <select id="selectByDay" resultMap="TodoResult">
+        select <include refid="selectTodoColumns"/>
+        from preg_todo t
+        where t.due_date = #{dueDate} and t.del_flag = '0'
+        order by t.done asc, t.due_time asc, t.id asc
+    </select>
+
+    <select id="countByDay" resultType="java.util.Map">
+        select t.due_date as dueDate, count(1) as total
+        from preg_todo t
+        where t.due_date &gt;= #{from}
+          and t.due_date &lt;= #{to}
+          and t.del_flag = '0'
+        group by t.due_date
+    </select>
+
+</mapper>

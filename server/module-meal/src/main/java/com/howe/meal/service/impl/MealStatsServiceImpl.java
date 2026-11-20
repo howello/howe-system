@@ -185,7 +185,7 @@ public class MealStatsServiceImpl implements IMealStatsService {
     }
 
     private MealAppVersionOverview computeAppVersionOverview() {
-        MealAppVersion latest = mealAppVersionMapper.selectLatestPublished();
+        MealAppVersion latest = mealAppVersionMapper.selectLatestPublished("meal");
         long total = mealStatsMapper.selectAppVersionCount();
         if (latest == null) {
             return new MealAppVersionOverview(null, null, false, total);

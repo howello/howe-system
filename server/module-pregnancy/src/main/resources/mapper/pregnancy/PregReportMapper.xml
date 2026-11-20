@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.pregnancy.mapper.PregReportMapper">
+
+    <resultMap id="ReportResult" type="com.howe.pregnancy.domain.PregReport">
+        <id     property="id"          column="id"/>
+        <result property="name"        column="name"/>
+        <result property="reportDate"  column="report_date"/>
+        <result property="checkupId"   column="checkup_id"/>
+        <result property="note"        column="note"/>
+        <result property="actorUserId" column="actor_user_id"/>
+        <result property="requestId"   column="request_id"/>
+        <result property="requestHash" column="request_hash"/>
+        <result property="version"     column="version"/>
+        <result property="createBy"    column="create_by"/>
+        <result property="createTime"  column="create_time"/>
+        <result property="updateBy"    column="update_by"/>
+        <result property="updateTime"  column="update_time"/>
+        <result property="remark"      column="remark"/>
+            <result property="delFlag" column="del_flag"/>
+    </resultMap>
+
+    <sql id="selectReportColumns">
+        r.id, r.name, r.report_date, r.checkup_id, r.note, r.actor_user_id,
+        r.request_id, r.request_hash, r.version,
+        r.create_by, r.create_time, r.update_by, r.update_time, r.remark, r.del_flag
+    </sql>
+
+    <select id="selectList" resultMap="ReportResult">
+        select <include refid="selectReportColumns"/>
+        from preg_report r
+        where r.del_flag = '0'
+        <if test="from != null">
+            and r.report_date &gt;= #{from}
+        </if>
+        <if test="to != null">
+            and r.report_date &lt;= #{to}
+        </if>
+        <if test="checkupId != null">
+            and r.checkup_id = #{checkupId}
+        </if>
+        order by r.report_date desc, r.id desc
+    </select>
+
+    <select id="selectById" resultMap="ReportResult">
+        select <include refid="selectReportColumns"/>
+        from preg_report r
+        where r.id = #{id} and r.del_flag = '0'
+    </select>
+
+    <select id="selectByRequest" resultMap="ReportResult">
+        select <include refid="selectReportColumns"/>
+        from preg_report r
+        where r.actor_user_id = #{actorUserId} and r.request_id = #{requestId}
+        limit 1
+    </select>
+
+    <insert id="insert" parameterType="com.howe.pregnancy.domain.PregReport"
+            useGeneratedKeys="true" keyProperty="id">
+        insert into preg_report (
+            name, report_date, checkup_id, note, actor_user_id,
+            request_id, request_hash, version, create_by, create_time
+        ) values (
+            #{name}, #{reportDate}, #{checkupId}, #{note}, #{actorUserId},
+            #{requestId}, #{requestHash}, 1, #{createBy}, now(3)
+        )
+    </insert>
+
+    <update id="update" parameterType="com.howe.pregnancy.domain.PregReport">
+        update preg_report
+        set name        = #{name},
+            report_date = #{reportDate},
+            checkup_id  = #{checkupId},
+            note        = #{note},
+            version     = version + 1,
+            update_by   = #{updateBy},
+            update_time = now(3)
+        where id = #{id} and version = #{version} and del_flag = '0'
+    </update>
+
+    <update id="logicalDelete">
+        update preg_report
+        set del_flag    = '2',
+            version     = version + 1,
+            update_time = now(3)
+        where id = #{id} and version = #{version} and del_flag = '0'
+    </update>
+
+    <update id="detachMeasurements">
+        update preg_measurement
+        set report_id = null, update_time = now(3)
+        where report_id = #{reportId} and del_flag = '0'
+    </update>
+
+    <select id="selectFilesByReport" resultMap="com.howe.pregnancy.mapper.PregFileMapper.FileResult">
+        select f.id, f.uploader_user_id, f.original_name, f.storage_key, f.mime_type,
+               f.size_bytes, f.sha256, f.width, f.height, f.state, f.owner_type, f.owner_id,
+               f.sort_order, f.detached_at, f.reclaim_at, f.request_id
+        from preg_file f
+        where f.owner_type = 'REPORT' and f.owner_id = #{reportId} and f.del_flag = '0'
+        order by f.sort_order asc, f.id asc
+    </select>
+
+    <select id="countByDay" resultType="java.util.Map">
+        select r.report_date as recordDate, count(1) as total
+        from preg_report r
+        where r.report_date &gt;= #{from}
+          and r.report_date &lt;= #{to}
+          and r.del_flag = '0'
+        group by r.report_date
+    </select>
+
+    <select id="selectByDay" resultMap="ReportResult">
+        select <include refid="selectReportColumns"/>
+        from preg_report r
+        where r.report_date = #{date} and r.del_flag = '0'
+        order by r.id asc
+    </select>
+
+</mapper>

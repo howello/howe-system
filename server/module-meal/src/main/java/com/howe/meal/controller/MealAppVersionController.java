@@ -3,7 +3,6 @@ package com.howe.meal.controller;
 import com.howe.common.annotation.Anonymous;
 import com.howe.common.annotation.Log;
 import com.howe.common.annotation.RateLimiter;
-import com.howe.common.constant.ConfigConstants;
 import com.howe.common.constant.HttpStatus;
 import com.howe.common.core.controller.BaseController;
 import com.howe.common.core.domain.AjaxResult;
@@ -13,6 +12,7 @@ import com.howe.common.enums.LimitType;
 import com.howe.common.utils.ConfigUtils;
 import com.howe.common.utils.StringUtils;
 import com.howe.meal.domain.MealAppVersion;
+import com.howe.meal.domain.AppReleaseChannel;
 import com.howe.meal.domain.dto.AppPackageCheckRequest;
 import com.howe.meal.domain.dto.AppVersionLogPolishBody;
 import com.howe.meal.service.IMealAppVersionService;
@@ -50,7 +50,7 @@ import java.util.Map;
  *
  * @author howe
  */
-@Tag(name = "点餐-App 版本", description = "wgt 资源包版本管理与客户端热更新检测")
+@Tag(name = "App 版本管理", description = "按应用渠道管理 wgt 资源包和客户端热更新")
 @RestController
 @RequestMapping("/meal/app/version")
 @RequiredArgsConstructor
@@ -66,11 +66,16 @@ public class MealAppVersionController extends BaseController {
     private static final String PUBLISH_TOKEN_HEADER = "X-Publish-Token";
 
     @Operation(summary = "查询版本列表")
+    @PreAuthorize("@ss.hasPermi('tool:appVersion:list')")
     @GetMapping("/list")
     public TableDataInfo list(MealAppVersion mealAppVersion) {
         startPage();
-        List<MealAppVersion> list = mealAppVersionService.selectMealAppVersionList(mealAppVersion);
-        return getDataTable(list);
+        try {
+            List<MealAppVersion> list = mealAppVersionService.selectMealAppVersionList(mealAppVersion);
+            return getDataTable(list);
+        } finally {
+            clearPage();
+        }
     }
 
     /**
@@ -80,14 +85,20 @@ public class MealAppVersionController extends BaseController {
      */
     @Operation(summary = "检测是否有新版本", description = "客户端上报当前版本名称与版本号，返回 wgt 更新信息")
     @Anonymous
+    @RateLimiter(time = 60, count = 120, limitType = LimitType.IP)
     @GetMapping("/check")
     public AjaxResult check(
+            @RequestParam(value = "appKey", required = false) String appKey,
             @Parameter(description = "客户端当前版本名称") @RequestParam(value = "versionName", required = false) String versionName,
             @Parameter(description = "客户端当前版本序号") @RequestParam(value = "versionCode", required = false) Integer versionCode) {
-        return success(mealAppVersionService.checkUpdate(versionName, versionCode));
+        AppReleaseChannel channel = AppReleaseChannel.resolve(appKey);
+        var result = mealAppVersionService.checkUpdate(channel, versionName, versionCode);
+        result.setAppKey(channel.getKey());
+        return success(result);
     }
 
     @Operation(summary = "获取版本详情")
+    @PreAuthorize("@ss.hasAnyPermi('tool:appVersion:query,tool:appVersion:edit')")
     @GetMapping(value = "/{versionId}")
     public AjaxResult getInfo(@Parameter(description = "版本记录ID", required = true)
             @PathVariable("versionId") Long versionId) {
@@ -95,11 +106,12 @@ public class MealAppVersionController extends BaseController {
     }
 
     @Operation(summary = "上传 wgt 资源包", description = "上传 .wgt 文件到对象存储（R2），返回可访问地址")
-    @PreAuthorize("@ss.hasPermi('meal:appVersion:upload')")
+    @PreAuthorize("@ss.hasPermi('tool:appVersion:upload') && "
+            + "(#appKey != 'pregnancy' || @ss.hasPermi('tool:appVersion:pregnancy'))")
     @PostMapping("/upload")
-    public AjaxResult uploadWgt(MultipartFile file) {
+    public AjaxResult uploadWgt(MultipartFile file, @RequestParam(value = "appKey", required = false) String appKey) {
         try {
-            String url = mealAppVersionService.uploadWgt(file);
+            String url = mealAppVersionService.uploadWgt(AppReleaseChannel.resolve(appKey), file);
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("url", url);
             data.put("size", file.getSize());
@@ -111,15 +123,15 @@ public class MealAppVersionController extends BaseController {
     }
 
     @Operation(summary = "校验远程资源包链接", description = "有界下载并验证 wgt 结构；结果仅供即时反馈，保存时会按需重新校验")
-    @PreAuthorize("@ss.hasPermi('meal:appVersion:upload')")
+    @PreAuthorize("@ss.hasPermi('tool:appVersion:upload')")
     @PostMapping("/check-package")
     public AjaxResult checkPackage(@Valid @RequestBody AppPackageCheckRequest request) {
         return success(mealAppPackageService.check(request));
     }
 
     @Operation(summary = "新增版本")
-    @PreAuthorize("@ss.hasPermi('meal:appVersion:add')")
-    @Log(title = "点餐App版本", businessType = BusinessType.INSERT)
+    @PreAuthorize("@ss.hasPermi('tool:appVersion:add')")
+    @Log(title = "App 版本管理", businessType = BusinessType.INSERT)
     @PostMapping
     public AjaxResult add(@Valid @RequestBody MealAppVersion mealAppVersion) {
         // 远程链接（非上传地址）在保存前必须通过校验
@@ -128,18 +140,19 @@ public class MealAppVersionController extends BaseController {
     }
 
     @Operation(summary = "修改版本")
-    @PreAuthorize("@ss.hasPermi('meal:appVersion:edit')")
-    @Log(title = "点餐App版本", businessType = BusinessType.UPDATE)
+    @PreAuthorize("@ss.hasPermi('tool:appVersion:edit')")
+    @Log(title = "App 版本管理", businessType = BusinessType.UPDATE)
     @PutMapping
     public AjaxResult edit(@Valid @RequestBody MealAppVersion mealAppVersion) {
         MealAppVersion exist = mealAppVersionService.selectMealAppVersionById(mealAppVersion.getVersionId());
-        mealAppPackageService.assertVerified(mealAppVersion, exist == null ? null : exist.getStatus());
+        mealAppVersion.setAppKey(exist.getAppKey());
+        mealAppPackageService.assertVerified(mealAppVersion, exist.getStatus());
         return toAjax(mealAppVersionService.updateMealAppVersion(mealAppVersion));
     }
 
     @Operation(summary = "删除版本")
-    @PreAuthorize("@ss.hasPermi('meal:appVersion:remove')")
-    @Log(title = "点餐App版本", businessType = BusinessType.DELETE)
+    @PreAuthorize("@ss.hasPermi('tool:appVersion:remove')")
+    @Log(title = "App 版本管理", businessType = BusinessType.DELETE)
     @DeleteMapping("/{versionIds}")
     public AjaxResult remove(@Parameter(description = "版本记录ID数组，多个用逗号分隔", required = true)
             @PathVariable Long[] versionIds) {
@@ -156,22 +169,26 @@ public class MealAppVersionController extends BaseController {
     @Operation(summary = "发布 wgt 版本（脚本用）",
             description = "用发布令牌鉴权，一次请求完成「上传 wgt 到 R2 + 新建版本记录」")
     @Anonymous
+    @RateLimiter(time = 60, count = 10, limitType = LimitType.IP)
     @PostMapping("/publish")
     public AjaxResult publish(
+            @RequestParam(value = "appKey", required = false) String appKey,
             @Parameter(description = "发布令牌") @RequestHeader(value = PUBLISH_TOKEN_HEADER, required = false) String publishToken,
             @Parameter(description = "wgt 资源包") @RequestParam(value = "file", required = false) MultipartFile file,
             @Parameter(description = "版本名称") @RequestParam(value = "versionName", required = false) String versionName,
             @Parameter(description = "版本序号") @RequestParam(value = "versionCode", required = false) Integer versionCode,
             @Parameter(description = "更新说明") @RequestParam(value = "updateLog", required = false) String updateLog,
             @Parameter(description = "是否强制更新（0/1）") @RequestParam(value = "forceUpdate", required = false) String forceUpdate) {
-        AjaxResult tokenError = assertPublishToken(publishToken);
+        AppReleaseChannel channel = AppReleaseChannel.resolve(appKey);
+        AjaxResult tokenError = assertPublishToken(publishToken, channel);
         if (tokenError != null) {
             return tokenError;
         }
         try {
-            MealAppVersion version = mealAppVersionService.publishWgt(file, versionName, versionCode, updateLog, forceUpdate);
+            MealAppVersion version = mealAppVersionService.publishWgt(channel, file, versionName, versionCode, updateLog, forceUpdate);
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("versionId", version.getVersionId());
+            data.put("appKey", version.getAppKey());
             data.put("versionName", version.getVersionName());
             data.put("versionCode", version.getVersionCode());
             data.put("wgtUrl", version.getWgtUrl());
@@ -199,7 +216,7 @@ public class MealAppVersionController extends BaseController {
     public AjaxResult polishLog(
             @Parameter(description = "发布令牌") @RequestHeader(value = PUBLISH_TOKEN_HEADER, required = false) String publishToken,
             @RequestBody AppVersionLogPolishBody body) {
-        AjaxResult tokenError = assertPublishToken(publishToken);
+        AjaxResult tokenError = assertPublishToken(publishToken, AppReleaseChannel.MEAL);
         if (tokenError != null) {
             return tokenError;
         }
@@ -220,11 +237,11 @@ public class MealAppVersionController extends BaseController {
      * @param publishToken 请求头里的令牌
      * @return 校验通过返回 {@code null}，否则返回应直接回给调用方的错误结果
      */
-    private AjaxResult assertPublishToken(String publishToken) {
-        String expected = ConfigUtils.getString(ConfigConstants.MEAL_APP_PUBLISH_TOKEN);
+    private AjaxResult assertPublishToken(String publishToken, AppReleaseChannel channel) {
+        String expected = ConfigUtils.getString(channel.getTokenKey());
         if (StringUtils.isEmpty(expected)) {
             return AjaxResult.error("发布令牌未配置：请在「系统管理 > 参数设置」配置参数 "
-                    + ConfigConstants.MEAL_APP_PUBLISH_TOKEN);
+                    + channel.getTokenKey());
         }
         // 常量时间比较，避免通过响应时间推断令牌
         if (StringUtils.isEmpty(publishToken) || !MessageDigest.isEqual(

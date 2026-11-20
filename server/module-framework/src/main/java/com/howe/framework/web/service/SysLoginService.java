@@ -104,14 +104,32 @@ public class SysLoginService
         return loginUser;
     }
 
-    /** 保留原后台和点餐端的准入、登录信息更新及 JWT 有效期策略。 */
+    /** 按客户端选择准入策略、登录信息更新及 JWT 有效期。 */
     private String doLogin(String username, String password, String client) {
         LoginUser loginUser = authenticateCredentials(username, password);
         assertAdminConsoleAllowed(loginUser, client);
         recordLoginInfo(loginUser.getUserId());
-        loginUser.setExpireMinutes(Constants.CLIENT_MEAL.equals(client)
-                ? tokenService.getMealExpireTime() : tokenService.getExpireTime());
+        loginUser.setExpireMinutes(resolveExpireMinutes(client));
         return tokenService.createToken(loginUser);
+    }
+
+    /**
+     * 按客户端解析会话有效期
+     *
+     * <p>管理端沿用默认时长；点餐端与孕期助手端各自使用独立的长期会话配置，
+     * 避免一端调整影响其他端。</p>
+     *
+     * @param client 登录客户端
+     * @return 有效分钟数
+     */
+    private int resolveExpireMinutes(String client) {
+        if (Constants.CLIENT_MEAL.equals(client)) {
+            return tokenService.getMealExpireTime();
+        }
+        if (Constants.CLIENT_PREGNANCY.equals(client)) {
+            return tokenService.getPregnancyExpireTime();
+        }
+        return tokenService.getExpireTime();
     }
 
     /** 校验凭据并记录原有认证审计；调用方独立决定客户端准入和会话类型。 */
@@ -258,13 +276,19 @@ public class SysLoginService
      * 点餐端（{@code client=meal}）不受此限制：点餐员和厨师本来就要用它。
      * </p>
      *
+     * <p>
+     * 孕期助手端（{@code client=pregnancy}）同样不受管理端角色限制：孕期档案的
+     * 可见性由档案成员关系决定，家庭普通账号也可能被邀请为记录者或只读成员。
+     * 该参数只选择准入策略，不代替档案级授权。
+     * </p>
+     *
      * @param loginUser 登录用户
      * @param client 登录客户端
      * @throws ServiceException 无管理端权限时抛出
      */
     private void assertAdminConsoleAllowed(LoginUser loginUser, String client)
     {
-        if (Constants.CLIENT_MEAL.equals(client))
+        if (Constants.CLIENT_MEAL.equals(client) || Constants.CLIENT_PREGNANCY.equals(client))
         {
             return;
         }

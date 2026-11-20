@@ -1,5 +1,6 @@
 import request from '@/utils/request'
 import type { MealAppVersionQueryParams, MealAppVersion, WgtUploadResult, AppPackageCheckResult, AjaxResult, TableDataInfo } from '@/types'
+import type { AppReleaseKey } from '@/types/api/meal/appversion'
 
 // 查询 App 版本列表
 export function listAppVersion(query: MealAppVersionQueryParams): Promise<TableDataInfo<MealAppVersion[]>> {
@@ -45,9 +46,10 @@ export function delAppVersion(versionId: number | number[]): Promise<AjaxResult>
 }
 
 // 上传 wgt 资源包（存 R2），返回可访问地址
-export function uploadAppVersionWgt(file: File): Promise<AjaxResult<WgtUploadResult>> {
+export function uploadAppVersionWgt(file: File, appKey: AppReleaseKey = 'meal'): Promise<AjaxResult<WgtUploadResult>> {
   const data = new FormData()
   data.append('file', file)
+  data.append('appKey', appKey)
   return request({
     url: '/meal/app/version/upload',
     method: 'post',

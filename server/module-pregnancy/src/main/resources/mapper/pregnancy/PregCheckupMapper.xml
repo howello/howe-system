@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.pregnancy.mapper.PregCheckupMapper">
+
+    <resultMap id="CheckupResult" type="com.howe.pregnancy.domain.PregCheckup">
+        <id     property="id"                column="id"/>
+        <result property="seedKey"           column="seed_key"/>
+        <result property="title"             column="title"/>
+        <result property="suggestStartDay"   column="suggest_start_day"/>
+        <result property="suggestEndDay"     column="suggest_end_day"/>
+        <result property="suggestedDate"     column="suggested_date"/>
+        <result property="appointmentDate"   column="appointment_date"/>
+        <result property="appointmentTime"   column="appointment_time"/>
+        <result property="hospital"          column="hospital"/>
+        <result property="location"          column="location"/>
+        <result property="completedDate"     column="completed_date"/>
+        <result property="focus"             column="focus"/>
+        <result property="status"            column="status"/>
+        <result property="requestId"         column="request_id"/>
+        <result property="requestHash"       column="request_hash"/>
+        <result property="version"           column="version"/>
+        <result property="createBy"          column="create_by"/>
+        <result property="createTime"        column="create_time"/>
+        <result property="updateBy"          column="update_by"/>
+        <result property="updateTime"        column="update_time"/>
+        <result property="remark"            column="remark"/>
+            <result property="delFlag" column="del_flag"/>
+    </resultMap>
+
+    <resultMap id="DetailResult" type="com.howe.pregnancy.domain.PregCheckupDetail">
+        <id     property="id"               column="id"/>
+        <result property="checkupId"        column="checkup_id"/>
+        <result property="type"             column="type"/>
+        <result property="title"            column="title"/>
+        <result property="description"      column="description"/>
+        <result property="sortOrder"        column="sort_order"/>
+        <result property="estimatedMinutes" column="estimated_minutes"/>
+        <result property="done"             column="done"/>
+        <result property="doneAt"           column="done_at"/>
+        <result property="doneBy"           column="done_by"/>
+    </resultMap>
+
+    <sql id="selectCheckupColumns">
+        c.id, c.seed_key, c.title, c.suggest_start_day, c.suggest_end_day, c.suggested_date,
+        c.appointment_date, c.appointment_time, c.hospital, c.location, c.completed_date,
+        c.focus, c.status, c.request_id, c.request_hash, c.version,
+        c.create_by, c.create_time, c.update_by, c.update_time, c.remark, c.del_flag
+    </sql>
+
+    <select id="selectList" resultMap="CheckupResult">
+        select <include refid="selectCheckupColumns"/>
+        from preg_checkup c
+        where c.del_flag = '0'
+        order by
+            case when c.appointment_date is null then 1 else 0 end,
+            c.appointment_date asc,
+            c.suggest_start_day asc,
+            c.id asc
+    </select>
+
+    <select id="selectById" resultMap="CheckupResult">
+        select <include refid="selectCheckupColumns"/>
+        from preg_checkup c
+        where c.id = #{id} and c.del_flag = '0'
+    </select>
+
+    <select id="selectBySeedKey" resultMap="CheckupResult">
+        select <include refid="selectCheckupColumns"/>
+        from preg_checkup c
+        where c.seed_key = #{seedKey}
+        limit 1
+    </select>
+
+    <select id="selectByRequest" resultMap="CheckupResult">
+        select <include refid="selectCheckupColumns"/>
+        from preg_checkup c
+        where c.request_id = #{requestId}
+        limit 1
+    </select>
+
+    <insert id="insert" parameterType="com.howe.pregnancy.domain.PregCheckup"
+            useGeneratedKeys="true" keyProperty="id">
+        insert into preg_checkup (
+            seed_key, title, suggest_start_day, suggest_end_day, suggested_date,
+            appointment_date, appointment_time, hospital, location, completed_date,
+            focus, status, request_id, request_hash, version, create_by, create_time
+        ) values (
+            #{seedKey}, #{title}, #{suggestStartDay}, #{suggestEndDay}, #{suggestedDate},
+            #{appointmentDate}, #{appointmentTime}, #{hospital}, #{location}, #{completedDate},
+            #{focus}, #{status}, #{requestId}, #{requestHash}, 1, #{createBy}, now(3)
+        )
+    </insert>
+
+    <update id="update" parameterType="com.howe.pregnancy.domain.PregCheckup">
+        update preg_checkup
+        set title            = #{title},
+            suggested_date   = #{suggestedDate},
+            appointment_date = #{appointmentDate},
+            appointment_time = #{appointmentTime},
+            hospital         = #{hospital},
+            location         = #{location},
+            completed_date   = #{completedDate},
+            focus            = #{focus},
+            status           = #{status},
+            version          = version + 1,
+            update_by        = #{updateBy},
+            update_time      = now(3)
+        where id = #{id} and version = #{version} and del_flag = '0'
+    </update>
+
+    <update id="bumpVersion">
+        update preg_checkup
+        set version     = version + 1,
+            update_time = now(3)
+        where id = #{id} and version = #{version} and del_flag = '0'
+    </update>
+
+    <update id="logicalDelete">
+        update preg_checkup
+        set del_flag    = '2',
+            version     = version + 1,
+            update_time = now(3)
+        where id = #{id} and version = #{version} and del_flag = '0'
+    </update>
+
+    <select id="selectByDay" resultMap="CheckupResult">
+        select <include refid="selectCheckupColumns"/>
+        from preg_checkup c
+        where c.del_flag = '0'
+          and (c.appointment_date = #{date} or c.completed_date = #{date})
+        order by c.appointment_time asc, c.id asc
+    </select>
+
+    <select id="countByDay" resultType="java.util.Map">
+        select d.record_date as recordDate, count(1) as total
+        from (
+            select c.appointment_date as record_date
+            from preg_checkup c
+            where c.del_flag = '0' and c.appointment_date is not null
+            union all
+            select c.completed_date as record_date
+            from preg_checkup c
+            where c.del_flag = '0' and c.completed_date is not null
+        ) d
+        where d.record_date &gt;= #{from} and d.record_date &lt;= #{to}
+        group by d.record_date
+    </select>
+
+    <select id="selectDetails" resultMap="DetailResult">
+        select d.id, d.checkup_id, d.type, d.title, d.description, d.sort_order,
+               d.estimated_minutes, d.done, d.done_at, d.done_by
+        from preg_checkup_detail d
+        where d.checkup_id = #{checkupId} and d.del_flag = '0'
+        order by d.type asc, d.sort_order asc, d.id asc
+    </select>
+
+    <insert id="insertDetails">
+        insert into preg_checkup_detail (
+            checkup_id, type, title, description, sort_order, estimated_minutes,
+            done, create_time, update_time
+        ) values
+        <foreach collection="details" item="item" separator=",">
+            (#{item.checkupId}, #{item.type}, #{item.title}, #{item.description},
+             #{item.sortOrder}, #{item.estimatedMinutes}, 0, now(3), now(3))
+        </foreach>
+    </insert>
+
+    <update id="deleteDetailsByType">
+        update preg_checkup_detail
+        set del_flag = '2', update_time = now(3)
+        where checkup_id = #{checkupId} and type = #{type} and del_flag = '0'
+    </update>
+
+    <select id="selectDetailById" resultMap="DetailResult">
+        select d.id, d.checkup_id, d.type, d.title, d.description, d.sort_order,
+               d.estimated_minutes, d.done, d.done_at, d.done_by
+        from preg_checkup_detail d
+        where d.id = #{id} and d.del_flag = '0'
+    </select>
+
+    <update id="updatePreparationDone">
+        update preg_checkup_detail
+        set done        = #{done},
+            done_at     = case when #{done} = 1 then now(3) else null end,
+            done_by     = #{doneBy},
+            update_time = now(3)
+        where id = #{id} and type = 'PREPARATION' and del_flag = '0'
+    </update>
+
+</mapper>
