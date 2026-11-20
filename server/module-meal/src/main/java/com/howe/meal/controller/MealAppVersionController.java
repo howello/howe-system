@@ -214,14 +214,16 @@ public class MealAppVersionController extends BaseController {
     @RateLimiter(time = 60, count = 10, limitType = LimitType.IP)
     @PostMapping("/polish-log")
     public AjaxResult polishLog(
+            @Parameter(description = "应用渠道，缺省为 meal") @RequestParam(value = "appKey", required = false) String appKey,
             @Parameter(description = "发布令牌") @RequestHeader(value = PUBLISH_TOKEN_HEADER, required = false) String publishToken,
             @RequestBody AppVersionLogPolishBody body) {
-        AjaxResult tokenError = assertPublishToken(publishToken, AppReleaseChannel.MEAL);
+        AppReleaseChannel channel = AppReleaseChannel.resolve(appKey);
+        AjaxResult tokenError = assertPublishToken(publishToken, channel);
         if (tokenError != null) {
             return tokenError;
         }
         try {
-            String updateLog = mealAppVersionLogService.polish(
+            String updateLog = mealAppVersionLogService.polish(channel,
                     body == null ? null : body.getSource(),
                     body == null ? null : body.getVersionName(),
                     body == null ? null : body.getVersionCode());
