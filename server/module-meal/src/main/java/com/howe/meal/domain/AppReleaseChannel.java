@@ -10,10 +10,11 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum AppReleaseChannel {
 
-    MEAL("meal", "__UNI__091B4F4", "meal/app", ConfigConstants.MEAL_APP_PUBLISH_TOKEN),
-    PREGNANCY("pregnancy", "__UNI__B95B91A", "pregnancy/app", ConfigConstants.PREGNANCY_APP_PUBLISH_TOKEN);
+    MEAL("meal", "吃了么", "__UNI__091B4F4", "meal/app", ConfigConstants.MEAL_APP_PUBLISH_TOKEN),
+    PREGNANCY("pregnancy", "宝宝", "__UNI__B95B91A", "pregnancy/app", ConfigConstants.PREGNANCY_APP_PUBLISH_TOKEN);
 
     private final String key;
+    private final String displayName;
     private final String appId;
     private final String directory;
     private final String tokenKey;
