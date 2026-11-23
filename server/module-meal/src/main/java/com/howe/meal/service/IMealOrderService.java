@@ -1,6 +1,7 @@
 package com.howe.meal.service;
 
 import com.howe.meal.domain.MealOrder;
+import com.howe.meal.domain.dto.MealCookingOrderEditBody;
 import com.howe.meal.domain.vo.MealOrderAssignee;
 import com.howe.meal.domain.dto.MealOrderSubmitBody;
 import com.howe.meal.domain.vo.MealKitchenOrderSummary;
@@ -223,13 +224,19 @@ public interface IMealOrderService {
     int finishOrder(Long orderId);
 
     /**
-     * 工具专用的完成：要求订单数据版本等于预览时的版本。
+     * 按指定数据版本完成订单，防止旧版菜品清单触发出餐。
      *
      * @param orderId 订单ID
      * @param expectedVersion 期望的订单数据版本
      * @return 结果
      */
     int finishOrder(Long orderId, Long expectedVersion);
+
+    /** 接单厨师修改仍在制作中的订单菜品。 */
+    MealOrder editCookingOrder(Long orderId, MealCookingOrderEditBody body);
+
+    /** 接单厨师取消仍在制作中的整张订单。 */
+    int cancelCookingOrder(Long orderId, Long expectedVersion);
 
     /**
      * 批量删除订单

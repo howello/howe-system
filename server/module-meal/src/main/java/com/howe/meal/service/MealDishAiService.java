@@ -14,7 +14,6 @@ import com.howe.common.utils.ConfigUtils;
 import com.howe.common.utils.SecurityUtils;
 import com.howe.meal.constant.MealCategoryTaxonomy;
 import com.howe.meal.domain.MealCategory;
-import com.howe.meal.domain.MealCategoryRef;
 import com.howe.meal.domain.MealDish;
 import com.howe.meal.domain.dto.DishAiAuditResult;
 import com.howe.meal.domain.dto.DishAiCoverResult;
@@ -22,16 +21,13 @@ import com.howe.meal.domain.dto.DishAiGenerateRequest;
 import com.howe.meal.domain.dto.DishAiTextResult;
 import com.howe.meal.domain.dto.DishAiUpdateRequest;
 import com.howe.meal.mapper.MealCategoryMapper;
-import com.howe.meal.mapper.MealCategoryRefMapper;
 import com.howe.meal.mapper.MealDishMapper;
-import com.howe.meal.service.IMealDishService;
+import com.howe.meal.service.MealDishAiTaskService.Outcome;
 import com.howe.meal.util.MealCategoryGuard;
-import com.howe.meal.service.IMealWeComNotifyService;
 import com.howe.meal.util.MealScopeGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -74,7 +70,7 @@ public class MealDishAiService {
     /** 文生图场景（路由 key） */
     private static final String SCENE_COVER = "meal.dish.cover";
 
-    /** 菜品 AI 更新场景（路由 key）：从完整做法提取字段并覆盖入库 */
+    /** 菜品 AI 更新场景（路由 key）：根据用户意图调整已保存的菜谱。 */
     private static final String SCENE_UPDATE = "meal.dish.update";
 
     /** AI 更新写入的操作人标识 */
@@ -150,27 +146,31 @@ public class MealDishAiService {
             + "例如「西红柿炒鸡蛋」与「番茄炒蛋」「西红柿炒蛋」），也必须 approved 填 \"false\"，"
             + "rejectReason 写明与哪道已有菜品重复，避免重复上架。";
 
-    /**
-     * 菜品 AI 更新的 system 提示词缺省值
-     *
-     * <p>实际取值优先读 sys_config（{@link ConfigConstants#AI_PROMPT_MEAL_DISH_UPDATE_SYSTEM}）。</p>
-     */
-    private static final String DEFAULT_UPDATE_SYSTEM_PROMPT =
-            "你是一位资深中餐菜谱编辑。用户会给出一道菜的完整做法，请从中提取结构化菜品信息。"
-            + "所有内容使用简体中文：简介精炼（不超过 60 字）；标签给出 3 到 6 个短词；"
-            + "耗时、难度、份量、热量按文本合理推断；用料提取名称与用量；"
-            + "做法按步骤拆分并保留原文关键信息；小贴士提取注意事项。"
-            + "文本中确实未提到的字段返回空字符串或空数组，不要编造。";
+    /** 在一次调用中确定编辑范围并生成可直接保存的菜谱字段。 */
+    private static final String UPDATE_RECIPE_RULES = """
+            你是一位中餐菜谱编辑。读取已保存的菜谱和用户输入，直接返回简体中文 JSON。
+            自行判断 mode，无需询问用户选择，也不输出分析过程：
+            - replace：用户提供了完整的新菜谱。用新菜谱替换原菜谱，保留原文的用量、火候、时间、顺序和注意事项。
+              用户附带的增删要求也要执行。原文没给的精确数值不编造，用量可留空，缺失的可选信息用空值或省略。
+            - revise：用户提出局部改动、指出某处不对，或要求把现有做法写清楚。没有明确要求重写时优先采用。
+              只返回需要修改的字段。数组字段要返回修改后的完整列表，并保留列表里其他条目及顺序。
+              删掉某食材时同步调整相关备料、下锅步骤和小贴士；改火候或顺序时同步调整受影响的步骤和耗时。
+              字段省略或 null 表示沿用原值。只有用户确实要清空时才返回空字符串或空数组。
+            - rewrite：用户明确给出整道菜的新思路或要求重写。保留用户指定的食材、禁忌、方法和顺序，补齐完整菜谱。
+              补出的份量、用量或时间用「建议」「约」等标明，热量没有可靠依据时留空。
+            - unchanged：输入无关、已有菜谱已符合要求，或缺少足够信息进行任何确定的改动。只返回 mode 和简短说明。
+            replace 和 rewrite 要同时返回有效的 ingredients 和 steps；未提及的可选字段不会沿用旧菜谱。
+            步骤按备料、下锅和出锅顺序写。对需要补写的关键步骤，写清食材怎么处理、什么火、
+            做多久或看到什么状态再继续。只在有帮助时拆步；用料应与做法对得上。
+            description 不超过 60 字；summary 用一句话说清结果或未修改的原因，不超过 60 字。
+            菜名、封面和分类由现有编辑区管理。
+            """;
 
     private final AiClient aiClient;
 
     private final MealCategoryMapper mealCategoryMapper;
 
-    private final MealCategoryRefMapper mealCategoryRefMapper;
-
     private final MealCategoryGuard mealCategoryGuard;
-
-    private final TransactionTemplate transactionTemplate;
 
     private final IMealDishService mealDishService;
 
@@ -191,14 +191,15 @@ public class MealDishAiService {
     }
 
     /**
-     * 提交一次异步 AI 更新：校验在请求线程完成，提取与落库在线程池执行
+     * 提交一次异步 AI 更新：校验在请求线程完成，生成与落库在线程池执行
      *
      * <p>请求线程只做参数校验、菜品可见性与写权限校验，随后立即返回；AI 调用与数据库更新
      * 在独立线程池中进行。调用者身份传播到任务线程供统一 AI 配额归属使用；
      * 落库仍使用 {@link MealDishMapper}，操作人记为 {@link #AI_UPDATER}。
      * 任务池不可用或已满时明确拒绝，不退化为同步调用。</p>
      *
-     * @param request AI 更新请求（菜品 ID + 完整做法文本）
+     * @param request AI 更新请求（菜品 ID + 新菜谱或修改要求）
+     * @return 后台任务 ID
      */
     public String submitUpdateFromText(DishAiUpdateRequest request) {
         if (request == null || request.getDishId() == null) {
@@ -206,7 +207,7 @@ public class MealDishAiService {
         }
         String text = request.getText() == null ? "" : request.getText().trim();
         if (text.isEmpty()) {
-            throw new ServiceException("请先输入这道菜的完整做法");
+            throw new ServiceException("请粘贴菜谱或描述你想怎么改");
         }
 
         // 请求线程内完成可见性与写权限校验，异步线程不再访问登录态
@@ -214,106 +215,81 @@ public class MealDishAiService {
         MealScopeGuard.assertDishWritable(exist.getDeptId(), "菜品");
 
         Long dishId = exist.getDishId();
-        String name = exist.getName();
         // 异步线程没有登录态：操作人与家庭归属在请求线程内捕获。
         // 通知发到操作人所在家庭；公共菜（deptId=0）没有自己的家庭群。
         Long operatorId = SecurityUtils.getUserId();
         Long operatorDeptId = SecurityUtils.getDeptId();
         Long deptId = operatorDeptId != null ? operatorDeptId : exist.getDeptId();
-        if (text.length() > 30000) throw new ServiceException("做法文本不能超过30000个字符");
-        return aiTaskService.submit(dishId,
-                () -> applyUpdateFromText(dishId, name, text, deptId, operatorId, exist.getDataVersion()));
+        if (text.length() > 30000) {
+            throw new ServiceException("更新内容不能超过30000个字符");
+        }
+        return aiTaskService.submit(dishId, () -> applyUpdateFromText(exist, text, deptId, operatorId));
     }
 
-    /**
-     * 异步执行 AI 提取并落库（不依赖登录态）
-     *
-     * <p>只覆盖模型实际返回的非空字段；缺失或空字段保留数据库原值。
-     * 菜名、封面、归属与来源不变。分类<b>仅在菜品当前没有主类时</b>才补一个，
-     * 已有主类不覆盖。结束后发送企业微信结果通知。</p>
-     *
-     * @param dishId     菜品 ID
-     * @param name       菜名，用于提示词定位菜品
-     * @param text       用户输入的完整做法
-     * @param deptId     菜品归属家庭 ID
-     * @param operatorId 发起更新的用户 ID
-     * @param expectedVersion 受理时的菜品版本，防止覆盖后续人工修改
-     */
-    private boolean applyUpdateFromText(Long dishId, String name, String text, Long deptId, Long operatorId, Long expectedVersion) {
+    /** 从受理时的菜谱生成改动，再按同一版本校验并保存。 */
+    private Outcome applyUpdateFromText(MealDish current, String text, Long deptId, Long operatorId) {
+        Long dishId = current.getDishId();
+        String name = current.getName();
         String model = null;
         try {
-            // 分类只在当前为空时补齐，已有主类不请求、不覆盖
-            boolean needCategory = mealCategoryRefMapper.selectCategoryId(MealCategoryRef.BIZ_DISH, dishId) == null;
-            Map<String, Long> categoryIdByName = needCategory ? loadCandidateCategories(deptId) : Map.of();
-            boolean requestCategory = needCategory && !categoryIdByName.isEmpty();
-
-            Map<String, Object> properties = new LinkedHashMap<>();
-            List<String> required = new ArrayList<>();
-            appendUpdateSchema(properties, requestCategory);
-
             AiChatResult chatResult = aiClient.chat(AiChatRequest.builder()
                     .scene(SCENE_UPDATE)
                     .system(updateSystemPrompt())
-                    .prompt(buildUpdatePrompt(name, text, requestCategory))
-                    .outputSchema(JSON.toJSONString(objectSchema(properties, required)))
+                    .prompt(buildUpdatePrompt(current, text))
+                    .outputSchema(buildUpdateSchema())
                     .build());
             model = chatResult.getModel();
-            Object structured = chatResult.getStructured();
-            if (!(structured instanceof Map)) {
-                log.warn("菜品 AI 更新未返回可解析的结构化结果，dishId={}，raw={}", dishId,
-                        abbreviate(chatResult.getText()));
-                notifyUpdateResult(deptId, dishId, name, operatorId, false, "AI 没有看懂这段做法，这次先不改了", model);
-                return false;
+            Map<String, Object> data = toMap(chatResult.getStructured());
+            String mode = updateText(data.get("mode"), false);
+            String summary = updateText(data.get("summary"), false);
+            if (summary != null && summary.length() > 80) {
+                summary = null;
             }
-            Map<String, Object> data = toMap(structured);
+            if ("unchanged".equals(mode)) {
+                return new Outcome(true, updateSummary(summary, "没有需要更新的菜谱内容"));
+            }
+            boolean replace = "replace".equals(mode) || "rewrite".equals(mode);
+            if (!replace && !"revise".equals(mode)) {
+                throw new ServiceException("AI 未能生成有效的菜谱更新，请调整描述后重试");
+            }
+
+            List<?> ingredients = updateArray(data.get("ingredients"), "ingredients");
+            List<?> steps = updateArray(data.get("steps"), "steps");
+            if (replace && (ingredients == null || ingredients.isEmpty() || steps == null || steps.isEmpty())) {
+                throw new ServiceException("AI 没有生成完整的用料和做法，菜谱已保留");
+            }
 
             Map<String, Object> fields = new LinkedHashMap<>();
             MealDish update = new MealDish();
             update.setDishId(dishId);
-            fillUpdateField(update, fields, "description", toText(data.get("description")));
-            fillUpdateField(update, fields, "tags", String.join(",", toStringList(data.get("tags"))));
-            fillUpdateField(update, fields, "duration", toText(data.get("duration")));
-            fillUpdateField(update, fields, "level", toText(data.get("level")));
-            fillUpdateField(update, fields, "serve", toText(data.get("serve")));
-            fillUpdateField(update, fields, "kcal", toText(data.get("kcal")));
-            fillUpdateField(update, fields, "ingredients", nonEmptyJson(data.get("ingredients")));
-            fillUpdateField(update, fields, "steps", nonEmptyJson(data.get("steps")));
-            fillUpdateField(update, fields, "tips", nonEmptyJson(data.get("tips")));
+            for (String key : List.of("description", "duration", "level", "serve", "kcal")) {
+                fillUpdateField(update, fields, key, updateText(data.get(key), replace));
+            }
+            List<?> tags = updateArray(data.get("tags"), "tags");
+            fillUpdateField(update, fields, "tags", tags == null && !replace ? null : String.join(",", toStringList(tags)));
+            fillUpdateField(update, fields, "ingredients", toJson(ingredients));
+            fillUpdateField(update, fields, "steps", toJson(steps));
+            List<?> tips = updateArray(data.get("tips"), "tips");
+            fillUpdateField(update, fields, "tips", replace && tips == null ? "[]" : toJson(tips));
 
-            Long categoryId = null;
-            if (requestCategory) {
-                categoryId = categoryIdByName.get(toText(data.get("category")));
+            if (fields.isEmpty()) {
+                return new Outcome(true, "没有需要更新的菜谱内容");
             }
 
-            if (fields.isEmpty() && categoryId == null) {
-                log.info("菜品 AI 更新未提取到可用字段，dishId={}", dishId);
-                notifyUpdateResult(deptId, dishId, name, operatorId, false, "这段做法里没有找到能补充的菜品信息", model);
-                return false;
-            }
             update.setUpdateBy(AI_UPDATER);
-            update.getParams().put("expectedVersion", expectedVersion);
-            Long finalCategoryId = categoryId;
-            // 文本字段与主类写入放在同一事务：任一步失败整体回滚，不出现「文本已改、主类没写」的中间态
-            transactionTemplate.executeWithoutResult(status -> {
-                if (mealDishMapper.updateMealDish(update) != 1) {
-                    throw new ServiceException("菜品已被修改，请刷新后重新提交 AI 更新");
-                }
-                if (finalCategoryId != null) {
-                    saveDishCategory(dishId, finalCategoryId);
-                }
-            });
-            if (categoryId != null) {
-                fields.put("category", categoryId);
+            update.getParams().put("expectedVersion", current.getDataVersion());
+            if (mealDishMapper.updateMealDish(update) != 1) {
+                throw new ServiceException("菜品已被修改，请刷新后重新提交 AI 更新");
             }
             log.info("菜品 AI 更新完成，dishId={}，写入字段={}", dishId, fields.keySet());
-            notifyUpdateResult(deptId, dishId, name, operatorId, true,
-                    humanFieldNames(fields.keySet()), model);
-            return true;
+            String updated = humanFieldNames(fields.keySet());
+            notifyUpdateResult(deptId, dishId, name, operatorId, true, updated, model);
+            return new Outcome(true, updateSummary(summary, "已更新" + updated));
         } catch (Exception e) {
-            // 异步失败只记录日志：数据库保持原值，用户可稍后重试
             log.warn("菜品 AI 更新失败，dishId={}", dishId, e);
-            notifyUpdateResult(deptId, dishId, name, operatorId, false, readableMessage(e), model);
-            return false;
+            String detail = readableMessage(e);
+            notifyUpdateResult(deptId, dishId, name, operatorId, false, detail, model);
+            return new Outcome(false, detail);
         }
     }
 
@@ -342,18 +318,9 @@ public class MealDishAiService {
         return e instanceof ServiceException && e.getMessage() != null ? e.getMessage() : "AI 这次没有帮上忙";
     }
 
-    /**
-     * 写入菜品的唯一主类关联（AI 更新仅在主类为空时调用）
-     *
-     * @param dishId     菜品ID
-     * @param categoryId 主类ID
-     */
-    private void saveDishCategory(Long dishId, Long categoryId) {
-        MealCategoryRef ref = new MealCategoryRef();
-        ref.setBizType(MealCategoryRef.BIZ_DISH);
-        ref.setBizId(dishId);
-        ref.setCategoryId(categoryId);
-        mealCategoryRefMapper.insertMealCategoryRef(ref);
+    /** 模型没有提供简短说明时返回对应的固定提示。 */
+    private String updateSummary(String summary, String fallback) {
+        return summary == null || summary.isBlank() ? fallback : summary;
     }
 
     /**
@@ -373,7 +340,6 @@ public class MealDishAiService {
         names.put("ingredients", "用料");
         names.put("steps", "做法");
         names.put("tips", "小贴士");
-        names.put("category", "主类");
         java.util.List<String> result = new java.util.ArrayList<>();
         for (String key : keys) {
             result.add(names.getOrDefault(key, key));
@@ -778,16 +744,11 @@ public class MealDishAiService {
         }
     }
 
-    /**
-     * 组装 AI 更新的 JSON Schema：请求全部文本字段，允许模型对未提及字段返回空
-     *
-     * @param properties      Schema properties 输出
-     * @param requestCategory 本次是否需要补主类（仅菜品当前没有主类时为 true）
-     */
-    private void appendUpdateSchema(Map<String, Object> properties, boolean requestCategory) {
-        if (requestCategory) {
-            properties.put("category", stringSchema("分类名称，必须是给定候选分类之一"));
-        }
+    /** 保存的菜谱字段可省略，模型同时返回自动判断的编辑范围。 */
+    private String buildUpdateSchema() {
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("mode", Map.of("type", "string", "enum", List.of("replace", "revise", "rewrite", "unchanged")));
+        properties.put("summary", stringSchema("一句话说明修改内容或未修改的原因"));
         properties.put("description", stringSchema());
         properties.put("tags", arrayOfStringSchema());
         properties.put("duration", stringSchema());
@@ -797,31 +758,27 @@ public class MealDishAiService {
         properties.put("ingredients", arrayOfIngredientSchema());
         properties.put("steps", arrayOfStringSchema());
         properties.put("tips", arrayOfStringSchema());
+        return JSON.toJSONString(objectSchema(properties, List.of("mode", "summary")));
+    }
+
+    /** 将已保存版本与用户的新菜谱或修改要求作为独立字段传给模型。 */
+    private String buildUpdatePrompt(MealDish current, String text) {
+        Map<String, Object> recipe = new LinkedHashMap<>();
+        recipe.put("name", current.getName());
+        recipe.put("description", current.getDescription());
+        recipe.put("tags", current.getTags());
+        recipe.put("duration", current.getDuration());
+        recipe.put("level", current.getLevel());
+        recipe.put("serve", current.getServe());
+        recipe.put("kcal", current.getKcal());
+        recipe.put("ingredients", JSON.parse(current.getIngredients()));
+        recipe.put("steps", JSON.parse(current.getSteps()));
+        recipe.put("tips", JSON.parse(current.getTips()));
+        return JSON.toJSONString(Map.of("currentRecipe", recipe, "userInput", text));
     }
 
     /**
-     * 组装 AI 更新的用户提示词
-     *
-     * @param name            菜名，帮助模型定位菜品
-     * @param text            用户输入的完整做法
-     * @param requestCategory 是否需要模型给出主类
-     * @return 提示词
-     */
-    private String buildUpdatePrompt(String name, String text, boolean requestCategory) {
-        StringBuilder builder = new StringBuilder();
-        builder.append("菜名：").append(name).append("\n")
-                .append("完整做法：\n").append(text).append("\n")
-                .append("请从中提取菜品信息；文本未提到的字段返回空字符串或空数组。");
-        if (requestCategory) {
-            builder.append("\n这道菜当前还没有主类，请同时给出 category。");
-        }
-        return builder.toString();
-    }
-
-    /**
-     * 把非空的提取结果写入更新对象与本次写入字段集合
-     *
-     * <p>空字符串、空数组不写入，从而保留数据库原值。</p>
+     * 将候选字段放入更新对象。null 保留原值，空字符串或空数组显式清空。
      *
      * @param update 更新对象
      * @param fields 本次实际写入字段集合
@@ -829,7 +786,7 @@ public class MealDishAiService {
      * @param value  提取结果
      */
     private void fillUpdateField(MealDish update, Map<String, Object> fields, String key, String value) {
-        if (value == null || value.trim().isEmpty()) {
+        if (value == null) {
             return;
         }
         switch (key) {
@@ -849,20 +806,29 @@ public class MealDishAiService {
         fields.put(key, value);
     }
 
-    /**
-     * 把数组结果序列化为 JSON 文本
-     *
-     * <p>只接受集合：空集合、非集合（模型未按 schema 返回）一律返回 null，
-     * 避免写入非法 JSON 或覆盖原值。</p>
-     *
-     * @param value 模型返回的字段值
-     * @return JSON 文本或 null
-     */
-    private String nonEmptyJson(Object value) {
-        if (!(value instanceof Collection<?> collection) || collection.isEmpty()) {
+    /** 检查模型返回的文本类型，区分全量编辑清空和局部编辑保留。 */
+    private String updateText(Object value, boolean replace) {
+        if (value == null) {
+            return replace ? "" : null;
+        }
+        if (value instanceof String text) {
+            return text.trim();
+        }
+        throw new ServiceException("AI 返回的菜谱文本格式不正确，请重试");
+    }
+
+    /** 只接收现有菜谱编辑器可读的数组结构，保留显式空数组。 */
+    private List<?> updateArray(Object value, String key) {
+        if (value == null) {
             return null;
         }
-        return JSON.toJSONString(value);
+        if (value instanceof List<?> items && items.stream().allMatch(item -> "ingredients".equals(key)
+                ? item instanceof Map<?, ?> ingredient && ingredient.get("name") instanceof String name && !name.isBlank()
+                        && (ingredient.get("amount") == null || ingredient.get("amount") instanceof String)
+                : item instanceof String text && !text.isBlank())) {
+            return items;
+        }
+        throw new ServiceException("AI 返回的用料、做法或其他列表格式不正确，请重试");
     }
 
     /**
@@ -930,14 +896,11 @@ public class MealDishAiService {
                 DEFAULT_AUDIT_SUFFIX) + AUDIT_DUPLICATE_SUFFIX;
     }
 
-    /**
-     * 读取 AI 更新的 system 提示词，并固定追加公共分类定义与判定顺序
-     *
-     * @return system 提示词
-     */
+    /** 兼容已配置的提示词，在其后给出优先级更高的当前菜谱编辑规则。 */
     private String updateSystemPrompt() {
-        return ConfigUtils.getString(ConfigConstants.AI_PROMPT_MEAL_DISH_UPDATE_SYSTEM,
-                DEFAULT_UPDATE_SYSTEM_PROMPT) + "\n" + MealCategoryTaxonomy.promptFragment();
+        String custom = ConfigUtils.getString(ConfigConstants.AI_PROMPT_MEAL_DISH_UPDATE_SYSTEM, "");
+        return custom.isBlank() ? UPDATE_RECIPE_RULES : "原有菜谱编辑偏好：\n" + custom
+                + "\n\n以下是当前任务规则，若与原有偏好冲突，以当前规则为准：\n" + UPDATE_RECIPE_RULES;
     }
 
     /**

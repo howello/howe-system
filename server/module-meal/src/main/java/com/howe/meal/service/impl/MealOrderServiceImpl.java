@@ -13,6 +13,7 @@ import com.howe.meal.domain.MealDish;
 import com.howe.meal.domain.MealOrder;
 import com.howe.meal.domain.MealOrderCandidate;
 import com.howe.meal.domain.MealOrderItem;
+import com.howe.meal.domain.dto.MealCookingOrderEditBody;
 import com.howe.meal.domain.dto.MealOrderSubmitBody;
 import com.howe.meal.domain.vo.MealKitchenOrderSummary;
 import com.howe.meal.domain.vo.MealOrderAssignee;
@@ -260,22 +261,7 @@ public class MealOrderServiceImpl implements IMealOrderService {
             if (count <= 0) {
                 throw new ServiceException("份数必须大于 0");
             }
-            MealDish dish = mealDishMapper.selectMealDishById(line.getDishId());
-            if (dish == null) {
-                throw new ServiceException("菜品不存在或已删除");
-            }
-            // 只能点公共菜谱或本家庭的私有菜
-            boolean isPublic = dish.getDeptId() != null && dish.getDeptId().longValue() == 0L;
-            if (!isPublic && !dish.getDeptId().equals(deptId)) {
-                throw new ServiceException("存在不属于本家庭的菜品");
-            }
-            if (!"0".equals(dish.getStatus())) {
-                throw new ServiceException("菜品「" + dish.getName() + "」已下架");
-            }
-            // 停用分类下的菜与分类一起隐藏：最终以下单时的分类状态为准
-            if (!mealDishMapper.isDishMenuVisible(dish.getDishId())) {
-                throw new ServiceException("菜品「" + dish.getName() + "」所属分类已停用");
-            }
+            MealDish dish = requireAvailableDish(line.getDishId(), deptId);
             // 菜名与封面在此刻落成快照，之后菜品怎么改都不影响这张订单
             MealOrderItem item = new MealOrderItem();
             item.setDishId(dish.getDishId());
@@ -329,6 +315,24 @@ public class MealOrderServiceImpl implements IMealOrderService {
         // 一键备菜清单：事务提交后才在后台线程调用 AI，下单响应不等待生成结果
         transactionCommitExecutor.afterCommit(() -> mealPrepPlanService.submitGenerate(order.getOrderId()));
         return order.getOrderId();
+    }
+
+    /** 下单和换菜均只接受当前家庭菜单中可点的菜品。 */
+    private MealDish requireAvailableDish(Long dishId, Long deptId) {
+        MealDish dish = mealDishMapper.selectMealDishById(dishId);
+        if (dish == null) {
+            throw new ServiceException("菜品不存在或已删除");
+        }
+        if (dish.getDeptId() == null || (dish.getDeptId() != 0L && !dish.getDeptId().equals(deptId))) {
+            throw new ServiceException("存在不属于本家庭的菜品");
+        }
+        if (!"0".equals(dish.getStatus())) {
+            throw new ServiceException("菜品「" + dish.getName() + "」已下架");
+        }
+        if (!mealDishMapper.isDishMenuVisible(dish.getDishId())) {
+            throw new ServiceException("菜品「" + dish.getName() + "」所属分类已停用");
+        }
+        return dish;
     }
 
     /**
@@ -574,6 +578,131 @@ public class MealOrderServiceImpl implements IMealOrderService {
         transactionCommitExecutor.afterCommit(() -> mealWeComNotifyService.notifyOrderCompleted(order.getOrderId()));
         // 订单结束后备菜清单不再需要，事务提交后清理该订单的 Redis 缓存
         transactionCommitExecutor.afterCommit(() -> mealPrepPlanService.removePlan(order.getOrderId()));
+        return rows;
+    }
+
+    /** 校验归属、接单人和数据版本，并锁定订单直至事务结束。 */
+    private MealOrder lockCookingOrder(Long orderId, Long expectedVersion) {
+        MealOrder order = mealOrderMapper.selectOrderForUpdate(orderId);
+        if (order == null) {
+            throw new ServiceException("订单不存在或已删除");
+        }
+        MealScopeGuard.assertSameDept(order.getDeptId(), "订单");
+        if (!SecurityUtils.getUserId().equals(order.getAcceptUserId())) {
+            throw new ServiceException("只有接单的厨师可以修改订单");
+        }
+        if (!MealOrder.STATUS_COOKING.equals(order.getStatus())) {
+            throw new ServiceException("订单已不在制作中，请刷新后查看");
+        }
+        if (expectedVersion == null || !expectedVersion.equals(order.getDataVersion())) {
+            throw new ServiceException("订单已变化，请刷新后重试");
+        }
+        return order;
+    }
+
+    /** 事务内更新订单明细、总份数和订单数据版本，提交后再通知点餐人。 */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public MealOrder editCookingOrder(Long orderId, MealCookingOrderEditBody body) {
+        MealOrder order = lockCookingOrder(orderId, body.expectedVersion());
+        List<MealOrderItem> originals = mealOrderMapper.selectItemsByOrderId(orderId);
+        Map<Long, MealCookingOrderEditBody.Item> edits = new HashMap<>();
+        for (MealCookingOrderEditBody.Item edit : body.items()) {
+            if (edits.putIfAbsent(edit.itemId(), edit) != null) {
+                throw new ServiceException("订单菜品明细重复");
+            }
+        }
+
+        List<MealOrderItem> remaining = new ArrayList<>();
+        List<Long> removedIds = new ArrayList<>();
+        List<String> changes = new ArrayList<>();
+        for (MealOrderItem item : originals) {
+            MealCookingOrderEditBody.Item edit = edits.remove(item.getItemId());
+            if (edit == null) {
+                removedIds.add(item.getItemId());
+                changes.add("取消「" + item.getDishName() + "」");
+                continue;
+            }
+            if (applyCookingItemEdit(order, item, edit, changes)
+                    && mealOrderMapper.updateCookingOrderItem(item) != 1) {
+                throw new ServiceException("订单菜品已变化，请刷新后重试");
+            }
+            remaining.add(item);
+        }
+        if (!edits.isEmpty() || remaining.isEmpty()) {
+            throw new ServiceException("订单菜品已变化，请刷新后重试");
+        }
+        order.setItems(remaining);
+        if (changes.isEmpty()) {
+            fillDuration(order);
+            return order;
+        }
+
+        if (!removedIds.isEmpty()
+                && mealOrderMapper.deleteCookingOrderItems(orderId, removedIds) != removedIds.size()) {
+            throw new ServiceException("订单菜品已变化，请刷新后重试");
+        }
+        String summary = String.join("；", changes);
+        order.setTotalCount(remaining.stream().mapToInt(MealOrderItem::getCount).sum());
+        order.setExpectedVersion(body.expectedVersion());
+        order.setUpdateBy(SecurityUtils.getUsername());
+        if (mealOrderMapper.updateCookingOrderItems(order) != 1) {
+            throw new ServiceException("订单已变化，请刷新后重试");
+        }
+        order.setExpectedVersion(null);
+        order.setDataVersion(body.expectedVersion() + 1);
+        fillDuration(order);
+        transactionCommitExecutor.afterCommit(() -> mealNotifyService.push("notify:user:" + order.getUserId(),
+                "ORDER_UPDATED", orderId, "厨师已更新菜品", summary, notificationExtra(order.getOrderNo())));
+        transactionCommitExecutor.afterCommit(() -> mealPrepPlanService.submitGenerate(orderId));
+        return order;
+    }
+
+    /** 更新菜品快照或份数并生成点餐人可读的变更说明。 */
+    private boolean applyCookingItemEdit(MealOrder order, MealOrderItem item, MealCookingOrderEditBody.Item edit,
+            List<String> changes) {
+        boolean dishChanged = !edit.dishId().equals(item.getDishId());
+        boolean countChanged = !edit.count().equals(item.getCount());
+        if (!dishChanged && !countChanged) {
+            return false;
+        }
+        String oldName = item.getDishName();
+        Integer oldCount = item.getCount();
+        if (dishChanged) {
+            MealDish dish = requireAvailableDish(edit.dishId(), order.getDeptId());
+            item.setDishId(dish.getDishId());
+            item.setDishName(dish.getName());
+            item.setDishCover(dish.getCover());
+            changes.add("将「" + oldName + "」换成「" + item.getDishName() + "」"
+                    + (countChanged ? "，份数由 " + oldCount + " 改为 " + edit.count() : ""));
+        } else {
+            changes.add("「" + oldName + "」由 " + oldCount + " 份改为 " + edit.count() + " 份");
+        }
+        item.setCount(edit.count());
+        return true;
+    }
+
+    /** 厨师取消保留订单及菜品快照，并在事务提交后通知点餐人。 */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int cancelCookingOrder(Long orderId, Long expectedVersion) {
+        MealOrder order = lockCookingOrder(orderId, expectedVersion);
+        MealOrder update = new MealOrder();
+        update.setOrderId(orderId);
+        update.setStatus(MealOrder.STATUS_CANCELED);
+        update.setExpectedStatus(MealOrder.STATUS_COOKING);
+        update.setExpectedVersion(expectedVersion);
+        update.setCloseReason(MealOrder.CLOSE_REASON_CHEF_CANCELED);
+        update.setCancelTime(new Date());
+        update.setUpdateBy(SecurityUtils.getUsername());
+        int rows = mealOrderMapper.updateMealOrderStatus(update);
+        if (rows != 1) {
+            throw new ServiceException("订单已变化，请刷新后重试");
+        }
+        transactionCommitExecutor.afterCommit(() -> mealNotifyService.push("notify:user:" + order.getUserId(),
+                "ORDER_CANCELED", orderId, "厨师已取消订单", "您的订单已被接单厨师取消",
+                notificationExtra(order.getOrderNo())));
+        transactionCommitExecutor.afterCommit(() -> mealPrepPlanService.removePlan(orderId));
         return rows;
     }
 

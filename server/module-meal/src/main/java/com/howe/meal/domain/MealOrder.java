@@ -50,6 +50,8 @@ public class MealOrder extends BaseEntity {
     public static final String CLOSE_REASON_TIMEOUT = "2";
     /** 关闭原因：全部候选人拒绝 */
     public static final String CLOSE_REASON_ALL_REFUSED = "3";
+    /** 关闭原因：接单厨师取消 */
+    public static final String CLOSE_REASON_CHEF_CANCELED = "4";
 
     @Schema(description = "订单ID", example = "1")
     private Long orderId;
@@ -111,7 +113,7 @@ public class MealOrder extends BaseEntity {
     @Schema(description = "接单截止时间")
     private Date deadlineTime;
 
-    @Schema(description = "关闭原因（1用户取消 2超时 3全员拒绝）", example = "2")
+    @Schema(description = "关闭原因（1用户取消 2超时 3全员拒绝 4厨师取消）", example = "2")
     private String closeReason;
 
     @Schema(description = "删除标记（0存在 2删除）", example = "0")

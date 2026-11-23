@@ -30,8 +30,12 @@ public class MealDishAiTaskService {
             String message, long createdAt) {
     }
 
+    /** 菜谱更新结果及供页面展示的简短说明。 */
+    public record Outcome(boolean success, String message) {
+    }
+
     /** 先持久化受理状态，再提交任务；池满或状态写入失败必须向调用方报错。 */
-    public String submit(Long dishId, Supplier<Boolean> action) {
+    public String submit(Long dishId, Supplier<Outcome> action) {
         Status queued = new Status(IdUtil.fastSimpleUUID(), SecurityUtils.getUserId(), SecurityUtils.getDeptId(),
                 dishId, "PENDING", "等待处理", System.currentTimeMillis());
         save(queued);
@@ -43,9 +47,8 @@ public class MealDishAiTaskService {
                         return;
                     }
                     save(state(queued, "RUNNING", "正在更新"));
-                    boolean success = action.get();
-                    save(state(queued, success ? "SUCCEEDED" : "FAILED",
-                            success ? "菜品已更新" : "更新失败，原内容已保留，请重试"));
+                    Outcome result = action.get();
+                    save(state(queued, result.success() ? "SUCCEEDED" : "FAILED", result.message()));
                 } catch (Exception e) {
                     log.warn("菜品 AI 任务失败，taskId={}", queued.taskId(), e);
                     fail(queued, "任务结果未确认，请刷新菜品查看后重试");

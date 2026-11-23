@@ -1,6 +1,8 @@
 package com.howe.meal.service;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
+import cn.hutool.core.util.IdUtil;
 import com.howe.ai.api.AiClient;
 import com.howe.ai.api.dto.AiChatRequest;
 import com.howe.ai.api.dto.AiChatResult;
@@ -151,16 +153,18 @@ public class MealPrepPlanService {
         placeholder.setOrderId(orderId);
         placeholder.setStatus(MealPrepPlan.STATUS_GENERATING);
         placeholder.setGeneratedAt(System.currentTimeMillis());
-        try {
-            save(placeholder);
-        } catch (Exception e) {
-            log.warn("写入备菜清单生成中状态失败，orderId={}", orderId, e);
+        // 用唯一占位值区分重叠的任务，旧订单明细的生成结果不能覆盖新任务。
+        JSONObject payload = (JSONObject) JSON.toJSON(placeholder);
+        payload.put("generationId", IdUtil.fastSimpleUUID());
+        String pending = payload.toJSONString();
+        if (!save(orderId, pending, null)) {
+            return;
         }
         try {
-            executor.execute(() -> generate(orderId));
+            executor.execute(() -> generate(orderId, pending));
         } catch (Exception e) {
             log.warn("备菜清单任务未受理，orderId={}", orderId, e);
-            markFailed(orderId, "任务繁忙，未开始生成，请稍后重新生成");
+            markFailed(orderId, "任务繁忙，未开始生成，请稍后重新生成", pending);
         }
     }
 
@@ -239,7 +243,7 @@ public class MealPrepPlanService {
      *
      * @param orderId 订单 ID
      */
-    private void generate(Long orderId) {
+    private void generate(Long orderId, String pending) {
         try {
             MealOrder order = mealOrderMapper.selectMealOrderById(orderId);
             if (order == null) {
@@ -252,13 +256,13 @@ public class MealPrepPlanService {
             }
             List<MealOrderItem> items = mealOrderMapper.selectItemsByOrderId(orderId);
             if (items == null || items.isEmpty()) {
-                markFailed(orderId, "订单没有可汇总的菜品");
+                markFailed(orderId, "订单没有可汇总的菜品", pending);
                 return;
             }
             String prompt = buildPrompt(items);
             if (prompt.isEmpty()) {
                 // 无用料不是失败：写入 READY 空清单，页面展示空态而不是误导性的「生成失败」
-                saveEmpty(orderId);
+                saveEmpty(orderId, pending);
                 return;
             }
             AiChatRequest request = AiChatRequest.builder()
@@ -272,7 +276,7 @@ public class MealPrepPlanService {
             MealPrepPlan plan = MealPrepPlanParser.parse(orderId,
                     result == null ? null : result.getStructured());
             if (plan == null || plan.getGroups().isEmpty()) {
-                markFailed(orderId, "AI 未返回可用的备菜清单，请重新生成");
+                markFailed(orderId, "AI 未返回可用的备菜清单，请重新生成", pending);
                 return;
             }
             // AI 调用可能持续数秒，期间订单可能已完成或取消；写回前复查状态，避免清理后又被写回
@@ -280,10 +284,10 @@ public class MealPrepPlanService {
                 log.info("订单已结束，丢弃本次备菜清单生成结果，orderId={}", orderId);
                 return;
             }
-            save(plan);
+            save(orderId, JSON.toJSONString(plan), pending);
         } catch (Exception e) {
             log.warn("生成备菜清单失败，orderId={}", orderId, e);
-            markFailed(orderId, "备菜清单生成失败，请重新生成");
+            markFailed(orderId, "备菜清单生成失败，请重新生成", pending);
         }
     }
 
@@ -436,23 +440,17 @@ public class MealPrepPlanService {
      * 订单完成/取消/无人接单/删除写入墓碑后，即使后台线程已通过状态检查，
      * 也无法再把旧清单写回。返回值只用于日志，不向调用方抛出。</p>
      *
-     * @param plan 清单
-     * @return 实际写入返回 true；订单已结束或 Redis 异常返回 false
+     * @param orderId 订单 ID
+     * @param payload 清单 JSON
+     * @param pending 本次生成的占位值；写占位时为空
+     * @return 实际写入返回 true
      */
-    private boolean save(MealPrepPlan plan) {
+    private boolean save(Long orderId, String payload, String pending) {
         try {
-            // 清单以纯 JSON 字符串读写，与守卫脚本共用字符串序列化，避免对象序列化器改写脚本参数
-            String payload = JSON.toJSONString(plan);
-            boolean written = redis.setStringIfGuardAbsent(
-                    CLOSED_KEY_PREFIX + plan.getOrderId(),
-                    KEY_PREFIX + plan.getOrderId(),
-                    payload, TTL_DAYS, TimeUnit.DAYS);
-            if (!written) {
-                log.info("订单已结束，跳过备菜清单写入，orderId={}", plan.getOrderId());
-            }
-            return written;
+            return redis.setStringIfGuardAbsent(CLOSED_KEY_PREFIX + orderId, KEY_PREFIX + orderId,
+                    payload, pending, TTL_DAYS, TimeUnit.DAYS);
         } catch (Exception e) {
-            log.warn("写入备菜清单失败，orderId={}", plan.getOrderId(), e);
+            log.warn("写入备菜清单失败，orderId={}", orderId, e);
             return false;
         }
     }
@@ -463,7 +461,7 @@ public class MealPrepPlanService {
      * @param orderId 订单 ID
      * @param message 失败原因
      */
-    private void markFailed(Long orderId, String message) {
+    private void markFailed(Long orderId, String message, String pending) {
         // 订单已结束时不写失败状态，避免清理之后又被写回
         if (!isActiveOrder(orderId)) {
             return;
@@ -473,11 +471,7 @@ public class MealPrepPlanService {
         failed.setStatus(MealPrepPlan.STATUS_FAILED);
         failed.setMessage(message);
         failed.setGeneratedAt(System.currentTimeMillis());
-        try {
-            save(failed);
-        } catch (Exception e) {
-            log.warn("写入备菜清单失败状态异常，orderId={}", orderId, e);
-        }
+        save(orderId, JSON.toJSONString(failed), pending);
     }
 
     /**
@@ -488,17 +482,13 @@ public class MealPrepPlanService {
      *
      * @param orderId 订单 ID
      */
-    private void saveEmpty(Long orderId) {
+    private void saveEmpty(Long orderId, String pending) {
         MealPrepPlan empty = new MealPrepPlan();
         empty.setOrderId(orderId);
         empty.setStatus(MealPrepPlan.STATUS_READY);
         empty.setMessage("订单菜品暂无可用料数据");
         empty.setGeneratedAt(System.currentTimeMillis());
-        try {
-            save(empty);
-        } catch (Exception e) {
-            log.warn("写入空备菜清单异常，orderId={}", orderId, e);
-        }
+        save(orderId, JSON.toJSONString(empty), pending);
     }
 
     /**

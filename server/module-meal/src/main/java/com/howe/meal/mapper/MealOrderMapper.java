@@ -216,6 +216,15 @@ public interface MealOrderMapper {
      */
     int insertOrderItems(@Param("items") List<MealOrderItem> items);
 
+    /** 修改同一订单内的明细快照及份数。 */
+    int updateCookingOrderItem(MealOrderItem item);
+
+    /** 移除同一订单内已取消的明细。 */
+    int deleteCookingOrderItems(@Param("orderId") Long orderId, @Param("itemIds") List<Long> itemIds);
+
+    /** 将菜品总份数和订单数据版本与明细一起更新。 */
+    int updateCookingOrderItems(MealOrder order);
+
     /**
      * 状态流转（接单 / 完成 / 取消），只更新状态相关字段
      *
