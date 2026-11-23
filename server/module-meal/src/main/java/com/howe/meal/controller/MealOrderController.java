@@ -6,6 +6,7 @@ import com.howe.common.core.domain.AjaxResult;
 import com.howe.common.core.page.TableDataInfo;
 import com.howe.common.enums.BusinessType;
 import com.howe.meal.domain.MealOrder;
+import com.howe.meal.domain.dto.MealCookingOrderEditBody;
 import com.howe.meal.domain.dto.MealOrderSubmitBody;
 import com.howe.meal.service.IMealOrderService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -112,13 +113,35 @@ public class MealOrderController extends BaseController {
         return success();
     }
 
+    /** 按客户端看到的订单数据版本确认出餐。 */
     @Operation(summary = "标记完成", description = "制作中 → 已完成")
     @PreAuthorize("@ss.hasPermi('meal:order:finish')")
     @Log(title = "点餐订单", businessType = BusinessType.UPDATE)
     @PutMapping("/finish/{orderId}")
     public AjaxResult finish(@Parameter(description = "订单ID", required = true)
-            @PathVariable("orderId") Long orderId) {
-        return toAjax(mealOrderService.finishOrder(orderId));
+            @PathVariable("orderId") Long orderId,
+            @RequestParam(value = "expectedVersion", required = false) Long expectedVersion) {
+        return toAjax(mealOrderService.finishOrder(orderId, expectedVersion));
+    }
+
+    /** 修改制作中的订单菜品。 */
+    @Operation(summary = "编辑制作中订单", description = "仅接单厨师可换菜、改份数或取消部分菜品")
+    @PreAuthorize("@ss.hasPermi('meal:order:finish')")
+    @Log(title = "点餐订单", businessType = BusinessType.UPDATE)
+    @PutMapping("/kitchen/{orderId}/items")
+    public AjaxResult editCookingOrder(@PathVariable("orderId") Long orderId,
+            @Valid @RequestBody MealCookingOrderEditBody body) {
+        return success(mealOrderService.editCookingOrder(orderId, body));
+    }
+
+    /** 取消制作中的整张订单。 */
+    @Operation(summary = "厨师取消订单", description = "仅接单厨师可取消制作中的订单")
+    @PreAuthorize("@ss.hasPermi('meal:order:finish')")
+    @Log(title = "点餐订单", businessType = BusinessType.UPDATE)
+    @PutMapping("/kitchen/{orderId}/cancel")
+    public AjaxResult cancelCookingOrder(@PathVariable("orderId") Long orderId,
+            @RequestParam("expectedVersion") Long expectedVersion) {
+        return toAjax(mealOrderService.cancelCookingOrder(orderId, expectedVersion));
     }
 
     @Operation(summary = "查询订单列表（管理端）", description = "受数据权限约束，可跨状态与时间筛选本家庭订单")

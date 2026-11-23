@@ -100,10 +100,10 @@ public class MealDishController extends BaseController {
         return success(mealDishAiService.generateCover(request));
     }
 
-    @Operation(summary = "AI 更新菜品信息（异步）",
-            description = "从用户输入的完整做法中提取简介、标签、耗时、难度、份量、热量、用料、做法与小贴士，"
-                    + "非空字段覆盖入库；未提取到的字段保留原值，菜名、封面、分类与归属不变。"
-                    + "接口校验权限后立即返回，提取与落库在服务端线程池异步执行。需要 meal:dish:edit 权限。")
+    /** 受理菜谱的后台更新任务。 */
+    @Operation(summary = "AI 更新菜谱（异步）",
+            description = "根据新菜谱、修改要求或做法思路，自动选择替换、局部修改或重写，"
+                    + "在后台生成并保存。需要 meal:dish:edit 权限。")
     @PreAuthorize("@ss.hasPermi('meal:dish:edit')")
     @Log(title = "点餐菜品", businessType = BusinessType.UPDATE)
     @PostMapping("/ai-update")

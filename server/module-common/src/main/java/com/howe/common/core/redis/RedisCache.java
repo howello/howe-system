@@ -101,12 +101,19 @@ public class RedisCache
     public boolean setStringIfGuardAbsent(final String guardKey, final String key, final String value,
             final long timeout, final TimeUnit unit)
     {
+        return setStringIfGuardAbsent(guardKey, key, value, null, timeout, unit);
+    }
+
+    /** 守卫键不存在且缓存仍是指定占位值时才写入；期望值为空时跳过占位校验。 */
+    public boolean setStringIfGuardAbsent(final String guardKey, final String key, final String value,
+            final String expectedValue, final long timeout, final TimeUnit unit) {
         if (notificationRedisTemplate == null)
         {
             throw new IllegalStateException("通知 RedisTemplate 未配置");
         }
         Long result = (Long) notificationRedisTemplate.execute(SET_IF_GUARD_ABSENT_SCRIPT,
-                Arrays.asList(guardKey, key), value, Long.toString(unit.toSeconds(timeout)));
+                Arrays.asList(guardKey, key), value, Long.toString(unit.toSeconds(timeout)),
+                expectedValue == null ? "" : expectedValue);
         return result != null && result == 1L;
     }
 
@@ -138,6 +145,7 @@ public class RedisCache
     /** 守卫键不存在时原子写入字符串缓存。 */
     private static final DefaultRedisScript<Long> SET_IF_GUARD_ABSENT_SCRIPT = new DefaultRedisScript<>(
             "if redis.call('EXISTS', KEYS[1]) == 1 then return 0 end\n"
+                    + "if ARGV[3] ~= '' and redis.call('GET', KEYS[2]) ~= ARGV[3] then return 0 end\n"
                     + "redis.call('SET', KEYS[2], ARGV[1], 'EX', ARGV[2])\n"
                     + "return 1",
             Long.class);
