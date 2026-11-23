@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.howe.system.mapper.AppReleaseNotifyConfigMapper">
+    <resultMap id="AppReleaseNotifyConfigResult" type="com.howe.system.domain.AppReleaseNotifyConfig">
+        <id property="configId" column="config_id"/>
+        <result property="label" column="label"/>
+        <result property="webhookKey" column="webhook_key"/>
+        <result property="enabled" column="enabled"/>
+    </resultMap>
+
+    <select id="selectByApp" resultMap="AppReleaseNotifyConfigResult">
+        select config_id, label, webhook_key, enabled
+        from app_release_notify_config
+        where app_key = #{appKey}
+        <if test="enabledOnly">and enabled = 1</if>
+        order by config_id
+    </select>
+
+    <insert id="insert">
+        insert into app_release_notify_config (app_key, label, webhook_key, enabled)
+        values (#{appKey}, #{config.label}, #{config.webhookKey}, #{config.enabled})
+    </insert>
+
+    <update id="update">
+        update app_release_notify_config
+        <set>
+            label = #{config.label},
+            enabled = #{config.enabled},
+            <if test="config.webhookKey != null">webhook_key = #{config.webhookKey},</if>
+        </set>
+        where app_key = #{appKey} and config_id = #{configId}
+    </update>
+
+    <delete id="delete">
+        delete from app_release_notify_config where app_key = #{appKey} and config_id = #{configId}
+    </delete>
+</mapper>

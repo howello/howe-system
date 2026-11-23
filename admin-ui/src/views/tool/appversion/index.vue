@@ -1,10 +1,12 @@
 <template>
   <div class="app-container">
-    <el-radio-group v-if="canManagePregnancy" v-model="appKey" aria-label="应用渠道" class="mb8" @change="switchApp">
-      <el-radio-button value="meal">吃了么</el-radio-button>
-      <el-radio-button value="pregnancy">宝宝</el-radio-button>
-    </el-radio-group>
     <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="80px">
+      <el-form-item label="应用名称" prop="appKey">
+        <el-select v-model="queryParams.appKey" style="width: 160px" @change="switchApp">
+          <el-option label="全部" value="all" />
+          <el-option v-for="app in appOptions" :key="app.value" :label="app.label" :value="app.value" />
+        </el-select>
+      </el-form-item>
       <el-form-item label="版本名称" prop="versionName">
         <el-input v-model="queryParams.versionName" placeholder="请输入版本名称" clearable style="width: 200px" @keyup.enter="handleQuery" />
       </el-form-item>
@@ -30,11 +32,25 @@
       <el-col :span="1.5">
         <el-button type="danger" plain icon="Delete" :disabled="multiple" @click="handleDelete()" v-hasPermi="['tool:appVersion:remove']">删除</el-button>
       </el-col>
+      <el-col :span="1.5" v-hasPermi="['tool:appVersion:edit']">
+        <el-dropdown v-if="queryParams.appKey === 'all' && appOptions.length > 1" trigger="click" @command="openNotify">
+          <el-button plain icon="Bell">发版通知</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item v-for="app in appOptions" :key="app.value" :command="app.value">{{ app.label }}</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <el-button v-else plain icon="Bell" @click="openNotify(selectedAppKey())">发版通知</el-button>
+      </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
     <el-table v-loading="loading" :data="versionList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
+      <el-table-column label="应用名称" width="100">
+        <template #default="{ row }">{{ appName(row.appKey) }}</template>
+      </el-table-column>
       <el-table-column label="版本名称" align="left" prop="versionName" :show-overflow-tooltip="true" min-width="120">
         <template #default="scope">
           <a class="link-type" style="cursor: pointer" @click="handleUpdate(scope.row)">{{ scope.row.versionName }}</a>
@@ -72,6 +88,12 @@
 
     <el-dialog :title="title" v-model="open" width="640px" append-to-body>
       <el-form ref="entityFormRef" :model="form" :rules="rules" label-width="90px">
+        <el-form-item label="应用名称" prop="appKey">
+          <el-select v-model="form.appKey" placeholder="请选择应用" :disabled="!!form.versionId || uploading || checking || submitting"
+            @change="clearPackage">
+            <el-option v-for="app in appOptions" :key="app.value" :label="app.label" :value="app.value" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="版本名称" prop="versionName">
           <el-input v-model="form.versionName" placeholder="如 1.0.4" maxlength="32" />
         </el-form-item>
@@ -80,19 +102,20 @@
           <span class="form-tip">整数递增，客户端按它判断版本先后</span>
         </el-form-item>
         <el-form-item label="资源包" prop="wgtUrl">
-          <el-radio-group v-model="packageMode" @change="handlePackageModeChange">
+          <el-radio-group v-model="packageMode" :disabled="!form.appKey" @change="handlePackageModeChange">
             <el-radio value="upload">本地上传</el-radio>
             <el-radio value="remote">远程链接</el-radio>
           </el-radio-group>
           <div v-if="packageMode === 'upload'" class="package-actions">
             <el-upload :show-file-list="false" :before-upload="beforeWgtUpload" :http-request="handleWgtUpload" accept=".wgt">
-              <el-button type="primary" :loading="uploading" v-hasPermi="['tool:appVersion:upload']">选择 wgt 文件</el-button>
+              <el-button type="primary" :disabled="!form.appKey" :loading="uploading" v-hasPermi="['tool:appVersion:upload']">选择 wgt 文件</el-button>
             </el-upload>
           </div>
           <div v-else class="package-actions">
             <el-input
               v-model="form.wgtUrl"
               placeholder="https://... 资源包直链（仅 https）"
+              :disabled="!form.appKey"
               clearable
               style="width: 360px"
               @input="remoteChecked = null"
@@ -130,15 +153,17 @@
       </el-form>
       <template #footer>
         <div class="dialog-footer">
-          <el-button type="primary" :loading="submitting" @click="submitForm">确 定</el-button>
+          <el-button type="primary" :loading="submitting" :disabled="uploading || checking" @click="submitForm">确 定</el-button>
           <el-button @click="cancel">取 消</el-button>
         </div>
       </template>
     </el-dialog>
+    <AppReleaseNotifyDialog v-model="notifyOpen" :app-key="notifyAppKey" :app-name="appName(notifyAppKey)" />
   </div>
 </template>
 
 <script setup lang="ts" name="MealAppVersion">
+import AppReleaseNotifyDialog from './AppReleaseNotifyDialog.vue'
 import { useAppProxy, formRef } from '@/utils/appProxy'
 import { checkPermi } from '@/utils/permission'
 import { getAppVersion, listAppVersion, addAppVersion, updateAppVersion, delAppVersion, uploadAppVersionWgt, checkAppPackage } from "@/api/meal/appversion"
@@ -148,6 +173,8 @@ const proxy = useAppProxy()
 
 const versionList = ref<MealAppVersion[]>([])
 const open = ref<boolean>(false)
+const notifyOpen = ref(false)
+const notifyAppKey = ref<AppReleaseKey>('meal')
 const loading = ref<boolean>(true)
 const submitting = ref<boolean>(false)
 const uploading = ref<boolean>(false)
@@ -157,20 +184,24 @@ const single = ref<boolean>(true)
 const multiple = ref<boolean>(true)
 const total = ref<number>(0)
 const title = ref<string>("")
-const appKey = ref<AppReleaseKey>('meal')
 const canManagePregnancy = computed(() => checkPermi(['tool:appVersion:pregnancy']))
 let listVersion = 0
-const appName = (key = appKey.value) => key === 'pregnancy' ? '宝宝' : '吃了么'
+const appName = (key?: AppReleaseKey) => key === 'pregnancy' ? '宝宝' : '吃了么'
+const appOptions = computed(() => (['meal', 'pregnancy'] as const)
+  .filter(key => key === 'meal' || canManagePregnancy.value)
+  .map(key => ({ value: key, label: appName(key) })))
 
 const data = reactive({
   form: {} as MealAppVersion,
   queryParams: {
     pageNum: 1,
     pageSize: 10,
+    appKey: 'all',
     versionName: undefined,
     status: undefined
   } as MealAppVersionQueryParams,
   rules: {
+    appKey: [{ required: true, message: "请选择应用", trigger: "change" }],
     versionName: [{ required: true, message: "版本名称不能为空", trigger: "blur" }],
     versionCode: [{ required: true, message: "版本序号不能为空", trigger: "blur" }],
     wgtUrl: [{ required: true, message: "请上传 wgt 资源包或填写远程链接", trigger: "change" }]
@@ -202,7 +233,7 @@ function formatSize(size?: number): string {
 function getList() {
   const version = ++listVersion
   loading.value = true
-  listAppVersion({ ...queryParams.value, appKey: appKey.value })
+  listAppVersion({ ...queryParams.value })
     .then((response: any) => {
       if (version !== listVersion) return
       versionList.value = response.rows
@@ -251,7 +282,7 @@ function handleQuery() {
 
 function resetQuery() {
   proxy.resetForm("queryRef")
-  handleQuery()
+  switchApp()
 }
 
 function handleSelectionChange(selection: MealAppVersion[]) {
@@ -260,13 +291,27 @@ function handleSelectionChange(selection: MealAppVersion[]) {
   multiple.value = !selection.length
 }
 
+/** 筛选到单个应用时带入该应用，全部视图中有多个应用时由用户选择。 */
+function selectedAppKey() {
+  const key = queryParams.value.appKey
+  if (key && key !== 'all') return key
+  return appOptions.value.length === 1 ? appOptions.value[0].value : undefined
+}
+
+function openNotify(key: unknown) {
+  const app = appOptions.value.find(option => option.value === key)
+  if (!app) return
+  notifyAppKey.value = app.value
+  notifyOpen.value = true
+}
+
 function handleAdd() {
   reset()
-  form.value.appKey = appKey.value
+  form.value.appKey = selectedAppKey()
   packageMode.value = 'upload'
   remoteChecked.value = null
   open.value = true
-  title.value = '新增版本 · ' + appName()
+  title.value = '新增版本'
 }
 
 function handleUpdate(row?: MealAppVersion) {
@@ -282,6 +327,14 @@ function handleUpdate(row?: MealAppVersion) {
   })
 }
 
+/** 资源包属于所选应用，更换应用时清除上一个应用的资源包。 */
+function clearPackage() {
+  form.value.wgtUrl = undefined
+  form.value.wgtSize = undefined
+  form.value.fileName = undefined
+  remoteChecked.value = null
+}
+
 /** 切换录入方式时清掉另一种方式的状态，避免残留校验结果 */
 function handlePackageModeChange() {
   remoteChecked.value = null
@@ -289,13 +342,17 @@ function handlePackageModeChange() {
 
 /** 即时校验远程链接；结果只作反馈，保存时服务端会再校验 */
 function handleCheckPackage() {
-  if (!form.value.wgtUrl) {
+  const target = form.value
+  const url = target.wgtUrl
+  if (!url) {
     return
   }
   checking.value = true
-  checkAppPackage(form.value.wgtUrl)
+  checkAppPackage(url)
     .then((response: any) => {
-      remoteChecked.value = response.data as AppPackageCheckResult
+      if (form.value === target && target.wgtUrl === url) {
+        remoteChecked.value = response.data as AppPackageCheckResult
+      }
       checking.value = false
     })
     .catch(() => {
@@ -318,17 +375,21 @@ function beforeWgtUpload(file: File): boolean {
 
 /** 上传 wgt 到后端（存 R2），成功后回填地址、大小与文件名 */
 function handleWgtUpload(options: { file: File }): Promise<void> {
+  const target = form.value
+  const key = target.appKey
+  if (!key) return Promise.resolve()
   uploading.value = true
-  return uploadAppVersionWgt(options.file, form.value.appKey)
+  return uploadAppVersionWgt(options.file, key)
     .then((res) => {
+      if (form.value !== target || target.appKey !== key) return
       const data = res.data
       if (!data || !data.url) {
         proxy.$modal.msgError("上传响应缺少资源包地址")
         return
       }
-      form.value.wgtUrl = data.url
-      form.value.wgtSize = data.size
-      form.value.fileName = data.fileName
+      target.wgtUrl = data.url
+      target.wgtSize = data.size
+      target.fileName = data.fileName
       proxy.$modal.msgSuccess("资源包上传成功")
     })
     .finally(() => {

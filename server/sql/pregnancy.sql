@@ -380,13 +380,13 @@ where not exists (select 1 from sys_config where config_key = 'pregnancy.reminde
 
 insert into sys_config (config_name, config_key, config_value, config_type, param_type, create_by, create_time, remark, `sensitive`)
 select '孕期-企微机器人凭证', 'pregnancy.wecom.webhookKey', '', 'N', '孕期', 'admin', sysdate(),
-       '用于孕期提醒和宝宝 App 发版通知。填写企业微信群机器人 Webhook 的 key 参数', 'Y'
+       '用于孕期提醒。填写企业微信群机器人 Webhook 的 key 参数', 'Y'
 from dual
 where not exists (select 1 from sys_config where config_key = 'pregnancy.wecom.webhookKey');
 
 insert into sys_config (config_name, config_key, config_value, config_type, param_type, create_by, create_time, remark, `sensitive`)
 select '孕期-企微通知开关', 'pregnancy.wecom.enabled', '0', 'N', '孕期', 'admin', sysdate(),
-       '孕期提醒和宝宝 App 发版的企微通道总开关（0 停用，1 启用）', 'N'
+       '孕期提醒的企微通道总开关（0 停用，1 启用）', 'N'
 from dual
 where not exists (select 1 from sys_config where config_key = 'pregnancy.wecom.enabled');
 

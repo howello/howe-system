@@ -1,11 +1,9 @@
 package com.howe.meal.service;
 
-import com.howe.meal.domain.MealAppVersion;
-
 /**
  * 点餐-企业微信通知发送服务
  *
- * <p>把订单、AI 异步任务与 App 新版本事件转成 text 文案、解析 @ 手机号后调用公共客户端。
+ * <p>把订单和 AI 异步任务转成 text 文案、解析 @ 手机号后调用公共客户端。
  * 调用方负责选择正确的触发时机（订单事件必须在事务提交后），本服务内部不重试、
  * 不抛异常，任何失败只记录日志。</p>
  *
@@ -77,14 +75,4 @@ public interface IMealWeComNotifyService {
      */
     void notifyProposalAiAudit(Long deptId, Long proposalId, String name, Long userId, String result, String reason,
             String model);
-
-    /**
-     * 发送 App 新版本发布通知
-     *
-     * <p>平台级事件：向所有启用通知且已配置 Webhook Key 的家庭群各发一条，
-     * 只受家庭级总开关约束，不受订单 / AI 事件开关影响。</p>
-     *
-     * @param version 本次发布的版本记录
-     */
-    void notifyAppRelease(MealAppVersion version);
 }

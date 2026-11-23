@@ -38,7 +38,7 @@ public class HomeCardCatalogService {
             new CardDef("M15", "blog", "blog:article:list,blog:draft:list"),
             new CardDef("M2", "meal", "meal:order:list,meal:review:list"),
             new CardDef("N9", "meal", "meal:dish:list"),
-            new CardDef("N10", "meal", "meal:appVersion:list"),
+            new CardDef("N10", "meal", "tool:appVersion:list"),
             new CardDef("N11", "meal", "meal:order:list"),
             new CardDef("M3", "ai", "ai:calllog:stats"),
             new CardDef("N5", "ai", "ai:channel:list"),

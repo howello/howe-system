@@ -5,7 +5,8 @@ export type AppReleaseKey = 'meal' | 'pregnancy';
 
 /** App 版本分页查询参数 */
 export interface MealAppVersionQueryParams extends PageDomain {
-  appKey?: AppReleaseKey;
+  /** 全部表示查询当前账号可管理的所有应用。 */
+  appKey?: AppReleaseKey | 'all';
   /** 版本名称（模糊匹配） */
   versionName?: string;
   /** 发布状态（0已发布 1停用） */

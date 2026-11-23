@@ -42,7 +42,7 @@ public class MealStatsController extends BaseController {
     }
 
     @Operation(summary = "App 版本概况", description = "最新已发布版本、发布时间、是否强制更新与记录总数")
-    @PreAuthorize("@ss.hasPermi('meal:appVersion:list')")
+    @PreAuthorize("@ss.hasPermi('tool:appVersion:list')")
     @GetMapping("/appVersion")
     public AjaxResult appVersion() {
         return success(mealStatsService.getAppVersionOverview());

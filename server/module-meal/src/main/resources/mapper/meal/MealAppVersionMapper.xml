@@ -29,15 +29,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         from meal_app_version
     </sql>
 
-    <select id="selectMealAppVersionList" parameterType="MealAppVersion" resultMap="MealAppVersionResult">
+    <select id="selectMealAppVersionList" resultMap="MealAppVersionResult">
         <include refid="selectMealAppVersionVo"/>
         <where>
-            del_flag = '0' and app_key = #{appKey}
-            <if test="versionName != null and versionName != ''">
-                AND version_name like concat('%', #{versionName}, '%')
+            del_flag = '0' and app_key in
+            <foreach collection="appKeys" item="appKey" open="(" separator="," close=")">
+                #{appKey}
+            </foreach>
+            <if test="query.versionName != null and query.versionName != ''">
+                AND version_name like concat('%', #{query.versionName}, '%')
             </if>
-            <if test="status != null and status != ''">
-                AND status = #{status}
+            <if test="query.status != null and query.status != ''">
+                AND status = #{query.status}
             </if>
         </where>
         order by version_code desc, version_id desc

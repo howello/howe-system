@@ -17,10 +17,12 @@ public interface MealAppVersionMapper {
     /**
      * 查询版本列表
      *
-     * @param mealAppVersion 查询条件（versionName 模糊、status 精确）
+     * @param query 查询条件（versionName 模糊、status 精确）
+     * @param appKeys 已授权的应用标识
      * @return 版本集合
      */
-    List<MealAppVersion> selectMealAppVersionList(MealAppVersion mealAppVersion);
+    List<MealAppVersion> selectMealAppVersionList(@Param("query") MealAppVersion query,
+            @Param("appKeys") List<String> appKeys);
 
     /**
      * 按主键查询版本

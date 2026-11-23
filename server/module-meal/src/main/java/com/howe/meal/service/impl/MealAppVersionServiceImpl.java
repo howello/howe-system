@@ -2,6 +2,7 @@ package com.howe.meal.service.impl;
 
 import com.howe.common.exception.ServiceException;
 import com.howe.common.exception.file.InvalidExtensionException;
+import com.howe.common.notify.wecom.AppReleaseWeComNotifier;
 import com.howe.common.utils.SecurityUtils;
 import com.howe.common.utils.StringUtils;
 import com.howe.common.utils.file.FileUploadUtils;
@@ -11,7 +12,6 @@ import com.howe.meal.domain.dto.AppUpdateCheckResult;
 import com.howe.meal.mapper.MealAppVersionMapper;
 import com.howe.meal.service.IMealAppVersionService;
 import com.howe.meal.service.MealAppPackageService;
-import com.howe.meal.service.IMealWeComNotifyService;
 import com.howe.meal.service.ITransactionCommitExecutor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -46,16 +47,22 @@ public class MealAppVersionServiceImpl implements IMealAppVersionService {
 
     private final MealAppPackageService packageService;
 
-    private final IMealWeComNotifyService mealWeComNotifyService;
+    private final AppReleaseWeComNotifier appReleaseNotifier;
 
     private final ITransactionCommitExecutor transactionCommitExecutor;
 
     @Override
     public List<MealAppVersion> selectMealAppVersionList(MealAppVersion mealAppVersion) {
+        if ("all".equals(mealAppVersion.getAppKey())) {
+            List<String> appKeys = Arrays.stream(AppReleaseChannel.values())
+                    .filter(this::canManageChannel)
+                    .map(AppReleaseChannel::getKey)
+                    .toList();
+            return mealAppVersionMapper.selectMealAppVersionList(mealAppVersion, appKeys);
+        }
         AppReleaseChannel channel = AppReleaseChannel.resolve(mealAppVersion.getAppKey());
         requireChannelManagement(channel);
-        mealAppVersion.setAppKey(channel.getKey());
-        return mealAppVersionMapper.selectMealAppVersionList(mealAppVersion);
+        return mealAppVersionMapper.selectMealAppVersionList(mealAppVersion, List.of(channel.getKey()));
     }
 
     @Override
@@ -166,10 +173,15 @@ public class MealAppVersionServiceImpl implements IMealAppVersionService {
 
     /** 原点餐授权随菜单移动，宝宝渠道的管理权限单独授予。 */
     private void requireChannelManagement(AppReleaseChannel channel) {
-        if (channel == AppReleaseChannel.PREGNANCY && !SecurityUtils.isAdmin()
-                && !SecurityUtils.hasPermi("tool:appVersion:pregnancy")) {
+        if (!canManageChannel(channel)) {
             throw new AccessDeniedException("没有管理宝宝 App 版本的权限");
         }
+    }
+
+    /** 判断当前用户是否有权管理应用渠道。 */
+    private boolean canManageChannel(AppReleaseChannel channel) {
+        return channel != AppReleaseChannel.PREGNANCY || SecurityUtils.isAdmin()
+                || SecurityUtils.hasPermi("tool:appVersion:pregnancy");
     }
 
     /**
@@ -233,7 +245,9 @@ public class MealAppVersionServiceImpl implements IMealAppVersionService {
                 if (latest == null || !version.getVersionId().equals(latest.getVersionId())) {
                     return;
                 }
-                mealWeComNotifyService.notifyAppRelease(version);
+                AppReleaseChannel channel = AppReleaseChannel.resolve(latest.getAppKey());
+                appReleaseNotifier.notifyPublished(channel.getKey(), channel.getDisplayName(), latest.getVersionName(),
+                        latest.getVersionCode(), latest.getUpdateLog(), "1".equals(latest.getForceUpdate()));
             } catch (Exception e) {
                 log.warn("发送 App 新版本企业微信通知失败，versionId={}", version.getVersionId(), e);
             }
