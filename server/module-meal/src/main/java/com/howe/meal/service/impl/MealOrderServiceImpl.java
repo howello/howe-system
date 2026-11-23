@@ -397,6 +397,8 @@ public class MealOrderServiceImpl implements IMealOrderService {
         }
         // 取消后其余候选人一并失效，避免残留待响应记录
         mealOrderCandidateService.invalidateAll(orderId);
+        transactionCommitExecutor.afterCommit(() ->
+                mealWeComNotifyService.notifyOrderChanged(order, "订单已取消", "您已取消这张订单"));
         // 已取消订单不会有人备菜，提交后清理该订单的备菜清单
         transactionCommitExecutor.afterCommit(() -> mealPrepPlanService.removePlan(orderId));
         return rows;
@@ -607,15 +609,26 @@ public class MealOrderServiceImpl implements IMealOrderService {
         MealOrder order = lockCookingOrder(orderId, body.expectedVersion());
         List<MealOrderItem> originals = mealOrderMapper.selectItemsByOrderId(orderId);
         Map<Long, MealCookingOrderEditBody.Item> edits = new HashMap<>();
+        List<MealOrderItem> added = new ArrayList<>();
+        List<String> changes = new ArrayList<>();
         for (MealCookingOrderEditBody.Item edit : body.items()) {
-            if (edits.putIfAbsent(edit.itemId(), edit) != null) {
+            if (edit.itemId() == null) {
+                MealDish dish = requireAvailableDish(edit.dishId(), order.getDeptId());
+                MealOrderItem item = new MealOrderItem();
+                item.setOrderId(orderId);
+                item.setDishId(dish.getDishId());
+                item.setDishName(dish.getName());
+                item.setDishCover(dish.getCover());
+                item.setCount(edit.count());
+                added.add(item);
+                changes.add("添加「" + item.getDishName() + "」" + item.getCount() + " 份");
+            } else if (edits.putIfAbsent(edit.itemId(), edit) != null) {
                 throw new ServiceException("订单菜品明细重复");
             }
         }
 
         List<MealOrderItem> remaining = new ArrayList<>();
         List<Long> removedIds = new ArrayList<>();
-        List<String> changes = new ArrayList<>();
         for (MealOrderItem item : originals) {
             MealCookingOrderEditBody.Item edit = edits.remove(item.getItemId());
             if (edit == null) {
@@ -629,7 +642,7 @@ public class MealOrderServiceImpl implements IMealOrderService {
             }
             remaining.add(item);
         }
-        if (!edits.isEmpty() || remaining.isEmpty()) {
+        if (!edits.isEmpty() || (remaining.isEmpty() && added.isEmpty())) {
             throw new ServiceException("订单菜品已变化，请刷新后重试");
         }
         order.setItems(remaining);
@@ -642,8 +655,15 @@ public class MealOrderServiceImpl implements IMealOrderService {
                 && mealOrderMapper.deleteCookingOrderItems(orderId, removedIds) != removedIds.size()) {
             throw new ServiceException("订单菜品已变化，请刷新后重试");
         }
+        if (!added.isEmpty()) {
+            if (mealOrderMapper.insertOrderItems(added) != added.size()) {
+                throw new ServiceException("添加菜品失败，请重试");
+            }
+            // 插入后重新读取快照，让客户端拿到新增菜品的明细 ID。
+            order.setItems(mealOrderMapper.selectItemsByOrderId(orderId));
+        }
         String summary = String.join("；", changes);
-        order.setTotalCount(remaining.stream().mapToInt(MealOrderItem::getCount).sum());
+        order.setTotalCount(order.getItems().stream().mapToInt(MealOrderItem::getCount).sum());
         order.setExpectedVersion(body.expectedVersion());
         order.setUpdateBy(SecurityUtils.getUsername());
         if (mealOrderMapper.updateCookingOrderItems(order) != 1) {
@@ -652,8 +672,10 @@ public class MealOrderServiceImpl implements IMealOrderService {
         order.setExpectedVersion(null);
         order.setDataVersion(body.expectedVersion() + 1);
         fillDuration(order);
+        String title = "厨师已更新菜品";
         transactionCommitExecutor.afterCommit(() -> mealNotifyService.push("notify:user:" + order.getUserId(),
-                "ORDER_UPDATED", orderId, "厨师已更新菜品", summary, notificationExtra(order.getOrderNo())));
+                "ORDER_UPDATED", orderId, title, summary, notificationExtra(order.getOrderNo())));
+        transactionCommitExecutor.afterCommit(() -> mealWeComNotifyService.notifyOrderChanged(order, title, summary));
         transactionCommitExecutor.afterCommit(() -> mealPrepPlanService.submitGenerate(orderId));
         return order;
     }
@@ -699,9 +721,11 @@ public class MealOrderServiceImpl implements IMealOrderService {
         if (rows != 1) {
             throw new ServiceException("订单已变化，请刷新后重试");
         }
+        String title = "厨师已取消订单";
+        String detail = "您的订单已被接单厨师取消";
         transactionCommitExecutor.afterCommit(() -> mealNotifyService.push("notify:user:" + order.getUserId(),
-                "ORDER_CANCELED", orderId, "厨师已取消订单", "您的订单已被接单厨师取消",
-                notificationExtra(order.getOrderNo())));
+                "ORDER_CANCELED", orderId, title, detail, notificationExtra(order.getOrderNo())));
+        transactionCommitExecutor.afterCommit(() -> mealWeComNotifyService.notifyOrderChanged(order, title, detail));
         transactionCommitExecutor.afterCommit(() -> mealPrepPlanService.removePlan(orderId));
         return rows;
     }

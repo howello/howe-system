@@ -130,6 +130,14 @@ public class MealWeComNotifyServiceImpl implements IMealWeComNotifyService {
         sendOrderMessage(order.getDeptId(), true, content, mobilesOf(order.getUserId()), "接单");
     }
 
+    /** 使用本次提交保存的变更说明，在家庭企微群里提醒点餐人。 */
+    @Override
+    public void notifyOrderChanged(MealOrder order, String title, String detail) {
+        String content = title + "\n订单号：" + orderNo(order) + "\n\n"
+                + defaultText(order.getUserName()) + "，" + detail;
+        sendOrderMessage(order.getDeptId(), true, content, mobilesOf(order.getUserId()), title);
+    }
+
     @Override
     public void notifyOrderCompleted(Long orderId) {
         MealOrder order = mealOrderMapper.selectMealOrderById(orderId);

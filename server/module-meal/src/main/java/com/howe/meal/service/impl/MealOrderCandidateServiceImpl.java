@@ -244,6 +244,9 @@ public class MealOrderCandidateServiceImpl implements IMealOrderCandidateService
             return closeAsUnaccepted(order, fallbackReason);
         }
 
+        transactionCommitExecutor.afterCommit(() -> mealWeComNotifyService.notifyOrderChanged(
+                order, "订单已转为公开接单", "原指派厨师未接单，其他厨师现在可以接单"));
+
         // 只通知本轮新入池、且确实待响应的厨师
         Set<Long> notified = new HashSet<>();
         for (MealOrderCandidate candidate : reopened) {

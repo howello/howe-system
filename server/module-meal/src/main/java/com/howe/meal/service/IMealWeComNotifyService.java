@@ -1,5 +1,7 @@
 package com.howe.meal.service;
 
+import com.howe.meal.domain.MealOrder;
+
 /**
  * 点餐-企业微信通知发送服务
  *
@@ -24,6 +26,9 @@ public interface IMealWeComNotifyService {
      * @param orderId 订单ID
      */
     void notifyOrderAccepted(Long orderId);
+
+    /** 向点餐人发送已提交的订单变更说明。 */
+    void notifyOrderChanged(MealOrder order, String title, String detail);
 
     /**
      * 发送订单完成通知

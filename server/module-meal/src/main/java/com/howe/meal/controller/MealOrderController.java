@@ -125,7 +125,7 @@ public class MealOrderController extends BaseController {
     }
 
     /** 修改制作中的订单菜品。 */
-    @Operation(summary = "编辑制作中订单", description = "仅接单厨师可换菜、改份数或取消部分菜品")
+    @Operation(summary = "编辑制作中订单", description = "仅接单厨师可加菜、换菜、改份数或取消部分菜品")
     @PreAuthorize("@ss.hasPermi('meal:order:finish')")
     @Log(title = "点餐订单", businessType = BusinessType.UPDATE)
     @PutMapping("/kitchen/{orderId}/items")

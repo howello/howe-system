@@ -19,9 +19,10 @@ public record MealCookingOrderEditBody(
         @Size(max = 100, message = "每单最多100道菜")
         List<@NotNull @Valid Item> items) {
 
-    /** 保留原明细，并指定更新后的菜品和份数。 */
+    /** 指定菜品和份数，明细 ID 为空时添加新菜。 */
     public record Item(
-            @NotNull @Positive Long itemId,
+            @Schema(description = "原菜品明细 ID，添加菜品时省略")
+            @Positive Long itemId,
             @NotNull @Positive Long dishId,
             @NotNull @Min(1) @Max(99) Integer count) {
     }
