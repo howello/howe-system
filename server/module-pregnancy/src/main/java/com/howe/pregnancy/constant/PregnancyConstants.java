@@ -98,6 +98,17 @@ public final class PregnancyConstants {
     /** 任务类型：提醒 */
     public static final String TASK_REMINDER = "REMINDER";
 
+    /** 任务类型：待办每日提醒 */
+    public static final String TASK_TODO_REMINDER = "TODO_REMINDER";
+
+    /** 任务类型：按孕期提醒规则周期发送 */
+    public static final String TASK_RULE_REMINDER = "RULE_REMINDER";
+
+    /** 判断任务是否走企微提醒的发送与恢复流程。 */
+    public static boolean isReminderTask(String kind) {
+        return TASK_REMINDER.equals(kind) || TASK_TODO_REMINDER.equals(kind) || TASK_RULE_REMINDER.equals(kind);
+    }
+
     /** 任务类型：物品 AI 内容 */
     public static final String TASK_ITEM_CONTENT = "ITEM_CONTENT";
 
@@ -223,12 +234,6 @@ public final class PregnancyConstants {
 
     /** 配置键：提醒规则 */
     public static final String CONFIG_REMINDER_RULES = "pregnancy.reminder.rules";
-
-    /** 配置键：孕期企微机器人凭证 */
-    public static final String CONFIG_WECOM_KEY = "pregnancy.wecom.webhookKey";
-
-    /** 配置键：孕期企微通道开关 */
-    public static final String CONFIG_WECOM_ENABLED = "pregnancy.wecom.enabled";
 
     /**
      * 工具类不允许实例化

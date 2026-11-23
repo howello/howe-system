@@ -1,6 +1,5 @@
 package com.howe.pregnancy.service.impl;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.howe.pregnancy.constant.PregnancyConstants;
 import com.howe.pregnancy.domain.PregCheckup;
 import com.howe.pregnancy.domain.PregDietRecord;
@@ -183,8 +182,8 @@ public class PregCalendarServiceImpl implements IPregCalendarService {
                 days.add(day);
                 continue;
             }
-            GrowthVO.SideContent mother = sideContent("mother", gestationalDay, week);
-            GrowthVO.SideContent baby = sideContent("baby", gestationalDay, week);
+            GrowthVO.SideContent mother = contentProvider.dailyGrowth("mother", gestationalDay, week);
+            GrowthVO.SideContent baby = contentProvider.dailyGrowth("baby", gestationalDay, week);
             day.setMother(mother);
             day.setBaby(baby);
             day.setStatus(mother == null && baby == null ? "NO_CONTENT" : "AVAILABLE");
@@ -192,47 +191,6 @@ public class PregCalendarServiceImpl implements IPregCalendarService {
         }
         vo.setDays(days);
         return vo;
-    }
-
-    /**
-     * 组装单侧内容
-     *
-     * @param side            侧别（mother/baby）
-     * @param gestationalDay  孕日
-     * @param week            孕周
-     * @return 内容，缺失返回 null
-     */
-    private GrowthVO.SideContent sideContent(String side, Integer gestationalDay, Integer week) {
-        JsonNode root = contentProvider.growth();
-        if (root == null) {
-            return null;
-        }
-        JsonNode daily = root.path(side + "Daily");
-        if (GestationUtils.hasDailyContent(gestationalDay)) {
-            JsonNode text = daily.path(String.valueOf(gestationalDay));
-            if (text.isTextual() && !text.asText().isBlank()) {
-                GrowthVO.SideContent content = new GrowthVO.SideContent();
-                content.setSource("DAILY");
-                content.setText(text.asText());
-                content.setWeekly(false);
-                return content;
-            }
-        }
-        if (GestationUtils.hasWeeklyContent(week)) {
-            String title = "mother".equals(side) ? "准妈妈本周概况" : "胎宝宝本周概况";
-            for (JsonNode section : root.path("weeks").path(String.valueOf(week)).path("sections")) {
-                if (title.equals(section.path("title").asText())) {
-                    GrowthVO.SideContent content = new GrowthVO.SideContent();
-                    content.setSource("WEEKLY");
-                    List<String> paragraphs = new ArrayList<>();
-                    section.path("paragraphs").forEach(node -> paragraphs.add(node.asText()));
-                    content.setText(String.join("\n\n", paragraphs));
-                    content.setWeekly(true);
-                    return content;
-                }
-            }
-        }
-        return null;
     }
 
     /**

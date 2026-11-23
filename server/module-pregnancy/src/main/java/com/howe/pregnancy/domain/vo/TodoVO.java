@@ -24,6 +24,9 @@ public class TodoVO {
     @Schema(description = "可选时刻")
     private String dueTime;
 
+    @Schema(description = "是否每天重复提醒")
+    private Boolean repeatDaily;
+
     @Schema(description = "备注")
     private String note;
 

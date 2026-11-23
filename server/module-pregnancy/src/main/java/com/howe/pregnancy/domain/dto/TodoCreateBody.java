@@ -30,6 +30,9 @@ public class TodoCreateBody {
     @Schema(description = "可选时刻（HH:mm）")
     private String dueTime;
 
+    @Schema(description = "是否从待办日期起每日提醒，开启时必须填写时刻")
+    private Boolean repeatDaily;
+
     @Schema(description = "备注")
     @Size(max = 2000, message = "备注长度不能超过2000")
     private String note;

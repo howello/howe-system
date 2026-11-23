@@ -3,7 +3,9 @@ package com.howe.pregnancy.mapper;
 import com.howe.pregnancy.domain.PregTask;
 import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 /**
@@ -23,6 +25,14 @@ public interface PregTaskMapper {
      * @return 任务 ID 列表
      */
     List<Long> selectDueIds(@Param("now") LocalDateTime now, @Param("limit") int limit);
+
+    /** 为指定业务日的已到时待办生成提醒，每个待办每天最多一条任务。 */
+    int enqueueDailyTodoReminders(@Param("date") LocalDate date, @Param("from") LocalTime from,
+                                  @Param("to") LocalTime to, @Param("maxAttempts") int maxAttempts);
+
+    /** 原子写入按规则与业务日去重的周期提醒。 */
+    int enqueueRuleReminder(@Param("dedupKey") String dedupKey, @Param("payload") String payload,
+                            @Param("runAt") LocalDateTime runAt, @Param("maxAttempts") int maxAttempts);
 
     /**
      * 保存阶段结果（保持 RUNNING 与租约不变）

@@ -1,11 +1,14 @@
 package com.howe.meal.service.impl;
 
+import com.howe.common.constant.ConfigConstants;
 import com.howe.common.core.domain.entity.SysUser;
 import com.howe.common.notify.wecom.WeComRobotClient;
 import com.howe.common.notify.wecom.WeComRobotResponse;
 import com.howe.common.notify.wecom.WeComTextMessage;
+import com.howe.common.utils.ConfigUtils;
 import com.howe.common.utils.StringUtils;
 import com.howe.common.utils.spring.SpringUtils;
+import com.howe.meal.domain.AppReleaseChannel;
 import com.howe.meal.domain.MealAppVersion;
 import com.howe.meal.domain.MealOrder;
 import com.howe.meal.domain.MealOrderItem;
@@ -248,13 +251,22 @@ public class MealWeComNotifyServiceImpl implements IMealWeComNotifyService {
             return;
         }
         try {
+            if (AppReleaseChannel.PREGNANCY.getKey().equals(version.getAppKey())) {
+                if (ConfigUtils.getBoolean(ConfigConstants.PREGNANCY_WECOM_ENABLED, false)) {
+                    String key = ConfigUtils.getString(ConfigConstants.PREGNANCY_WECOM_WEBHOOK_KEY);
+                    if (StringUtils.isNotBlank(key)) {
+                        submitRelease(key, buildReleaseContent(version, "宝宝"));
+                    }
+                }
+                return;
+            }
             MealWeComConfig query = new MealWeComConfig();
             query.setEnabled(MealWeComConfig.ENABLED_YES);
             List<MealWeComConfig> configs = mealWeComConfigMapper.selectMealWeComConfigList(query);
             if (configs == null || configs.isEmpty()) {
                 return;
             }
-            String content = buildReleaseContent(version);
+            String content = buildReleaseContent(version, "点餐");
             for (MealWeComConfig config : configs) {
                 if (config == null || StringUtils.isEmpty(config.getWebhookKey())) {
                     continue;
@@ -270,10 +282,11 @@ public class MealWeComNotifyServiceImpl implements IMealWeComNotifyService {
      * 组装新版本通知文案
      *
      * @param version 版本记录
+     * @param appName 应用名称
      * @return 通知文案
      */
-    private String buildReleaseContent(MealAppVersion version) {
-        StringBuilder text = new StringBuilder("🎉 点餐 App 有新版本啦！\n\n");
+    private String buildReleaseContent(MealAppVersion version, String appName) {
+        StringBuilder text = new StringBuilder("🎉 ").append(appName).append(" App 有新版本啦！\n\n");
         text.append("版本：v").append(defaultText(version.getVersionName()))
                 .append(" (").append(version.getVersionCode() == null ? "-" : version.getVersionCode()).append(")\n");
         if (StringUtils.isNotEmpty(version.getUpdateLog())) {
@@ -288,7 +301,7 @@ public class MealWeComNotifyServiceImpl implements IMealWeComNotifyService {
     }
 
     /**
-     * 提交单个家庭群的新版本通知任务
+     * 提交单个群的新版本通知任务
      *
      * @param webhookKey webhook key
      * @param content    通知文案

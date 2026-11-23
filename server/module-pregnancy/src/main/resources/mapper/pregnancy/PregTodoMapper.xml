@@ -9,6 +9,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="title"     column="title"/>
         <result property="dueDate"   column="due_date"/>
         <result property="dueTime"   column="due_time"/>
+        <result property="repeatDaily" column="repeat_daily"/>
         <result property="note"      column="note"/>
         <result property="done"      column="done"/>
         <result property="doneAt"    column="done_at"/>
@@ -25,7 +26,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectTodoColumns">
-        t.id, t.title, t.due_date, t.due_time, t.note, t.done, t.done_at, t.done_by,
+        t.id, t.title, t.due_date, t.due_time, t.repeat_daily, t.note, t.done, t.done_at, t.done_by,
         t.request_id, t.request_hash, t.version,
         t.create_by, t.create_time, t.update_by, t.update_time, t.remark, t.del_flag
     </sql>
@@ -62,19 +63,41 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <insert id="insert" parameterType="com.howe.pregnancy.domain.PregTodo"
             useGeneratedKeys="true" keyProperty="id">
         insert into preg_todo (
-            title, due_date, due_time, note, done, request_id, request_hash, version,
+            title, due_date, due_time, repeat_daily, note, done, request_id, request_hash, version,
             create_by, create_time
         ) values (
-            #{title}, #{dueDate}, #{dueTime}, #{note}, #{done}, #{requestId}, #{requestHash}, 1,
+            #{title}, #{dueDate}, #{dueTime}, #{repeatDaily}, #{note}, #{done}, #{requestId}, #{requestHash}, 1,
             #{createBy}, now(3)
         )
     </insert>
+
+    <insert id="putCheckupTodos">
+        insert into preg_todo (title, due_date, checkup_id, checkup_occurrence_date, create_by, create_time)
+        values
+        <foreach collection="dates" item="date" separator=",">
+            (left(concat('安排产检 · ', #{title}), 200), #{date}, #{checkupId}, #{date}, 'system', now(3))
+        </foreach>
+        on duplicate key update
+            version = if(del_flag = '3', version + 1, version),
+            del_flag = if(del_flag = '3', '0', del_flag)
+    </insert>
+
+    <update id="hideObsoleteCheckupTodos">
+        update preg_todo set del_flag = '3', version = version + 1, update_time = now(3)
+        where checkup_id = #{checkupId} and del_flag = '0' and done = 0
+          and checkup_occurrence_date &gt;= #{today}
+        <if test="dates != null and !dates.isEmpty()">
+            and checkup_occurrence_date not in
+            <foreach collection="dates" item="date" open="(" separator="," close=")">#{date}</foreach>
+        </if>
+    </update>
 
     <update id="update" parameterType="com.howe.pregnancy.domain.PregTodo">
         update preg_todo
         set title       = #{title},
             due_date    = #{dueDate},
             due_time    = #{dueTime},
+            repeat_daily = #{repeatDaily},
             note        = #{note},
             done        = #{done},
             done_at     = #{doneAt},

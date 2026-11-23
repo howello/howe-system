@@ -81,7 +81,7 @@ public class MealAppVersionServiceImpl implements IMealAppVersionService {
         }
         mealAppVersion.setCreateBy(SecurityUtils.getUsername());
         int rows = mealAppVersionMapper.insertMealAppVersion(mealAppVersion);
-        // 后台手工新增且直接发布时同样通知家庭群
+        // 后台手工新增且直接发布时同样通知对应渠道
         if (rows > 0 && STATUS_PUBLISHED.equals(mealAppVersion.getStatus())) {
             notifyPublished(mealAppVersion);
         }
@@ -209,13 +209,13 @@ public class MealAppVersionServiceImpl implements IMealAppVersionService {
         version.setStatus(STATUS_PUBLISHED);
         version.setCreateBy(PUBLISH_CREATE_BY);
         mealAppVersionMapper.insertMealAppVersion(version);
-        // 脚本发布同样通知家庭群；发送失败只记日志，不影响发布结果
+        // 脚本发布同样通知对应渠道；发送失败只记日志，不影响发布结果
         notifyPublished(version);
         return version;
     }
 
     /**
-     * 版本发布后通知家庭企业微信群
+     * 版本发布后通知对应应用的企业微信群
      *
      * <p>只有成为「当前线上最新已发布版本」时才通知：补录旧版本或发布一个版本号更低的记录时，
      * 客户端检测不到更新，通知只会打扰家人。最新版本的判定放在事务提交后执行，
@@ -224,13 +224,12 @@ public class MealAppVersionServiceImpl implements IMealAppVersionService {
      * @param version 已发布的版本记录
      */
     private void notifyPublished(MealAppVersion version) {
-        if (version == null || version.getVersionId() == null
-                || !AppReleaseChannel.MEAL.getKey().equals(version.getAppKey())) {
+        if (version == null || version.getVersionId() == null) {
             return;
         }
         transactionCommitExecutor.afterCommit(() -> {
             try {
-                MealAppVersion latest = mealAppVersionMapper.selectLatestPublished(AppReleaseChannel.MEAL.getKey());
+                MealAppVersion latest = mealAppVersionMapper.selectLatestPublished(version.getAppKey());
                 if (latest == null || !version.getVersionId().equals(latest.getVersionId())) {
                     return;
                 }

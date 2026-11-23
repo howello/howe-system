@@ -8,19 +8,25 @@ import com.howe.ai.api.dto.AiChatResult;
 import com.howe.ai.api.dto.AiImage;
 import com.howe.ai.api.dto.AiImageRequest;
 import com.howe.ai.api.dto.AiImageResult;
+import com.howe.common.notify.wecom.WeComTextUtils;
 import com.howe.common.utils.ConfigUtils;
 import com.howe.pregnancy.constant.PregnancyConstants;
 import com.howe.pregnancy.domain.PregBagItem;
 import com.howe.pregnancy.domain.PregCheckup;
 import com.howe.pregnancy.domain.PregTask;
+import com.howe.pregnancy.domain.PregTodo;
+import com.howe.pregnancy.domain.vo.GrowthVO;
 import com.howe.pregnancy.domain.vo.TaskVO;
 import com.howe.pregnancy.mapper.PregBagMapper;
 import com.howe.pregnancy.mapper.PregCheckupMapper;
 import com.howe.pregnancy.mapper.PregTaskMapper;
+import com.howe.pregnancy.mapper.PregTodoMapper;
 import com.howe.pregnancy.service.IPregTaskService;
+import com.howe.pregnancy.util.GestationUtils;
 import com.howe.pregnancy.util.PregnancyAccessGuard;
 import com.howe.pregnancy.util.PregnancyConfig;
 import com.howe.pregnancy.util.PregnancyException;
+import com.howe.pregnancy.util.PregnancyReminderRule;
 import com.howe.pregnancy.util.PregnancyTimeUtils;
 import com.howe.pregnancy.util.PregnancySeedProvider;
 import com.howe.pregnancy.util.RequestHashUtils;
@@ -32,7 +38,9 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -63,11 +71,16 @@ public class PregTaskServiceImpl implements IPregTaskService {
     /** 退避秒数 */
     private static final long[] BACKOFF_SECONDS = {60L, 300L};
 
+    private static final List<PregnancyReminderRule> PERIODIC_RULES = List.of(
+            PregnancyReminderRule.FOLIC_ACID, PregnancyReminderRule.DAILY_GROWTH, PregnancyReminderRule.WEEKLY_GROWTH);
+
     private final PregTaskMapper taskMapper;
 
     private final PregBagMapper bagMapper;
 
     private final PregCheckupMapper checkupMapper;
+
+    private final PregTodoMapper todoMapper;
 
     private final PregnancyAccessGuard accessGuard;
 
@@ -89,6 +102,7 @@ public class PregTaskServiceImpl implements IPregTaskService {
      * @param taskMapper   任务数据层
      * @param bagMapper    待产包数据层
      * @param checkupMapper 产检数据层
+     * @param todoMapper 待办数据层
      * @param accessGuard  访问守卫
      * @param aiClient     AI 网关
      * @param seedProvider 物品介绍种子
@@ -98,6 +112,7 @@ public class PregTaskServiceImpl implements IPregTaskService {
     public PregTaskServiceImpl(PregTaskMapper taskMapper,
                                PregBagMapper bagMapper,
                                PregCheckupMapper checkupMapper,
+                               PregTodoMapper todoMapper,
                                PregnancyAccessGuard accessGuard,
                                AiClient aiClient,
                                PregnancySeedProvider seedProvider,
@@ -106,6 +121,7 @@ public class PregTaskServiceImpl implements IPregTaskService {
         this.taskMapper = taskMapper;
         this.bagMapper = bagMapper;
         this.checkupMapper = checkupMapper;
+        this.todoMapper = todoMapper;
         this.accessGuard = accessGuard;
         this.aiClient = aiClient;
         this.seedProvider = seedProvider;
@@ -234,6 +250,16 @@ public class PregTaskServiceImpl implements IPregTaskService {
         } catch (RuntimeException e) {
             log.warn("孕期导出过期扫描失败", e);
         }
+        try {
+            enqueueDailyTodoReminders(PregnancyTimeUtils.now());
+        } catch (RuntimeException e) {
+            log.warn("孕期待办每日提醒排程失败", e);
+        }
+        try {
+            enqueueCalendarReminders(PregnancyTimeUtils.now());
+        } catch (RuntimeException e) {
+            log.warn("孕期规则提醒排程失败", e);
+        }
         List<Long> ids;
         try {
             ids = taskMapper.selectDueIds(PregnancyTimeUtils.now().toLocalDateTime(), CLAIM_BATCH);
@@ -251,6 +277,54 @@ public class PregTaskServiceImpl implements IPregTaskService {
             }
             executor.execute(() -> runTask(id, leaseToken));
         }
+    }
+
+    /** 扫描业务时区内仍可发送的提醒，跨午夜时同时检查上一天。 */
+    private void enqueueDailyTodoReminders(OffsetDateTime now) {
+        if (!PregnancyConfig.wecomEnabled() || PregnancyConfig.wecomKey().isBlank()) {
+            return;
+        }
+        OffsetDateTime cutoff = now.minusMinutes(PregnancyConfig.reminderLateMinutes());
+        LocalDate today = now.toLocalDate();
+        int maxAttempts = PregnancyConfig.taskMaxAttempts();
+        if (cutoff.toLocalDate().isBefore(today)) {
+            taskMapper.enqueueDailyTodoReminders(cutoff.toLocalDate(), cutoff.toLocalTime(),
+                    LocalTime.of(23, 59, 59), maxAttempts);
+        }
+        LocalTime from = cutoff.toLocalDate().equals(today) ? cutoff.toLocalTime() : LocalTime.MIDNIGHT;
+        taskMapper.enqueueDailyTodoReminders(today, from, now.toLocalTime(), maxAttempts);
+    }
+
+    /** 按本地业务日期核对到期规则，跨午夜仍保留现有补发窗口。 */
+    private void enqueueCalendarReminders(OffsetDateTime now) {
+        if (!PregnancyConfig.wecomEnabled() || PregnancyConfig.wecomKey().isBlank()) return;
+        LocalDateTime current = now.toLocalDateTime();
+        LocalDateTime cutoff = current.minusMinutes(PregnancyConfig.reminderLateMinutes());
+        LocalDate dueDate = PregnancyConfig.dueDate();
+        JSONObject settings = PregnancyReminderRule.readSettings();
+        for (PregnancyReminderRule rule : PERIODIC_RULES) {
+            var setting = rule.resolve(settings);
+            if (!setting.enabled()) continue;
+            for (LocalDate date = cutoff.toLocalDate(); !date.isAfter(now.toLocalDate()); date = date.plusDays(1)) {
+                LocalDateTime scheduled = date.atTime(setting.time());
+                if (scheduled.isBefore(cutoff) || scheduled.isAfter(current) || !appliesOn(rule, dueDate, date)) continue;
+                String key = "RULE_REMINDER:" + rule.name() + ":" + date;
+                if (taskMapper.selectByDedupKey(key) != null) continue;
+                JSONObject payload = new JSONObject();
+                payload.put("rule", rule.name());
+                payload.put("date", date.toString());
+                taskMapper.enqueueRuleReminder(key, payload.toJSONString(), scheduled, PregnancyConfig.taskMaxAttempts());
+            }
+        }
+    }
+
+    /** 每日变化截至预产期，周变化按末次月经对齐到有资料的孕周。 */
+    private boolean appliesOn(PregnancyReminderRule rule, LocalDate dueDate, LocalDate date) {
+        if (rule == PregnancyReminderRule.FOLIC_ACID) return true;
+        Integer day = GestationUtils.gestationalDay(dueDate, date);
+        if (day == null || day < 0) return false;
+        return rule == PregnancyReminderRule.DAILY_GROWTH ? day <= PregnancyConstants.GESTATION_DAYS_AT_DUE
+                : rule == PregnancyReminderRule.WEEKLY_GROWTH && day % 7 == 0 && GestationUtils.hasWeeklyContent(day / 7);
     }
 
     @Override
@@ -336,6 +410,8 @@ public class PregTaskServiceImpl implements IPregTaskService {
             switch (task.getKind()) {
                 case PregnancyConstants.TASK_ITEM_CONTENT -> runItemContent(task, leaseToken);
                 case PregnancyConstants.TASK_REMINDER -> runReminder(task, leaseToken);
+                case PregnancyConstants.TASK_TODO_REMINDER -> runTodoReminder(task, leaseToken);
+                case PregnancyConstants.TASK_RULE_REMINDER -> runRuleReminder(task, leaseToken);
                 case PregnancyConstants.TASK_EXPORT -> runExport(task, leaseToken);
                 default -> taskMapper.complete(taskId, leaseToken, PregnancyConstants.TASK_SKIPPED,
                         task.getStageJson(), null, null, null, PregnancyTimeUtils.now().toLocalDateTime());
@@ -441,6 +517,14 @@ public class PregTaskServiceImpl implements IPregTaskService {
      * @param leaseToken 租约令牌
      */
     private void runReminder(PregTask task, String leaseToken) {
+        String code = parseObject(task.getPayloadJson()).getString("rule");
+        boolean appointmentRule = PregnancyReminderRule.CHECKUP_BEFORE.name().equals(code)
+                || PregnancyReminderRule.CHECKUP_TODAY.name().equals(code);
+        if (code != null && (!appointmentRule
+                || !PregnancyReminderRule.valueOf(code).resolve(PregnancyReminderRule.readSettings()).enabled())) {
+            finishSkipped(task, leaseToken, "CHECKUP_RULE_INACTIVE");
+            return;
+        }
         PregCheckup checkup = checkupMapper.selectById(task.getBusinessId());
         if (checkup == null) {
             finishSkipped(task, leaseToken, "CHECKUP_MISSING");
@@ -461,12 +545,94 @@ public class PregTaskServiceImpl implements IPregTaskService {
             finishSkipped(task, leaseToken, "REMINDER_LATE");
             return;
         }
+        sendReminder(task, leaseToken, buildReminderText(checkup), now);
+    }
+
+    /** 发送前重新读取待办，确保完成、删除或关闭提醒后不再发送。 */
+    private void runTodoReminder(PregTask task, String leaseToken) {
+        PregTodo todo = todoMapper.selectById(task.getBusinessId());
+        LocalDate date = LocalDate.parse(parseObject(task.getPayloadJson()).getString("date"));
+        if (todo == null || Boolean.TRUE.equals(todo.getDone()) || !Boolean.TRUE.equals(todo.getRepeatDaily())
+                || todo.getDueTime() == null || todo.getDueDate().isAfter(date)) {
+            finishSkipped(task, leaseToken, "TODO_REMINDER_INACTIVE");
+            return;
+        }
+        OffsetDateTime now = PregnancyTimeUtils.now();
+        if (!isReminderDue(task, leaseToken, date.atTime(todo.getDueTime()), now.toLocalDateTime())) return;
+        String content = "【宝宝 · 待办提醒】\n" + todo.getTitle()
+                + "\n每日 " + todo.getDueTime() + "\n请打开「宝宝」查看待办。";
+        sendReminder(task, leaseToken, content, now);
+    }
+
+    /** 根据发送时最新的规则、孕期配置及素材生成通知。 */
+    private void runRuleReminder(PregTask task, String leaseToken) {
+        JSONObject payload = parseObject(task.getPayloadJson());
+        PregnancyReminderRule rule = PregnancyReminderRule.valueOf(payload.getString("rule"));
+        LocalDate date = LocalDate.parse(payload.getString("date"));
+        var setting = rule.resolve(PregnancyReminderRule.readSettings());
+        LocalDate dueDate = PregnancyConfig.dueDate();
+        if (!PERIODIC_RULES.contains(rule) || !setting.enabled() || !appliesOn(rule, dueDate, date)) {
+            finishSkipped(task, leaseToken, "RULE_REMINDER_INACTIVE");
+            return;
+        }
+        OffsetDateTime now = PregnancyTimeUtils.now();
+        if (!isReminderDue(task, leaseToken, date.atTime(setting.time()), now.toLocalDateTime())) return;
+        if (rule == PregnancyReminderRule.FOLIC_ACID) {
+            sendReminder(task, leaseToken, "【宝宝 · 待办提醒】\n吃叶酸", now);
+            return;
+        }
+        String content = growthReminderText(rule, dueDate, date);
+        if (content == null) {
+            finishSkipped(task, leaseToken, "GROWTH_CONTENT_MISSING");
+            return;
+        }
+        sendReminder(task, leaseToken, content, now);
+    }
+
+    /** 取两侧素材摘要，给每侧独立留字节配额。 */
+    private String growthReminderText(PregnancyReminderRule rule, LocalDate dueDate, LocalDate date) {
+        Integer day = GestationUtils.gestationalDay(dueDate, date);
+        Integer week = GestationUtils.week(dueDate, date);
+        boolean weekly = rule == PregnancyReminderRule.WEEKLY_GROWTH;
+        String mother = weekly ? seedProvider.weeklyGrowth("mother", week)
+                : growthText(seedProvider.dailyGrowth("mother", day, week));
+        String baby = weekly ? seedProvider.weeklyGrowth("baby", week)
+                : growthText(seedProvider.dailyGrowth("baby", day, week));
+        if (mother == null && baby == null) return null;
+        String title = weekly ? "孕周变化 · 第 " + week + " 周" : "每日变化 · " + GestationUtils.formatGestation(dueDate, date);
+        StringBuilder result = new StringBuilder("【宝宝 · ").append(title).append("】\n").append(date);
+        if (mother != null) result.append("\n\n准妈妈\n").append(WeComTextUtils.truncateUtf8(mother, 900));
+        if (baby != null) result.append("\n\n胎宝宝\n").append(WeComTextUtils.truncateUtf8(baby, 900));
+        return result.append("\n\n打开「宝宝」查看完整内容。").toString();
+    }
+
+    /** 将日历摘要转换为推送文本。 */
+    private String growthText(GrowthVO.SideContent side) {
+        return side == null || side.getText() == null || side.getText().isBlank() ? null : side.getText();
+    }
+
+    /** 发送前确认时间未被改到稍后，且仍在补发窗口内。 */
+    private boolean isReminderDue(PregTask task, String leaseToken, LocalDateTime scheduled, LocalDateTime now) {
+        if (scheduled.isAfter(now)) {
+            // 排队期间修改了时刻，保留当天的去重键并按新的时间执行。
+            taskMapper.fail(task.getId(), leaseToken, PregnancyConstants.TASK_PENDING, null,
+                    task.getAttempt() - 1, task.getMaxAttempts(), scheduled, null, now);
+            return false;
+        }
+        if (scheduled.plusMinutes(PregnancyConfig.reminderLateMinutes()).isBefore(now)) {
+            finishSkipped(task, leaseToken, "REMINDER_LATE");
+            return false;
+        }
+        return true;
+    }
+
+    /** 通过共用的企微通道发送并记录回执，结果不明时保留去重保护。 */
+    private void sendReminder(PregTask task, String leaseToken, String content, OffsetDateTime now) {
         String webhookKey = PregnancyConfig.wecomKey();
         if (webhookKey == null || webhookKey.isBlank() || !PregnancyConfig.wecomEnabled()) {
             finishSkipped(task, leaseToken, "WECOM_DISABLED");
             return;
         }
-        String content = buildReminderText(checkup);
         JSONObject stage = parseObject(task.getStageJson());
         stage.put("stage", "SEND");
         touchStage(task, leaseToken, stage);
@@ -571,11 +737,11 @@ public class PregTaskServiceImpl implements IPregTaskService {
     private void recoverOne(PregTask task) {
         JSONObject stage = parseObject(task.getStageJson());
         String target;
-        if (PregnancyConstants.TASK_REMINDER.equals(task.getKind())
+        if (PregnancyConstants.isReminderTask(task.getKind())
                 && "SEND".equals(stage.getString("stage"))) {
             // 发送中的租约过期且无明确回执，按 UNKNOWN 处理
             target = PregnancyConstants.TASK_UNKNOWN;
-        } else if (PregnancyConstants.TASK_REMINDER.equals(task.getKind())) {
+        } else if (PregnancyConstants.isReminderTask(task.getKind())) {
             target = PregnancyConstants.TASK_RETRY_WAIT;
         } else {
             target = task.getAttempt() != null && task.getAttempt() >= (task.getMaxAttempts() == null
@@ -659,7 +825,7 @@ public class PregTaskServiceImpl implements IPregTaskService {
             }
             return;
         }
-        if (PregnancyConstants.TASK_REMINDER.equals(task.getKind())) {
+        if (PregnancyConstants.isReminderTask(task.getKind())) {
             accessGuard.requireManager();
             return;
         }

@@ -13,17 +13,20 @@ import com.howe.pregnancy.domain.vo.CheckupVO;
 import com.howe.pregnancy.domain.vo.ReportVO;
 import com.howe.pregnancy.mapper.PregCheckupMapper;
 import com.howe.pregnancy.mapper.PregReportMapper;
+import com.howe.pregnancy.mapper.PregTodoMapper;
 import com.howe.pregnancy.service.IPregCheckupService;
 import com.howe.pregnancy.service.IPregExpenseService;
 import com.howe.pregnancy.util.GestationUtils;
 import com.howe.pregnancy.util.PregnancyAccessGuard;
 import com.howe.pregnancy.util.PregnancyConfig;
 import com.howe.pregnancy.util.PregnancyException;
+import com.howe.pregnancy.util.PregnancyReminderRule;
 import com.howe.pregnancy.util.PregnancySeedProvider;
 import com.howe.pregnancy.util.PregnancyTimeUtils;
 import com.howe.pregnancy.util.RequestHashUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,6 +52,8 @@ public class PregCheckupServiceImpl implements IPregCheckupService {
 
     private final PregReportMapper reportMapper;
 
+    private final PregTodoMapper todoMapper;
+
     private final IPregExpenseService expenseService;
 
     private final PregnancyAccessGuard accessGuard;
@@ -58,6 +63,7 @@ public class PregCheckupServiceImpl implements IPregCheckupService {
     private final com.howe.pregnancy.service.IPregTaskService taskService;
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public List<CheckupVO> list() {
         accessGuard.requireReadable();
         ensureSeeded();
@@ -76,11 +82,14 @@ public class PregCheckupServiceImpl implements IPregCheckupService {
     public CheckupVO create(CheckupSaveBody body) {
         accessGuard.requireWritable();
         String requestId = body.getRequestId() == null ? null : body.getRequestId().trim();
+        LocalDate appointmentDate = parseOptionalDate(body.getAppointmentDate(), "预约日期");
+        String planHash = RequestHashUtils.hash(body.getTitle(), body.getSuggestStartDay(),
+                body.getSuggestEndDay(), body.getSuggestedDate(), body.getFocus());
+        String hash = appointmentDate == null ? planHash
+                : RequestHashUtils.hash(planHash, appointmentDate, body.getHospital(), body.getLocation());
         if (requestId != null && !requestId.isEmpty()) {
             PregCheckup existing = checkupMapper.selectByRequest(requestId);
             if (existing != null) {
-                String hash = RequestHashUtils.hash(body.getTitle(), body.getSuggestStartDay(),
-                        body.getSuggestEndDay(), body.getSuggestedDate(), body.getFocus());
                 if (!hash.equals(existing.getRequestHash())) {
                     throw PregnancyException.idempotencyConflict(requestId);
                 }
@@ -100,10 +109,10 @@ public class PregCheckupServiceImpl implements IPregCheckupService {
         checkup.setHospital(body.getHospital());
         checkup.setLocation(body.getLocation());
         checkup.setFocus(body.getFocus());
-        checkup.setStatus(PregnancyConstants.CHECKUP_PLANNED);
+        checkup.setAppointmentDate(appointmentDate);
+        checkup.setStatus(appointmentDate == null ? PregnancyConstants.CHECKUP_PLANNED : PregnancyConstants.CHECKUP_BOOKED);
         checkup.setRequestId(requestId == null || requestId.isEmpty() ? null : requestId);
-        checkup.setRequestHash(RequestHashUtils.hash(body.getTitle(), body.getSuggestStartDay(),
-                body.getSuggestEndDay(), body.getSuggestedDate(), body.getFocus()));
+        checkup.setRequestHash(hash);
         checkup.setCreateBy(SecurityUtils.getUsername());
         checkupMapper.insert(checkup);
         if (body.getItems() != null) {
@@ -112,7 +121,10 @@ public class PregCheckupServiceImpl implements IPregCheckupService {
         if (body.getPreparations() != null) {
             replaceDetail(checkup.getId(), PregnancyConstants.DETAIL_PREPARATION, body.getPreparations());
         }
-        return toVO(checkupMapper.selectById(checkup.getId()), true);
+        PregCheckup saved = checkupMapper.selectById(checkup.getId());
+        syncCheckupTodos(saved, PregnancyConfig.dueDate(), PregnancyTimeUtils.businessToday());
+        scheduleReminders(saved);
+        return toVO(saved, true);
     }
 
     @Override
@@ -165,7 +177,9 @@ public class PregCheckupServiceImpl implements IPregCheckupService {
             replaceDetail(id, PregnancyConstants.DETAIL_PREPARATION, body.getPreparations());
             bumpVersion(id);
         }
-        return toVO(checkupMapper.selectById(id), true);
+        PregCheckup saved = checkupMapper.selectById(id);
+        syncCheckupTodos(saved, PregnancyConfig.dueDate(), PregnancyTimeUtils.businessToday());
+        return toVO(saved, true);
     }
 
     @Override
@@ -235,8 +249,10 @@ public class PregCheckupServiceImpl implements IPregCheckupService {
         if (checkupMapper.update(checkup) == 0) {
             throw PregnancyException.versionConflict();
         }
-        scheduleReminders(checkupMapper.selectById(id));
-        return toVO(checkupMapper.selectById(id), true);
+        PregCheckup saved = checkupMapper.selectById(id);
+        syncCheckupTodos(saved, PregnancyConfig.dueDate(), PregnancyTimeUtils.businessToday());
+        scheduleReminders(saved);
+        return toVO(saved, true);
     }
 
     @Override
@@ -260,7 +276,9 @@ public class PregCheckupServiceImpl implements IPregCheckupService {
         }
         // 撤销预约后不再发送预约提醒
         taskService.cancelRemindersFor(id);
-        return toVO(checkupMapper.selectById(id), true);
+        PregCheckup saved = checkupMapper.selectById(id);
+        syncCheckupTodos(saved, PregnancyConfig.dueDate(), PregnancyTimeUtils.businessToday());
+        return toVO(saved, true);
     }
 
     @Override
@@ -285,7 +303,9 @@ public class PregCheckupServiceImpl implements IPregCheckupService {
         }
         // 完成后取消不再需要的提醒
         taskService.cancelRemindersFor(id);
-        return toVO(checkupMapper.selectById(id), true);
+        PregCheckup saved = checkupMapper.selectById(id);
+        syncCheckupTodos(saved, PregnancyConfig.dueDate(), PregnancyTimeUtils.businessToday());
+        return toVO(saved, true);
     }
 
     @Override
@@ -305,7 +325,9 @@ public class PregCheckupServiceImpl implements IPregCheckupService {
         if (checkupMapper.update(checkup) == 0) {
             throw PregnancyException.versionConflict();
         }
-        return toVO(checkupMapper.selectById(id), true);
+        PregCheckup saved = checkupMapper.selectById(id);
+        syncCheckupTodos(saved, PregnancyConfig.dueDate(), PregnancyTimeUtils.businessToday());
+        return toVO(saved, true);
     }
 
     @Override
@@ -325,7 +347,9 @@ public class PregCheckupServiceImpl implements IPregCheckupService {
         }
         // 取消整次计划不删除报告与费用，但不再发送提醒
         taskService.cancelRemindersFor(id);
-        return toVO(checkupMapper.selectById(id), true);
+        PregCheckup saved = checkupMapper.selectById(id);
+        syncCheckupTodos(saved, PregnancyConfig.dueDate(), PregnancyTimeUtils.businessToday());
+        return toVO(saved, true);
     }
 
     @Override
@@ -360,6 +384,7 @@ public class PregCheckupServiceImpl implements IPregCheckupService {
             insertDetail(checkup.getId(), PregnancyConstants.DETAIL_ITEM, seed.path("items"));
             insertDetail(checkup.getId(), PregnancyConstants.DETAIL_PREPARATION,
                     seed.path("preparations"));
+            syncCheckupTodos(checkup, PregnancyConfig.dueDate(), PregnancyTimeUtils.businessToday());
             created++;
         }
         return created;
@@ -436,62 +461,59 @@ public class PregCheckupServiceImpl implements IPregCheckupService {
      * @param checkup 产检
      */
     private void scheduleReminders(PregCheckup checkup) {
-        if (checkup.getAppointmentDate() == null) {
-            return;
-        }
+        if (checkup.getAppointmentDate() == null) return;
         try {
-            com.alibaba.fastjson2.JSONObject rules = reminderRules();
-            for (var entry : rules.entrySet()) {
-                String code = entry.getKey();
-                com.alibaba.fastjson2.JSONObject rule = (com.alibaba.fastjson2.JSONObject) entry.getValue();
-                if (!Boolean.TRUE.equals(rule.getBoolean("enabled"))) {
-                    continue;
-                }
-                String time = rule.getString("time");
-                if (time == null || !time.matches("^([01][0-9]|2[0-3]):[0-5][0-9]$")) {
-                    continue;
-                }
-                String[] parts = time.split(":");
-                LocalDate target = checkup.getAppointmentDate();
-                if ("CHECKUP_BEFORE".equals(code)) {
-                    target = target.minusDays(1);
-                }
-                java.time.OffsetDateTime executeAt = target.atTime(
-                        Integer.parseInt(parts[0]), Integer.parseInt(parts[1]))
-                        .atZone(PregnancyTimeUtils.businessZone()).toOffsetDateTime();
-                String dedupKey = "REMINDER:" + checkup.getId() + ":" + target + ":" + time;
+            var settings = PregnancyReminderRule.readSettings();
+            for (PregnancyReminderRule rule : List.of(PregnancyReminderRule.CHECKUP_BEFORE, PregnancyReminderRule.CHECKUP_TODAY)) {
+                var setting = rule.resolve(settings);
+                if (!setting.enabled()) continue;
+                int advance = rule == PregnancyReminderRule.CHECKUP_BEFORE ? Math.max(0, setting.daysBefore()) : 0;
+                LocalDate target = checkup.getAppointmentDate().minusDays(advance);
+                var executeAt = target.atTime(setting.time()).atZone(PregnancyTimeUtils.businessZone()).toOffsetDateTime();
+                if (executeAt.plusMinutes(PregnancyConfig.reminderLateMinutes()).isBefore(PregnancyTimeUtils.now())) continue;
+                String dedupKey = "REMINDER:" + checkup.getId() + ":" + target + ":" + setting.time();
                 taskService.scheduleReminder(dedupKey, checkup.getId(), checkup.getVersion(),
-                        "{\"rule\":\"" + code + "\"}", executeAt);
+                        new com.alibaba.fastjson2.JSONObject(java.util.Map.of("rule", rule.name())).toJSONString(), executeAt);
             }
         } catch (RuntimeException e) {
-            // 提醒排程失败不影响预约保存
             log.warn("安排产检提醒失败：checkupId={}", checkup.getId(), e);
         }
     }
 
-    /**
-     * 读取已保存的提醒规则
-     *
-     * @return 规则映射（编码 → 规则）
-     */
-    private com.alibaba.fastjson2.JSONObject reminderRules() {
-        String text = com.howe.common.utils.ConfigUtils.getString(PregnancyConstants.CONFIG_REMINDER_RULES);
-        com.alibaba.fastjson2.JSONObject result = new com.alibaba.fastjson2.JSONObject();
-        if (text == null || text.isBlank()) {
-            return result;
+    /** 定期核对已有计划及末次月经变更。 */
+    @Override
+    @Scheduled(initialDelay = 30_000L, fixedDelay = 300_000L)
+    @Transactional(rollbackFor = Exception.class)
+    public void reconcileCheckupTodos() {
+        LocalDate dueDate = PregnancyConfig.dueDate();
+        LocalDate today = PregnancyTimeUtils.businessToday();
+        for (PregCheckup checkup : checkupMapper.selectListForUpdate()) {
+            syncCheckupTodos(checkup, dueDate, today);
         }
-        com.alibaba.fastjson2.JSONArray array = com.alibaba.fastjson2.JSON.parseObject(text)
-                .getJSONArray("rules");
-        if (array == null) {
-            return result;
+    }
+
+    /** 同步默认待办，保留已完成和主动删除的历史。 */
+    private void syncCheckupTodos(PregCheckup checkup, LocalDate dueDate, LocalDate today) {
+        List<LocalDate> dates = checkupTodoDates(checkup, dueDate).stream()
+                .filter(date -> !date.isBefore(today)).toList();
+        todoMapper.hideObsoleteCheckupTodos(checkup.getId(), today, dates);
+        if (!dates.isEmpty()) todoMapper.putCheckupTodos(checkup.getId(), checkup.getTitle(), dates);
+    }
+
+    /** 建议窗口按末次月经划分孕周；手填日期和不足一周的窗口使用其建议日。 */
+    private List<LocalDate> checkupTodoDates(PregCheckup checkup, LocalDate dueDate) {
+        if (!PregnancyConstants.CHECKUP_PLANNED.equals(checkup.getStatus())) return List.of();
+        if (checkup.getSuggestedDate() != null) return List.of(checkup.getSuggestedDate());
+        if (dueDate == null || checkup.getSuggestStartDay() == null) return List.of();
+        int start = checkup.getSuggestStartDay();
+        int lastDay = PregnancyConstants.GROWTH_WEEK_MAX * 7 + 6;
+        int end = Math.min(checkup.getSuggestEndDay() == null ? start : checkup.getSuggestEndDay(), lastDay);
+        if (start > end) return List.of();
+        List<LocalDate> dates = new ArrayList<>();
+        for (int day = start + (7 - start % 7) % 7; day <= end; day += 7) {
+            dates.add(GestationUtils.dateOfGestationalDay(dueDate, day));
         }
-        for (int i = 0; i < array.size(); i++) {
-            com.alibaba.fastjson2.JSONObject item = array.getJSONObject(i);
-            if (item != null && item.getString("code") != null) {
-                result.put(item.getString("code"), item);
-            }
-        }
-        return result;
+        return dates.isEmpty() ? List.of(GestationUtils.dateOfGestationalDay(dueDate, start)) : dates;
     }
 
     /**

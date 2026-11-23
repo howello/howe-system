@@ -3,12 +3,15 @@ package com.howe.pregnancy.util;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.MissingNode;
+import com.howe.pregnancy.domain.vo.GrowthVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -44,6 +47,44 @@ public class PregnancySeedProvider {
     /** 读取每日和每周变化素材。 */
     public JsonNode growth() {
         return resources.computeIfAbsent("pregnancy/growth-content.json", this::read);
+    }
+
+    /** 按孕日读取内容，单侧缺少当日素材时使用同孕周概况。 */
+    public GrowthVO.SideContent dailyGrowth(String side, Integer day, Integer week) {
+        JsonNode root = growth();
+        if (root == null) return null;
+        if (GestationUtils.hasDailyContent(day)) {
+            JsonNode text = root.path(side + "Daily").path(String.valueOf(day));
+            if (text.isTextual() && !text.asText().isBlank()) {
+                GrowthVO.SideContent content = new GrowthVO.SideContent();
+                content.setSource("DAILY");
+                content.setText(text.asText());
+                content.setWeekly(false);
+                return content;
+            }
+        }
+        String text = weeklyGrowth(side, week);
+        if (text == null) return null;
+        GrowthVO.SideContent content = new GrowthVO.SideContent();
+        content.setSource("WEEKLY");
+        content.setText(text);
+        content.setWeekly(true);
+        return content;
+    }
+
+    /** 取孕周变化中准妈妈或宝宝的本周概况。 */
+    public String weeklyGrowth(String side, Integer week) {
+        JsonNode root = growth();
+        if (root == null || !GestationUtils.hasWeeklyContent(week)) return null;
+        String title = "mother".equals(side) ? "准妈妈本周概况" : "胎宝宝本周概况";
+        for (JsonNode section : root.path("weeks").path(String.valueOf(week)).path("sections")) {
+            if (title.equals(section.path("title").asText())) {
+                List<String> paragraphs = new ArrayList<>();
+                section.path("paragraphs").forEach(node -> paragraphs.add(node.asText()));
+                return String.join("\n\n", paragraphs);
+            }
+        }
+        return null;
     }
 
     /** 读取食物资料。 */

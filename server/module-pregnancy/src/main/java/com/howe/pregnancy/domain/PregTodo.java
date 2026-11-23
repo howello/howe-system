@@ -36,6 +36,9 @@ public class PregTodo extends BaseEntity {
     @Schema(description = "可选时刻")
     private LocalTime dueTime;
 
+    @Schema(description = "是否每天重复提醒")
+    private Boolean repeatDaily;
+
     @Schema(description = "备注")
     private String note;
 

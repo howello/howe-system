@@ -1,9 +1,7 @@
 package com.howe.pregnancy.service.impl;
 
-import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
-import com.howe.common.utils.ConfigUtils;
 import com.howe.pregnancy.constant.PregnancyConstants;
 import com.howe.pregnancy.domain.PregTask;
 import com.howe.pregnancy.domain.vo.TaskVO;
@@ -13,9 +11,9 @@ import com.howe.pregnancy.service.IPregTaskService;
 import com.howe.pregnancy.util.PregnancyAccessGuard;
 import com.howe.pregnancy.util.PregnancyConfig;
 import com.howe.pregnancy.util.PregnancyException;
+import com.howe.pregnancy.util.PregnancyReminderRule;
 import com.howe.pregnancy.util.PregnancyTimeUtils;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,22 +30,9 @@ import java.util.Map;
  *
  * @author howe
  */
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PregReminderServiceImpl implements IPregReminderService {
-
-    /** 规则编码：产检提前一天 */
-    private static final String RULE_CHECKUP_BEFORE = "CHECKUP_BEFORE";
-
-    /** 规则编码：产检当日 */
-    private static final String RULE_CHECKUP_TODAY = "CHECKUP_TODAY";
-
-    /** 规则编码：每日记录 */
-    private static final String RULE_DAILY_RECORD = "DAILY_RECORD";
-
-    /** 规则编码：待产包周提醒 */
-    private static final String RULE_BAG_WEEKLY = "BAG_WEEKLY";
 
     private static final int DEFAULT_VERSION = 1;
 
@@ -60,11 +45,11 @@ public class PregReminderServiceImpl implements IPregReminderService {
     @Override
     public Map<String, Object> getRules() {
         accessGuard.requireManager();
-        JSONObject stored = readStored();
+        JSONObject stored = PregnancyReminderRule.readSettings();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("reminderVersion", stored.getInteger("reminderVersion") == null
                 ? DEFAULT_VERSION : stored.getInteger("reminderVersion"));
-        result.put("rules", defaultRules(stored.getJSONArray("rules")));
+        result.put("rules", defaultRules(stored));
         result.put("channel", channelState());
         TaskVO latest = taskService.latestReminder();
         result.put("latest", latest);
@@ -78,35 +63,47 @@ public class PregReminderServiceImpl implements IPregReminderService {
         if (body == null || body.reminderVersion() == null) {
             throw PregnancyException.invalid("提醒规则版本不能为空");
         }
-        JSONObject stored = readStored();
+        JSONObject stored = PregnancyReminderRule.readSettings();
         int current = stored.getInteger("reminderVersion") == null
                 ? DEFAULT_VERSION : stored.getInteger("reminderVersion");
         if (body.reminderVersion() != current) {
             throw PregnancyException.versionConflict("提醒规则已被修改，请刷新后重试");
         }
-        JSONArray rules = new JSONArray();
+        Map<String, JSONObject> rules = new LinkedHashMap<>();
+        JSONArray previous = stored.getJSONArray("rules");
+        if (previous != null) {
+            for (int i = 0; i < previous.size(); i++) {
+                JSONObject item = previous.getJSONObject(i);
+                if (item != null && item.getString("code") != null) rules.put(item.getString("code"), item);
+            }
+        }
         if (body.rules() != null) {
             for (RuleItem item : body.rules()) {
                 if (item == null || item.code() == null || item.code().isBlank()) {
                     throw PregnancyException.invalid("规则编码不能为空");
                 }
-                if (!List.of(RULE_CHECKUP_BEFORE, RULE_CHECKUP_TODAY, RULE_DAILY_RECORD, RULE_BAG_WEEKLY)
-                        .contains(item.code())) {
+                PregnancyReminderRule definition;
+                try {
+                    definition = PregnancyReminderRule.valueOf(item.code());
+                } catch (IllegalArgumentException e) {
                     throw PregnancyException.invalid("未知的提醒规则：" + item.code());
                 }
-                validateTime(item.time());
+                String time = item.time() == null || item.time().isBlank() ? definition.getDefaultTime() : item.time();
+                if (!PregnancyReminderRule.validTime(time)) {
+                    throw PregnancyException.invalid("提醒时刻格式应为 HH:mm");
+                }
                 JSONObject rule = new JSONObject();
                 rule.put("code", item.code());
                 rule.put("enabled", Boolean.TRUE.equals(item.enabled()));
-                rule.put("time", item.time() == null ? defaultTime(item.code()) : item.time());
+                rule.put("time", time);
                 rule.put("daysBefore", item.daysBefore());
                 rule.put("weekday", item.weekday());
-                rules.add(rule);
+                rules.put(item.code(), rule);
             }
         }
         JSONObject next = new JSONObject();
         next.put("reminderVersion", current + 1);
-        next.put("rules", rules);
+        next.put("rules", new ArrayList<>(rules.values()));
         saveStored(next);
         // 规则变化使尚未发送的旧任务失效
         Map<String, Object> result = getRules();
@@ -119,7 +116,7 @@ public class PregReminderServiceImpl implements IPregReminderService {
     public TaskVO retryAttempt(Long taskId) {
         accessGuard.requireManager();
         PregTask task = taskMapper.selectById(taskId);
-        if (task == null || !PregnancyConstants.TASK_REMINDER.equals(task.getKind())) {
+        if (task == null || !PregnancyConstants.isReminderTask(task.getKind())) {
             throw PregnancyException.notFound();
         }
         if (PregnancyConstants.TASK_UNKNOWN.equals(task.getStatus())) {
@@ -142,31 +139,11 @@ public class PregReminderServiceImpl implements IPregReminderService {
     }
 
     /**
-     * 读取已保存的规则
-     *
-     * @return 已保存对象，空或损坏时返回空对象
-     */
-    private JSONObject readStored() {
-        String text = ConfigUtils.getString(PregnancyConstants.CONFIG_REMINDER_RULES);
-        if (text == null || text.isBlank()) {
-            return new JSONObject();
-        }
-        try {
-            JSONObject object = JSON.parseObject(text);
-            return object == null ? new JSONObject() : object;
-        } catch (RuntimeException e) {
-            log.warn("孕期提醒规则配置不是合法 JSON，按默认值处理");
-            return new JSONObject();
-        }
-    }
-
-    /**
      * 保存规则
      *
      * @param value 规则对象
      */
     private void saveStored(JSONObject value) {
-        ConfigUtils.getString(PregnancyConstants.CONFIG_REMINDER_RULES);
         // 通过系统配置服务写入，保持缓存刷新与敏感参数策略一致
         com.howe.system.service.ISysConfigService configService =
                 com.howe.common.utils.spring.SpringUtils.getBean(com.howe.system.service.ISysConfigService.class);
@@ -193,101 +170,21 @@ public class PregReminderServiceImpl implements IPregReminderService {
         }
     }
 
-    /**
-     * 合并默认规则
-     *
-     * @param stored 已保存规则
-     * @return 完整规则列表
-     */
-    private List<Map<String, Object>> defaultRules(JSONArray stored) {
-        Map<String, JSONObject> saved = new LinkedHashMap<>();
-        if (stored != null) {
-            for (int i = 0; i < stored.size(); i++) {
-                JSONObject item = stored.getJSONObject(i);
-                if (item != null && item.getString("code") != null) {
-                    saved.put(item.getString("code"), item);
-                }
-            }
-        }
+    /** 合并默认值与各账号已保存的通知设置。 */
+    private List<Map<String, Object>> defaultRules(JSONObject stored) {
         List<Map<String, Object>> result = new ArrayList<>();
-        result.add(ruleView(saved, RULE_CHECKUP_BEFORE, true, "20:00", 1, null));
-        result.add(ruleView(saved, RULE_CHECKUP_TODAY, true, "07:30", 0, null));
-        result.add(ruleView(saved, RULE_DAILY_RECORD, false, "21:00", 0, null));
-        result.add(ruleView(saved, RULE_BAG_WEEKLY, false, "10:00", 0, 0));
+        for (PregnancyReminderRule rule : PregnancyReminderRule.values()) {
+            PregnancyReminderRule.Setting setting = rule.resolve(stored);
+            Map<String, Object> view = new LinkedHashMap<>();
+            view.put("code", rule.name());
+            view.put("label", rule.getLabel());
+            view.put("enabled", setting.enabled());
+            view.put("time", setting.time().toString());
+            view.put("daysBefore", setting.daysBefore());
+            view.put("weekday", setting.weekday());
+            result.add(view);
+        }
         return result;
-    }
-
-    /**
-     * 组装单条规则
-     *
-     * @param saved     已保存规则
-     * @param code      编码
-     * @param enabled   默认启用
-     * @param time      默认时刻
-     * @param daysBefore 默认提前天数
-     * @param weekday   默认星期
-     * @return 规则视图
-     */
-    private Map<String, Object> ruleView(Map<String, JSONObject> saved, String code, boolean enabled,
-                                         String time, Integer daysBefore, Integer weekday) {
-        JSONObject item = saved.get(code);
-        Map<String, Object> view = new LinkedHashMap<>();
-        view.put("code", code);
-        view.put("label", labelOf(code));
-        view.put("enabled", item == null ? enabled
-                : Boolean.TRUE.equals(item.getBoolean("enabled")));
-        view.put("time", item == null || item.getString("time") == null ? time : item.getString("time"));
-        view.put("daysBefore", item == null || item.getInteger("daysBefore") == null
-                ? daysBefore : item.getInteger("daysBefore"));
-        view.put("weekday", item == null || item.getInteger("weekday") == null
-                ? weekday : item.getInteger("weekday"));
-        return view;
-    }
-
-    /**
-     * 规则显示名
-     *
-     * @param code 编码
-     * @return 显示名
-     */
-    private String labelOf(String code) {
-        return switch (code) {
-            case RULE_CHECKUP_BEFORE -> "产检提前提醒";
-            case RULE_CHECKUP_TODAY -> "产检当日提醒";
-            case RULE_DAILY_RECORD -> "每日记录提醒";
-            case RULE_BAG_WEEKLY -> "待产包周提醒";
-            default -> code;
-        };
-    }
-
-    /**
-     * 默认时刻
-     *
-     * @param code 编码
-     * @return 时刻
-     */
-    private String defaultTime(String code) {
-        return switch (code) {
-            case RULE_CHECKUP_BEFORE -> "20:00";
-            case RULE_CHECKUP_TODAY -> "07:30";
-            case RULE_DAILY_RECORD -> "21:00";
-            case RULE_BAG_WEEKLY -> "10:00";
-            default -> "09:00";
-        };
-    }
-
-    /**
-     * 校验时刻格式
-     *
-     * @param time 时刻
-     */
-    private void validateTime(String time) {
-        if (time == null || time.isBlank()) {
-            return;
-        }
-        if (!time.matches("^([01]\\d|2[0-3]):[0-5]\\d$")) {
-            throw PregnancyException.invalid("提醒时刻格式应为 HH:mm");
-        }
     }
 
     /**

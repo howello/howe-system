@@ -129,4 +129,7 @@ public interface IPregCheckupService {
      * @return 初始化的条数
      */
     int ensureSeeded();
+
+    /** 核对现有产检计划的默认待办。 */
+    void reconcileCheckupTodos();
 }

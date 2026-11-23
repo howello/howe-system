@@ -175,6 +175,9 @@ create table preg_todo (
   title      varchar(200)    not null                comment '标题',
   due_date   date            not null                comment '日期（允许未来）',
   due_time   time            default null            comment '可选时刻',
+  repeat_daily tinyint(1)    not null default 0      comment '从待办日期起每天提醒',
+  checkup_id bigint unsigned default null            comment '默认产检待办来源',
+  checkup_occurrence_date date default null           comment '默认待办原定日期',
   note       varchar(2000)   default null            comment '备注',
   done       tinyint(1)      not null default 0      comment '是否完成',
   done_at    datetime(3)     default null            comment '完成时刻',
@@ -182,14 +185,15 @@ create table preg_todo (
   request_id varchar(64)     default null            comment '客户端请求ID（幂等）',
   request_hash char(64)      default null            comment '请求内容摘要',
   version    int             not null default 1      comment '乐观锁版本',
-  del_flag   char(1)         not null default '0'    comment '删除标记（0存在 2删除）',
   create_by  varchar(64)     default ''              comment '创建者',
   create_time datetime(3)    default null            comment '创建时间',
   update_by  varchar(64)     default ''              comment '更新者',
   update_time datetime(3)    default null            comment '更新时间',
   remark     varchar(500)    default null            comment '备注',
+  del_flag   char(1)         not null default '0'    comment '删除标记（0存在 2用户删除 3安排变更隐藏）',
   primary key (id),
   unique key uk_preg_todo_request (request_id),
+  unique key uk_preg_todo_checkup_occurrence (checkup_id, checkup_occurrence_date),
   key idx_preg_todo_day (due_date, done, id)
 ) engine=innodb auto_increment=1 comment = '孕期-待办';
 
@@ -314,7 +318,7 @@ create table preg_file (
 drop table if exists preg_task;
 create table preg_task (
   id                 bigint unsigned not null auto_increment comment '任务ID',
-  kind               varchar(16)     not null                comment '类型（REMINDER/ITEM_CONTENT/EXPORT）',
+  kind               varchar(16)     not null                comment '类型（REMINDER/TODO_REMINDER/RULE_REMINDER/ITEM_CONTENT/EXPORT）',
   business_id        bigint unsigned default null            comment '业务ID',
   business_version   int             default null            comment '业务版本（回写校验）',
   requester_user_id  bigint          default null            comment '请求人账号ID',
@@ -376,13 +380,13 @@ where not exists (select 1 from sys_config where config_key = 'pregnancy.reminde
 
 insert into sys_config (config_name, config_key, config_value, config_type, param_type, create_by, create_time, remark, `sensitive`)
 select '孕期-企微机器人凭证', 'pregnancy.wecom.webhookKey', '', 'N', '孕期', 'admin', sysdate(),
-       '仅用于孕期提醒。填写企业微信群机器人 Webhook 的 key 参数', 'Y'
+       '用于孕期提醒和宝宝 App 发版通知。填写企业微信群机器人 Webhook 的 key 参数', 'Y'
 from dual
 where not exists (select 1 from sys_config where config_key = 'pregnancy.wecom.webhookKey');
 
 insert into sys_config (config_name, config_key, config_value, config_type, param_type, create_by, create_time, remark, `sensitive`)
 select '孕期-企微通知开关', 'pregnancy.wecom.enabled', '0', 'N', '孕期', 'admin', sysdate(),
-       '孕期提醒通道总开关（0 停用，1 启用）', 'N'
+       '孕期提醒和宝宝 App 发版的企微通道总开关（0 停用，1 启用）', 'N'
 from dual
 where not exists (select 1 from sys_config where config_key = 'pregnancy.wecom.enabled');
 

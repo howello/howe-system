@@ -30,6 +30,9 @@ public class TodoUpdateBody {
     @Schema(description = "可选时刻（HH:mm）")
     private String dueTime;
 
+    @Schema(description = "是否每天重复提醒，为空时保持原值")
+    private Boolean repeatDaily;
+
     @Schema(description = "备注")
     @Size(max = 2000, message = "备注长度不能超过2000")
     private String note;

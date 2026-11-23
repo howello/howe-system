@@ -1,5 +1,7 @@
 package com.howe.pregnancy.util;
 
+import com.howe.common.constant.ConfigConstants;
+
 import com.howe.common.utils.ConfigUtils;
 import com.howe.pregnancy.constant.PregnancyConstants;
 
@@ -130,7 +132,7 @@ public final class PregnancyConfig {
      * @return 明文 key，未配置返回空串
      */
     public static String wecomKey() {
-        return ConfigUtils.getString(PregnancyConstants.CONFIG_WECOM_KEY);
+        return ConfigUtils.getString(ConfigConstants.PREGNANCY_WECOM_WEBHOOK_KEY);
     }
 
     /**
@@ -139,6 +141,6 @@ public final class PregnancyConfig {
      * @return 启用返回 true
      */
     public static boolean wecomEnabled() {
-        return ConfigUtils.getBoolean(PregnancyConstants.CONFIG_WECOM_ENABLED, false);
+        return ConfigUtils.getBoolean(ConfigConstants.PREGNANCY_WECOM_ENABLED, false);
     }
 }

@@ -34,6 +34,9 @@ public class CheckupSaveBody {
     @Schema(description = "手填建议日期")
     private String suggestedDate;
 
+    @Schema(description = "新增时同时预约的日期（yyyy-MM-dd），可为空")
+    private String appointmentDate;
+
     @Schema(description = "医院")
     @Size(max = 200, message = "医院长度不能超过200")
     private String hospital;

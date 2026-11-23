@@ -49,6 +49,14 @@ public interface PregTodoMapper {
      */
     int insert(PregTodo todo);
 
+    /** 插入或恢复产检默认待办，保留已完成、用户删除及用户编辑的记录。 */
+    int putCheckupTodos(@Param("checkupId") Long checkupId, @Param("title") String title,
+                        @Param("dates") List<LocalDate> dates);
+
+    /** 隐藏不再符合产检计划的未完成默认待办。 */
+    int hideObsoleteCheckupTodos(@Param("checkupId") Long checkupId, @Param("today") LocalDate today,
+                                @Param("dates") List<LocalDate> dates);
+
     /**
      * 按版本更新
      *

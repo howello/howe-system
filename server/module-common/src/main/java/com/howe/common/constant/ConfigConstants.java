@@ -237,6 +237,12 @@ public class ConfigConstants {
     /** 宝宝 App 专用 WGT 发布令牌。 */
     public static final String PREGNANCY_APP_PUBLISH_TOKEN = "pregnancy.app.publishToken";
 
+    /** 孕期企微机器人凭证。 */
+    public static final String PREGNANCY_WECOM_WEBHOOK_KEY = "pregnancy.wecom.webhookKey";
+
+    /** 孕期企微通知总开关。 */
+    public static final String PREGNANCY_WECOM_ENABLED = "pregnancy.wecom.enabled";
+
     /**
      * APP 远程资源包大小上限（字节）
      *
@@ -329,6 +335,7 @@ public class ConfigConstants {
             BLOG_OPEN_TOKEN,
             MEAL_APP_PUBLISH_TOKEN,
             PREGNANCY_APP_PUBLISH_TOKEN,
+            PREGNANCY_WECOM_WEBHOOK_KEY,
             TURNSTILE_SECRET_KEY)));
 
     /**

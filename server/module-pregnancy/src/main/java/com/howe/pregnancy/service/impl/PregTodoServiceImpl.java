@@ -53,7 +53,12 @@ public class PregTodoServiceImpl implements IPregTodoService {
         String requestId = body.getRequestId() == null ? null : body.getRequestId().trim();
         LocalDate dueDate = PregnancyTimeUtils.parseDate(body.getDueDate(), "待办日期");
         LocalTime dueTime = PregnancyTimeUtils.parseOptionalTime(body.getDueTime(), "待办时刻");
-        String hash = RequestHashUtils.hash(body.getTitle(), body.getDueDate(), body.getDueTime(), body.getNote());
+        boolean repeatDaily = Boolean.TRUE.equals(body.getRepeatDaily());
+        requireReminderTime(repeatDaily, dueTime);
+        // 保留单次待办的请求摘要，兼容旧客户端及尚未完成的请求重试。
+        String hash = repeatDaily
+                ? RequestHashUtils.hash(body.getTitle(), body.getDueDate(), body.getDueTime(), body.getNote(), true)
+                : RequestHashUtils.hash(body.getTitle(), body.getDueDate(), body.getDueTime(), body.getNote());
 
         if (requestId != null && !requestId.isEmpty()) {
             PregTodo existing = todoMapper.selectByRequest(requestId);
@@ -72,6 +77,7 @@ public class PregTodoServiceImpl implements IPregTodoService {
         todo.setTitle(body.getTitle().trim());
         todo.setDueDate(dueDate);
         todo.setDueTime(dueTime);
+        todo.setRepeatDaily(repeatDaily);
         todo.setNote(body.getNote());
         todo.setDone(Boolean.FALSE);
         todo.setRequestId(requestId == null || requestId.isEmpty() ? null : requestId);
@@ -105,6 +111,10 @@ public class PregTodoServiceImpl implements IPregTodoService {
             existing.setDueTime(body.getDueTime().isBlank() ? null
                     : PregnancyTimeUtils.parseOptionalTime(body.getDueTime(), "待办时刻"));
         }
+        if (body.getRepeatDaily() != null) {
+            existing.setRepeatDaily(body.getRepeatDaily());
+        }
+        requireReminderTime(Boolean.TRUE.equals(existing.getRepeatDaily()), existing.getDueTime());
         if (body.getNote() != null) {
             existing.setNote(body.getNote());
         }
@@ -140,6 +150,13 @@ public class PregTodoServiceImpl implements IPregTodoService {
         }
     }
 
+    /** 开启每日提醒时必须有发送时刻。 */
+    private void requireReminderTime(boolean repeatDaily, LocalTime dueTime) {
+        if (repeatDaily && dueTime == null) {
+            throw PregnancyException.invalid("开启每日提醒时请选择时间");
+        }
+    }
+
     /**
      * 转换展示对象
      *
@@ -152,6 +169,7 @@ public class PregTodoServiceImpl implements IPregTodoService {
         vo.setTitle(todo.getTitle());
         vo.setDueDate(PregnancyTimeUtils.formatDate(todo.getDueDate()));
         vo.setDueTime(todo.getDueTime() == null ? null : todo.getDueTime().toString());
+        vo.setRepeatDaily(todo.getRepeatDaily());
         vo.setNote(todo.getNote());
         vo.setDone(todo.getDone());
         vo.setDoneAt(PregnancyTimeUtils.formatOffset(todo.getDoneAt() == null ? null : todo.getDoneAt().toInstant()));

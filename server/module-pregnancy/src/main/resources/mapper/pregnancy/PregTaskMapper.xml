@@ -45,6 +45,22 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         limit #{limit}
     </select>
 
+    <insert id="enqueueDailyTodoReminders">
+        insert into preg_task (
+            kind, business_id, dedup_key, payload_json, stage_json, status, max_attempts,
+            next_run_at, create_time, update_time
+        )
+        select 'TODO_REMINDER', t.id, concat('TODO_DAILY:', t.id, ':', #{date}),
+               json_object('date', date_format(#{date}, '%Y-%m-%d')), json_object(), 'PENDING', #{maxAttempts},
+               timestamp(#{date}, t.due_time), now(3), now(3)
+        from preg_todo t
+        left join preg_task existing on existing.dedup_key = concat('TODO_DAILY:', t.id, ':', #{date})
+        where t.del_flag = '0' and t.done = 0 and t.repeat_daily = 1
+          and t.due_date &lt;= #{date} and t.due_time between #{from} and #{to}
+          and existing.id is null
+        on duplicate key update id = preg_task.id
+    </insert>
+
     <update id="claim">
         update preg_task
         set status      = 'RUNNING',
@@ -58,6 +74,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and next_run_at &lt;= #{now}
           and del_flag = '0'
     </update>
+
+    <insert id="enqueueRuleReminder">
+        insert into preg_task (kind, dedup_key, payload_json, stage_json, next_run_at, max_attempts, create_time, update_time)
+        values ('RULE_REMINDER', #{dedupKey}, #{payload}, json_object(), #{runAt}, #{maxAttempts}, now(3), now(3))
+        on duplicate key update id = id
+    </insert>
 
     <update id="updateStage">
         update preg_task
@@ -203,7 +225,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectLatestReminder" resultMap="TaskResult">
         select <include refid="selectTaskColumns"/>
         from preg_task t
-        where t.kind = 'REMINDER' and t.del_flag = '0'
+        where t.kind in ('REMINDER', 'TODO_REMINDER', 'RULE_REMINDER') and t.del_flag = '0'
         order by t.id desc
         limit 1
     </select>

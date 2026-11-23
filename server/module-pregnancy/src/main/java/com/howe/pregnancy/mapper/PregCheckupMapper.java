@@ -22,6 +22,9 @@ public interface PregCheckupMapper {
      */
     List<PregCheckup> selectList();
 
+    /** 锁定在用产检，保证默认待办核对与预约状态变更串行。 */
+    List<PregCheckup> selectListForUpdate();
+
     /**
      * 按主键查询
      *
