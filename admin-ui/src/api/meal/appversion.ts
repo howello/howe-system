@@ -1,6 +1,12 @@
 import request from '@/utils/request'
-import type { MealAppVersionQueryParams, MealAppVersion, WgtUploadResult, AppPackageCheckResult, AjaxResult, TableDataInfo } from '@/types'
-import type { AppReleaseKey } from '@/types/api/meal/appversion'
+import type { AjaxResult, TableDataInfo } from '@/types/api/common'
+import type {
+  AppPackageCheckResult,
+  AppReleaseKey,
+  MealAppVersion,
+  MealAppVersionQueryParams,
+  WgtUploadResult
+} from '@/types/api/meal/appversion'
 
 // 查询 App 版本列表
 export function listAppVersion(query: MealAppVersionQueryParams): Promise<TableDataInfo<MealAppVersion[]>> {
