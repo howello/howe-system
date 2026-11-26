@@ -15,7 +15,6 @@
 --   meal_review       评价，一单一评（order_id 唯一约束）
 --   meal_proposal     新菜提案，审核通过时自动往 meal_dish 落一条（source=1）
 --   meal_category_ref 菜品/提案与唯一主类的一对一关联，biz_type 区分（1=菜品 2=提案）
---   meal_app_version  App（meal-ui）wgt 资源包版本，客户端启动时据此检测热更新
 --
 -- 菜品与分类承载「公共数据 + 家庭私有数据」，因此不走 @DataScope（数据权限只会
 -- 拼出本部门，会把 dept_id=0 的公共数据一起过滤掉），隔离条件在 Mapper XML 里手写。
@@ -115,6 +114,8 @@ create table meal_order (
   assign_user_name varchar(64) default ''                 comment '指派的厨师昵称（冗余快照）',
   deadline_time    datetime                               comment '接单截止时间',
   close_reason     char(1)                                comment '关闭原因（1用户取消 2超时 3全员拒绝）',
+  data_version     bigint      not null default 0        comment '订单数据版本，所有修改路径递增',
+  candidate_round  bigint      not null default 0        comment '候选轮次，指派转公开时递增',
   del_flag     char(1)      default '0'                comment '删除标记（0存在 2删除）',
   create_by    varchar(64)  default ''                 comment '创建者',
   create_time  datetime                                comment '下单时间',
@@ -152,12 +153,15 @@ create table meal_order_candidate (
   status       char(1)     default '0'             comment '状态（0待响应 1已接单 2已拒绝 3已失效 4已超时未响应）',
   expire_time  datetime                            comment '响应截止时间（与订单 deadline_time 一致）',
   respond_time datetime                            comment '接单/拒绝/超时判定时间',
+  data_version    bigint   not null default 0      comment '候选数据版本',
+  candidate_round bigint   not null default 0      comment '候选轮次',
   create_time  datetime                            comment '入池时间',
   update_time  datetime                            comment '更新时间',
   primary key (candidate_id),
   unique key uk_meal_candidate_order_user (order_id, user_id),
   key idx_meal_candidate_user (user_id, status),
-  key idx_meal_candidate_order (order_id, status)
+  key idx_meal_candidate_order (order_id, status),
+  key idx_meal_candidate_round (order_id, candidate_round, status)
 ) engine=innodb auto_increment=1 comment = '点餐-订单候选厨师';
 
 -- ----------------------------
@@ -225,6 +229,7 @@ create table meal_proposal (
   audit_time    datetime                               comment '审核时间',
   audit_remark  varchar(500) default ''                comment '审核意见',
   dish_id       bigint(20)                             comment '通过后生成的菜品ID',
+  data_version  bigint      not null default 0         comment '提案数据版本，所有修改路径递增',
   del_flag      char(1)      default '0'               comment '删除标记（0存在 2删除）',
   create_by     varchar(64)  default ''                comment '创建者',
   create_time   datetime                               comment '创建时间',
@@ -261,28 +266,7 @@ create table meal_category_ref (
 -- 只服务 wgt 资源热更新，不承载整包（apk/ipa）升级，因此没有整包下载地址列。
 -- 版本记录是平台级配置（不分家庭），不走 @DataScope。
 -- ----------------------------
-drop table if exists meal_app_version;
-create table meal_app_version (
-  version_id   bigint(20)   not null auto_increment    comment '版本记录ID',
-  app_key      varchar(24)  not null default 'meal'    comment '应用渠道',
-  version_name varchar(32)  not null                   comment '版本名称（展示用）',
-  version_code int(11)      not null                   comment '版本序号（比较基准，整数递增）',
-  wgt_url      varchar(500) not null                   comment 'wgt 资源包地址（R2）',
-  wgt_size     bigint(20)   default 0                  comment '资源包字节大小',
-  file_name    varchar(255) default ''                 comment '上传时的原始文件名',
-  update_log   text                                    comment '更新说明',
-  force_update char(1)      default '0'                comment '是否强制更新（0否 1是）',
-  status       char(1)      default '0'                comment '发布状态（0已发布 1停用）',
-  del_flag     char(1)      default '0'                comment '删除标记（0存在 2删除）',
-  create_by    varchar(64)  default ''                 comment '创建者',
-  create_time  datetime                                comment '创建时间',
-  update_by    varchar(64)  default ''                 comment '更新者',
-  update_time  datetime                                comment '更新时间',
-  remark       varchar(500) default null               comment '备注',
-  primary key (version_id),
-  key idx_meal_app_version_code (version_code, status, del_flag),
-  key idx_app_version_channel (app_key, status, del_flag, version_code)
-) engine=innodb auto_increment=1 comment = '点餐-App 版本（wgt 热更新）';
+-- 共享版本表 app_version 由 base.sql 初始化。
 
 -- ----------------------------
 -- 8.1、企业微信通知配置（每家庭一条）
@@ -348,11 +332,7 @@ values ('新菜审核', @mealDirId, '5', 'proposal', 'meal/proposal/index', 1, 0
 
 select @mealProposalMenuId := LAST_INSERT_ID();
 
-insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-select 'App 版本管理', menu_id, '6', 'appversion', 'tool/appversion/index', 1, 0, 'C', '0', '0', 'tool:appVersion:list', 'download', 'admin', sysdate(), '宝宝与吃了么的 WGT 版本管理'
-from sys_menu where path = 'tool' and parent_id = 0 and menu_type = 'M' limit 1;
 
-select @mealAppVersionMenuId := LAST_INSERT_ID();
 
 insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 values ('通知管理', @mealDirId, '7', 'wecom', 'meal/wecom/index', 1, 0, 'C', '0', '0', 'meal:wecom:list', 'message', 'admin', sysdate(), '企业微信通知配置菜单');
@@ -408,18 +388,6 @@ insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame
 values ('提案删除', @mealProposalMenuId, '3', '#', '', 1, 0, 'F', '0', '0', 'meal:proposal:remove', '#', 'admin', sysdate(), '');
 
 -- App 版本按钮
-insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-values ('版本查询', @mealAppVersionMenuId, '1', '#', '', 1, 0, 'F', '0', '0', 'tool:appVersion:query', '#', 'admin', sysdate(), '');
-insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-values ('版本新增', @mealAppVersionMenuId, '2', '#', '', 1, 0, 'F', '0', '0', 'tool:appVersion:add', '#', 'admin', sysdate(), '');
-insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-values ('版本修改', @mealAppVersionMenuId, '3', '#', '', 1, 0, 'F', '0', '0', 'tool:appVersion:edit', '#', 'admin', sysdate(), '');
-insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-values ('版本删除', @mealAppVersionMenuId, '4', '#', '', 1, 0, 'F', '0', '0', 'tool:appVersion:remove', '#', 'admin', sysdate(), '');
-insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-values ('资源包上传', @mealAppVersionMenuId, '5', '#', '', 1, 0, 'F', '0', '0', 'tool:appVersion:upload', '#', 'admin', sysdate(), '上传 wgt 资源包到 R2');
-insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-values ('管理宝宝渠道', @mealAppVersionMenuId, '6', '#', '', 1, 0, 'F', '0', '0', 'tool:appVersion:pregnancy', '#', 'admin', sysdate(), '允许在共用版本管理中操作宝宝渠道');
 
 -- 企业微信通知按钮
 insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
@@ -468,12 +436,13 @@ where perms in ('meal:dish:list', 'meal:dish:query', 'meal:dish:add', 'meal:dish
                 'meal:category:list', 'meal:category:query',
                 'meal:order:list', 'meal:order:query', 'meal:order:dispatch', 'meal:order:finish');
 
--- 家庭管理员：点餐管理目录下的全部菜单与按钮，包含家庭私有分类的新增/修改/删除。
+-- 家庭管理员可管理家庭私有分类；菜品归属调整仅授予平台管理员。
 -- 公共分类的锁定在 Service 层校验，不依赖菜单权限；厨师不获得分类写权限。
 insert into sys_role_menu (role_id, menu_id) values (@managerRoleId, @mealDirId);
 insert into sys_role_menu (role_id, menu_id)
 select @managerRoleId, menu_id from sys_menu
-where perms like 'meal:%' or (perms like 'tool:appVersion:%' and perms <> 'tool:appVersion:pregnancy');
+where (perms like 'meal:%' and perms <> 'meal:dish:owner')
+   or (perms like 'tool:appVersion:%' and perms NOT IN ('tool:appVersion:pregnancy', 'tool:appVersion:book'));
 insert ignore into sys_role_menu (role_id, menu_id)
 select @managerRoleId, menu_id from sys_menu where path = 'tool' and parent_id = 0 and menu_type = 'M';
 
@@ -653,7 +622,7 @@ where d.dept_id = 0
 -- ----------------------------
 -- 13、参数配置（App 版本发布令牌）
 --
--- 给打包脚本（meal-ui 的 publish:wgt）用的静态发布令牌，配合第 8 节的 meal_app_version
+-- 给打包脚本（meal-ui 的 publish:wgt）用的静态发布令牌，配合 base.sql 的共享 app_version
 -- 与发布接口 POST /meal/app/version/publish 使用。这里只预置键与说明：值留空表示未配置，
 -- 未配置时发布接口一律拒绝（不会变成无鉴权的上传口）。
 -- 真实令牌请在「系统管理 > 参数设置」里填入（改完即时生效），不要写进仓库。

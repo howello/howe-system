@@ -121,6 +121,9 @@ token:
   # 孕期助手端令牌有效期（默认43200分钟 = 30天）。登录时传 client=pregnancy 才会用到，
   # 与点餐端策略一致；管理端与点餐端不受影响。
   pregnancyExpireTime: ${JWT_PREGNANCY_EXPIRATION:43200}
+  # 读书端令牌有效期（默认43200分钟 = 30天）。登录时传 client=book 才会用到，
+  # 与点餐端、孕期端策略一致；管理端不受影响。
+  bookExpireTime: ${JWT_BOOK_EXPIRATION:43200}
 
 # MyBatis配置
 mybatis:

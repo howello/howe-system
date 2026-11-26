@@ -233,6 +233,11 @@
                 <artifactId>module-meal</artifactId>
                 <version>${howe.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.howe</groupId>
+                <artifactId>module-book</artifactId>
+                <version>${howe.version}</version>
+            </dependency>
 
             <!-- 孕期助手 -->
             <dependency>
@@ -304,6 +309,7 @@
         <module>module-blog</module>
         <module>module-ai</module>
         <module>module-meal</module>
+        <module>module-book</module>
         <module>module-pregnancy</module>
         <module>module-share</module>
         <module>module-mcp</module>

@@ -265,6 +265,7 @@ create table blog_talk (
   pub_date          datetime                                   comment '发布时间',
   is_top            char(1)         default '0'                comment '是否置顶（0否 1是）',
   status            char(1)         default '0'                comment '状态（0发布 1隐藏）',
+  data_version      bigint          not null default 0         comment '数据版本，所有修改路径递增',
   create_by         varchar(64)     default ''                 comment '创建者',
   create_time       datetime                                   comment '创建时间',
   update_by         varchar(64)     default ''                 comment '更新者',

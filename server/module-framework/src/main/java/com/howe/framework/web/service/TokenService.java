@@ -54,6 +54,10 @@ public class TokenService
     @Value("${token.pregnancyExpireTime:43200}")
     private int pregnancyExpireTime;
 
+    // 读书端令牌有效期（默认43200分钟 = 30天）
+    @Value("${token.bookExpireTime:43200}")
+    private int bookExpireTime;
+
     protected static final long MILLIS_SECOND = 1000;
 
     protected static final long MILLIS_MINUTE = 60 * MILLIS_SECOND;
@@ -215,6 +219,16 @@ public class TokenService
     public int getPregnancyExpireTime()
     {
         return pregnancyExpireTime;
+    }
+
+    /**
+     * 读书端会话有效期（分钟）
+     *
+     * @return 分钟数
+     */
+    public int getBookExpireTime()
+    {
+        return bookExpireTime;
     }
 
     /**

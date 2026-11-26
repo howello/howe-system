@@ -6,12 +6,12 @@ import com.howe.common.core.redis.RedisCache;
 import com.howe.common.utils.ConfigUtils;
 import com.howe.common.utils.DateUtils;
 import com.howe.common.utils.SecurityUtils;
-import com.howe.meal.domain.MealAppVersion;
-import com.howe.meal.domain.vo.MealAppVersionOverview;
+import com.howe.common.appversion.domain.AppVersion;
+import com.howe.meal.domain.vo.AppVersionOverview;
 import com.howe.meal.domain.vo.MealDishOverview;
 import com.howe.meal.domain.vo.MealHomeStats;
 import com.howe.meal.domain.vo.MealHotDishes;
-import com.howe.meal.mapper.MealAppVersionMapper;
+import com.howe.common.appversion.mapper.AppVersionMapper;
 import com.howe.meal.mapper.MealStatsMapper;
 import com.howe.meal.service.IMealStatsService;
 import lombok.RequiredArgsConstructor;
@@ -51,7 +51,7 @@ public class MealStatsServiceImpl implements IMealStatsService {
     private static final DateTimeFormatter DAY_FMT = DateTimeFormatter.ISO_LOCAL_DATE;
 
     private final MealStatsMapper mealStatsMapper;
-    private final MealAppVersionMapper mealAppVersionMapper;
+    private final AppVersionMapper appVersionMapper;
     private final RedisCache redisCache;
 
     @Override
@@ -79,12 +79,12 @@ public class MealStatsServiceImpl implements IMealStatsService {
     }
 
     @Override
-    public MealAppVersionOverview getAppVersionOverview() {
-        MealAppVersionOverview cached = redisCache.getCacheObject(CacheConstants.HOME_MEAL_VERSION_KEY);
+    public AppVersionOverview getAppVersionOverview() {
+        AppVersionOverview cached = redisCache.getCacheObject(CacheConstants.HOME_MEAL_VERSION_KEY);
         if (cached != null) {
             return cached;
         }
-        MealAppVersionOverview result = computeAppVersionOverview();
+        AppVersionOverview result = computeAppVersionOverview();
         cache(CacheConstants.HOME_MEAL_VERSION_KEY, result);
         return result;
     }
@@ -184,17 +184,17 @@ public class MealStatsServiceImpl implements IMealStatsService {
         return new MealDishOverview(onShelf, offShelf, categoryCount, publicCount, familyCount);
     }
 
-    private MealAppVersionOverview computeAppVersionOverview() {
-        MealAppVersion latest = mealAppVersionMapper.selectLatestPublished("meal");
+    private AppVersionOverview computeAppVersionOverview() {
+        AppVersion latest = appVersionMapper.selectLatestPublished("meal");
         long total = mealStatsMapper.selectAppVersionCount();
         if (latest == null) {
-            return new MealAppVersionOverview(null, null, false, total);
+            return new AppVersionOverview(null, null, false, total);
         }
         String publishTime = latest.getCreateTime() == null
                 ? null
                 : DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, latest.getCreateTime()).substring(0, 16);
         boolean force = "1".equals(latest.getForceUpdate());
-        return new MealAppVersionOverview(latest.getVersionName(), publishTime, force, total);
+        return new AppVersionOverview(latest.getVersionName(), publishTime, force, total);
     }
 
     private MealHotDishes computeHotDishes() {

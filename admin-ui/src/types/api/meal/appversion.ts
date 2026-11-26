@@ -1,7 +1,7 @@
 import type { PageDomain, BaseEntity } from "../common";
 
 /** 共用版本管理里的应用渠道。 */
-export type AppReleaseKey = 'meal' | 'pregnancy';
+export type AppReleaseKey = 'meal' | 'pregnancy' | 'book';
 
 /** App 版本分页查询参数 */
 export interface MealAppVersionQueryParams extends PageDomain {

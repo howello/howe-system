@@ -129,6 +129,9 @@ public class SysLoginService
         if (Constants.CLIENT_PREGNANCY.equals(client)) {
             return tokenService.getPregnancyExpireTime();
         }
+        if (Constants.CLIENT_BOOK.equals(client)) {
+            return tokenService.getBookExpireTime();
+        }
         return tokenService.getExpireTime();
     }
 
@@ -282,13 +285,19 @@ public class SysLoginService
      * 该参数只选择准入策略，不代替档案级授权。
      * </p>
      *
+     * <p>
+     * 读书端（{@code client=book}）同理：读书节点按 {@code user_id} 隔离，
+     * 任何账号都只能看到自己的树，不需要额外的管理端角色。
+     * </p>
+     *
      * @param loginUser 登录用户
      * @param client 登录客户端
      * @throws ServiceException 无管理端权限时抛出
      */
     private void assertAdminConsoleAllowed(LoginUser loginUser, String client)
     {
-        if (Constants.CLIENT_MEAL.equals(client) || Constants.CLIENT_PREGNANCY.equals(client))
+        if (Constants.CLIENT_MEAL.equals(client) || Constants.CLIENT_PREGNANCY.equals(client)
+                || Constants.CLIENT_BOOK.equals(client))
         {
             return;
         }

@@ -121,6 +121,15 @@ public class Constants
     public static final String CLIENT_PREGNANCY = "pregnancy";
 
     /**
+     * 登录客户端：读书端
+     *
+     * <p>读书数据按 {@code user_id} 隔离，任何能登录账号体系的人都可以用；
+     * 与点餐端、孕期端一样不套用管理端的角色准入规则，会话有效期取
+     * {@code token.bookExpireTime}。</p>
+     */
+    public static final String CLIENT_BOOK = "book";
+
+    /**
      * 令牌前缀
      */
     public static final String LOGIN_USER_KEY = "login_user_key";

@@ -4,7 +4,7 @@ import com.howe.common.annotation.Log;
 import com.howe.common.core.controller.BaseController;
 import com.howe.common.core.domain.AjaxResult;
 import com.howe.common.enums.BusinessType;
-import com.howe.meal.domain.AppReleaseChannel;
+import com.howe.common.appversion.domain.AppReleaseChannel;
 import com.howe.system.domain.AppReleaseNotifyConfig;
 import com.howe.system.service.AppReleaseNotifyConfigService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -26,7 +26,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/tool/app-release/notify/{appKey}")
 @PreAuthorize("@ss.hasPermi('tool:appVersion:edit') && "
-        + "(#appKey != 'pregnancy' || @ss.hasPermi('tool:appVersion:pregnancy'))")
+        + "(#appKey != 'pregnancy' || @ss.hasPermi('tool:appVersion:pregnancy'))"
+        + " && (#appKey != 'book' || @ss.hasPermi('tool:appVersion:book'))")
 @RequiredArgsConstructor
 public class AppReleaseNotifyController extends BaseController {
 

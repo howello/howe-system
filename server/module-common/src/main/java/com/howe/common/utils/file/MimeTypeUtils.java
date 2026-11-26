@@ -28,13 +28,15 @@ public class MimeTypeUtils
 
     public static final String[] DEFAULT_ALLOWED_EXTENSION = {
             // 图片
-            "bmp", "gif", "jpg", "jpeg", "png",
+            "bmp", "gif", "jpg", "jpeg", "png", "webp",
             // word excel powerpoint
             "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt",
             // 压缩文件
             "rar", "zip", "gz", "bz2",
             // 视频格式
             "mp4", "avi", "rmvb",
+            // 音频与浏览器录音容器
+            "mp3", "wav", "aac", "m4a", "ogg", "webm",
             // pdf
             "pdf" };
 
@@ -52,6 +54,20 @@ public class MimeTypeUtils
                 return "bmp";
             case IMAGE_GIF:
                 return "gif";
+            case "image/webp":
+                return "webp";
+            case "audio/mpeg":
+                return "mp3";
+            case "audio/wav":
+                return "wav";
+            case "audio/aac":
+                return "aac";
+            case "audio/mp4":
+                return "m4a";
+            case "audio/ogg":
+                return "ogg";
+            case "audio/webm":
+                return "webm";
             default:
                 return "";
         }
@@ -117,6 +133,14 @@ public class MimeTypeUtils
                 return "audio/mpeg";
             case "wav":
                 return "audio/wav";
+            case "aac":
+                return "audio/aac";
+            case "m4a":
+                return "audio/mp4";
+            case "ogg":
+                return "audio/ogg";
+            case "webm":
+                return "video/webm";
             case "doc":
                 return "application/msword";
             case "docx":

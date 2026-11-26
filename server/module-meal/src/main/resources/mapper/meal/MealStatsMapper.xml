@@ -74,7 +74,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </select>
 
     <select id="selectAppVersionCount" resultType="long">
-        select count(*) from meal_app_version v where v.del_flag = '0' and v.app_key = 'meal'
+        select count(*) from app_version v where v.del_flag = '0' and v.app_key = 'meal'
     </select>
 
     <!-- 热门菜品：近 30 天订单明细按份数汇总（不限订单状态，待接/制作中也会计入），

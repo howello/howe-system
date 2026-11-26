@@ -191,7 +191,7 @@ values ('anthropic', 'Anthropic', 'anthropic', 'https://api.anthropic.com',
 -- 「AI 管理 > 场景路由」里手工维护。
 -- 场景标识与 module-meal 代码里写死的常量一致，不要改名。
 -- ----------------------------------------------------------------------------
-delete from ai_scene_route where scene in ('meal.dish.generate', 'meal.dish.audit', 'meal.dish.update', 'meal.dish.search', 'meal.dish.cover', 'meal.app.version.log', 'meal.category.review');
+delete from ai_scene_route where scene in ('meal.dish.generate', 'meal.dish.audit', 'meal.dish.update', 'meal.dish.search', 'meal.dish.cover', 'meal.app.version.log', 'meal.category.review', 'meal.order.prep');
 
 -- 对话补齐：优先名为 deepseek-flash 的对话模型，否则取首个启用的对话模型
 insert into ai_scene_route (scene, scene_name, capability, primary_model_id, params, enabled, remark, create_by, create_time)
@@ -241,6 +241,14 @@ where m.capability = 'CHAT' and m.enabled = 1
 order by (m.model_name = 'deepseek-flash') desc, m.id asc
 limit 1;
 
+-- 一键备菜清单：优先使用已启用的 deepseek-flash，否则取首个启用的对话模型。
+insert into ai_scene_route (scene, scene_name, capability, primary_model_id, params, enabled, remark, create_by, create_time)
+select 'meal.order.prep', '一键备菜清单', 'CHAT', m.id, '{"temperature":0.2,"maxTokens":2000}', 1, '下单后生成备菜采购清单', 'admin', sysdate()
+from ai_model m
+where m.capability = 'CHAT' and m.enabled = 1
+order by (m.model_name = 'deepseek-flash') desc, m.id asc
+limit 1;
+
 -- 封面图：取首个启用的文生图模型；没有可用文生图模型时不写入（接口按未配置降级）
 insert into ai_scene_route (scene, scene_name, capability, primary_model_id, params, enabled, remark, create_by, create_time)
 select 'meal.dish.cover', '菜品封面生成', 'IMAGE', m.id, '{"size":"1024*1024","styleSuffixKey":"recipe.photo"}', 1, '菜品一键AI-封面图', 'admin', sysdate()
@@ -279,7 +287,8 @@ delete from sys_config where config_key in (
   'ai.prompt.meal.dish.updateSystem',
   'ai.prompt.meal.dish.searchSystem',
   'ai.prompt.meal.app.versionLog',
-  'ai.prompt.meal.category.reviewSystem'
+  'ai.prompt.meal.category.reviewSystem',
+  'ai.prompt.meal.order.prepSystem'
 );
 
 insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
@@ -399,6 +408,11 @@ insert into sys_config (config_name, config_key, config_value, config_type, crea
 values ('AI-点餐分类审阅提示词', 'ai.prompt.meal.category.reviewSystem',
         '你是家庭点餐分类编辑。请审阅用户提交的分类名称、分类说明和分类依据，并在合格时做克制的中文润色。分类用于帮助家庭成员判断一道菜应放在哪里。说明用一句话说明定位；依据清楚写出「放什么、不放什么、示例」。保持用户表达的地域、食材和范围，不添加用户未给出的菜名、菜品、地域事实或排除条件。只返回符合指定 JSON Schema 的对象，不要输出 Markdown。',
         'Y', 'admin', sysdate(), '点餐分类新增/修改时的 AI 审阅提示词；留空则用代码内缺省值。固定规则由代码追加，不随本配置改变', 'AI');
+
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
+values ('AI-一键备菜清单提示词', 'ai.prompt.meal.order.prepSystem',
+        '你是一位熟悉中国菜市场的家庭采购助理。用户会给出一张家庭订单的菜品清单与每道菜的用料，请汇总成一张可以直接拿去买菜的备菜清单。所有内容使用简体中文，只输出 JSON。',
+        'Y', 'admin', sysdate(), '一键备菜清单生成的 system 提示词；留空则用代码内缺省值。固定内容规则由代码追加，不随本配置改变', 'AI');
 
 -- ----------------------------------------------------------------------------
 -- 10. 菜单与按钮权限

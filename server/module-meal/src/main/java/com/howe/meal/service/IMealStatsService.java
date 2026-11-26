@@ -1,6 +1,6 @@
 package com.howe.meal.service;
 
-import com.howe.meal.domain.vo.MealAppVersionOverview;
+import com.howe.meal.domain.vo.AppVersionOverview;
 import com.howe.meal.domain.vo.MealDishOverview;
 import com.howe.meal.domain.vo.MealHomeStats;
 import com.howe.meal.domain.vo.MealHotDishes;
@@ -34,7 +34,7 @@ public interface IMealStatsService {
      *
      * @return 版本概况
      */
-    MealAppVersionOverview getAppVersionOverview();
+    AppVersionOverview getAppVersionOverview();
 
     /**
      * 热门菜品（近 30 天已完成订单中份数 Top 5）

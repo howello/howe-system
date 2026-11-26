@@ -58,6 +58,10 @@
             <groupId>com.howe</groupId>
             <artifactId>module-meal</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.howe</groupId>
+            <artifactId>module-book</artifactId>
+        </dependency>
 
         <!-- 孕期助手 -->
         <dependency>

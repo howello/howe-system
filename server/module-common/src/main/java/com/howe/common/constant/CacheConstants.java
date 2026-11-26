@@ -80,7 +80,7 @@ public class CacheConstants
     public static final String HOME_MEAL_DISH_KEY = "home:meal:dish";
 
     /** 首页点餐 App 版本概况缓存 key（平台级，不分家庭） */
-    public static final String HOME_MEAL_VERSION_KEY = "home:meal:version";
+    public static final String HOME_MEAL_VERSION_KEY = "home:meal:app-version:v2";
 
     /** 首页点餐热门菜品缓存 key 前缀 */
     public static final String HOME_MEAL_HOT_DISH_KEY = "home:meal:hotdish";

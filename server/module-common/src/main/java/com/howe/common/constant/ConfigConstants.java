@@ -217,7 +217,7 @@ public class ConfigConstants {
     public static final String AI_PROMPT_MEAL_DISH_SEARCH_SYSTEM = "ai.prompt.meal.dish.searchSystem";
 
     /** App 发版日志润色的 system 提示词 */
-    public static final String AI_PROMPT_MEAL_APP_VERSION_LOG = "ai.prompt.meal.app.versionLog";
+    public static final String AI_PROMPT_APP_VERSION_LOG = "ai.prompt.meal.app.versionLog";
 
     /** 点餐分类 AI 审阅与润色的 system 提示词 */
     public static final String AI_PROMPT_MEAL_CATEGORY_REVIEW_SYSTEM = "ai.prompt.meal.category.reviewSystem";
@@ -237,6 +237,9 @@ public class ConfigConstants {
     /** 宝宝 App 专用 WGT 发布令牌。 */
     public static final String PREGNANCY_APP_PUBLISH_TOKEN = "pregnancy.app.publishToken";
 
+    /** 读书 App 专用 WGT 发布令牌。 */
+    public static final String BOOK_APP_PUBLISH_TOKEN = "book.app.publishToken";
+
     /** 孕期企微机器人凭证。 */
     public static final String PREGNANCY_WECOM_WEBHOOK_KEY = "pregnancy.wecom.webhookKey";
 
@@ -248,7 +251,7 @@ public class ConfigConstants {
      *
      * <p>版本管理录入远程 wgt 链接时，有界下载校验的上限；默认 50 MiB。</p>
      */
-    public static final String MEAL_APP_PACKAGE_MAX_SIZE = "meal.app.packageMaxSize";
+    public static final String APP_PACKAGE_MAX_SIZE = "meal.app.packageMaxSize";
 
     /**
      * 分享本地上传暂存目录
@@ -335,6 +338,7 @@ public class ConfigConstants {
             BLOG_OPEN_TOKEN,
             MEAL_APP_PUBLISH_TOKEN,
             PREGNANCY_APP_PUBLISH_TOKEN,
+            BOOK_APP_PUBLISH_TOKEN,
             PREGNANCY_WECOM_WEBHOOK_KEY,
             TURNSTILE_SECRET_KEY)));
 

@@ -184,11 +184,10 @@ const single = ref<boolean>(true)
 const multiple = ref<boolean>(true)
 const total = ref<number>(0)
 const title = ref<string>("")
-const canManagePregnancy = computed(() => checkPermi(['tool:appVersion:pregnancy']))
 let listVersion = 0
-const appName = (key?: AppReleaseKey) => key === 'pregnancy' ? '宝宝' : '吃了么'
-const appOptions = computed(() => (['meal', 'pregnancy'] as const)
-  .filter(key => key === 'meal' || canManagePregnancy.value)
+const appName = (key?: AppReleaseKey) => ({ meal: '吃了么', pregnancy: '宝宝', book: '读书笔记' })[key ?? 'meal']
+const appOptions = computed(() => (['meal', 'pregnancy', 'book'] as const)
+  .filter(key => key === 'meal' || checkPermi(['tool:appVersion:' + key]))
   .map(key => ({ value: key, label: appName(key) })))
 
 const data = reactive({
@@ -348,7 +347,7 @@ function handleCheckPackage() {
     return
   }
   checking.value = true
-  checkAppPackage(url)
+  checkAppPackage(url, form.value.appKey)
     .then((response: any) => {
       if (form.value === target && target.wgtUrl === url) {
         remoteChecked.value = response.data as AppPackageCheckResult

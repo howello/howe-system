@@ -123,9 +123,10 @@ mysql -u root -p howe-system < server/sql/blog.sql
 mysql -u root -p howe-system < server/sql/ai.sql
 mysql -u root -p howe-system < server/sql/meal.sql
 mysql -u root -p howe-system < server/sql/share.sql
+mysql -u root -p howe-system < server/sql/book.sql
 ```
 
-`base.sql` 必须先执行；其余模块脚本按实际启用的功能导入。脚本会创建对应菜单、权限与参数配置。
+`base.sql` 必须先执行；其余模块脚本按实际启用的功能导入。脚本会创建对应菜单、权限与参数配置。共享 App 版本及发版通知表由 `base.sql` 初始化。已有库使用 `server/sql/增量/book_and_app_version_20261126.sql`，并与读取 `app_version` 的新后端配套上线。
 
 ### 2. 配置环境变量
 

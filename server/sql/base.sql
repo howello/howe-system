@@ -2,7 +2,7 @@
 -- base.sql — 系统基准脚本
 --
 -- 内容：系统管理 / 系统监控 / 字典 / 参数等核心表的建表与初始数据，
---       以及系统级参数（验证码、人机校验、首页统计）。
+--       以及系统级参数和共享 App 版本管理。
 --
 -- 库名 howe-system，字符集 utf8mb4。执行方式：
 --   mysql -u root -p howe-system < base.sql
@@ -83,7 +83,7 @@ create table sys_user (
 -- 初始化-用户信息表数据
 -- ----------------------------
 insert into sys_user values(1,  103, 'admin', '王艳涛', '00', 'ry@163.com', '15888888888', '1', '', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '0', '0', '127.0.0.1', sysdate(), sysdate(), 'admin', sysdate(), '', null, '管理员');
-insert into sys_user values(2,  105, 'ry',    '王艳涛', '00', 'ry@qq.com',  '15666666666', '1', '', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '0', '0', '127.0.0.1', sysdate(), sysdate(), 'admin', sysdate(), '', null, '测试员');
+insert into sys_user values(2,  105, 'ry',    '王艳涛', '00', 'ry@qq.com',  '15666666666', '1', '', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '1', '0', '127.0.0.1', sysdate(), sysdate(), 'admin', sysdate(), '', null, '测试员');
 
 
 -- ----------------------------
@@ -633,3 +633,58 @@ values('首页-模块探测缓存TTL', 'sys.home.moduleCacheTtl', '300', 'Y', 'a
 insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, update_by, update_time, remark, param_type)
 values('首页-卡片统计缓存TTL', 'sys.home.cardCacheTtl', '300', 'Y', 'admin', sysdate(), '', null, '首页点餐/分享/AI 等卡片统计结果 Redis 缓存秒数，默认 300（5 分钟）', '首页');
 
+-- 18、共享 App 版本和发版通知
+create table if not exists app_version (
+  version_id   bigint(20)   not null auto_increment    comment '版本记录ID',
+  app_key      varchar(24)  not null default 'meal'    comment '应用渠道',
+  version_name varchar(32)  not null                   comment '版本名称（展示用）',
+  version_code int(11)      not null                   comment '版本序号（比较基准，整数递增）',
+  wgt_url      varchar(500) not null                   comment 'wgt 资源包地址（R2）',
+  wgt_size     bigint(20)   default 0                  comment '资源包字节大小',
+  file_name    varchar(255) default ''                 comment '上传时的原始文件名',
+  update_log   text                                    comment '更新说明',
+  force_update char(1)      default '0'                comment '是否强制更新（0否 1是）',
+  status       char(1)      default '0'                comment '发布状态（0已发布 1停用）',
+  del_flag     char(1)      default '0'                comment '删除标记（0存在 2删除）',
+  create_by    varchar(64)  default ''                 comment '创建者',
+  create_time  datetime                                comment '创建时间',
+  update_by    varchar(64)  default ''                 comment '更新者',
+  update_time  datetime                                comment '更新时间',
+  remark       varchar(500) default null               comment '备注',
+  primary key (version_id),
+  key idx_app_version_code (version_code, status, del_flag),
+  key idx_app_version_channel (app_key, status, del_flag, version_code)
+) engine=innodb auto_increment=1 comment = '共享 App 版本（wgt 热更新）';
+
+create table if not exists app_release_notify_config (
+  config_id   bigint       not null auto_increment comment '配置ID',
+  app_key     varchar(64)  not null                comment '应用标识',
+  label       varchar(80)  not null default ''     comment '群备注',
+  webhook_key varchar(1024) not null               comment '加密的群机器人 Webhook Key',
+  enabled     tinyint      not null default 0      comment '是否启用（0停用 1启用）',
+  primary key (config_id),
+  key idx_app_release_notify_app (app_key, enabled)
+) engine=innodb default charset=utf8mb4 comment='App 发版通知机器人配置';
+
+-- 登记共享版本菜单和通用权限，已有菜单和授权原地保留。
+INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time)
+SELECT 'App 版本管理', parent.menu_id, 6, 'appversion', 'tool/appversion/index', 1, 0, 'C', '0', '0', 'tool:appVersion:list', 'download', 'admin', NOW()
+FROM sys_menu parent
+WHERE parent.parent_id = 0 AND parent.path = 'tool' AND parent.menu_type = 'M'
+  AND NOT EXISTS (SELECT 1 FROM sys_menu existing WHERE existing.component = 'tool/appversion/index')
+LIMIT 1;
+
+SET @shared_app_version_menu = (SELECT MIN(menu_id) FROM sys_menu WHERE component = 'tool/appversion/index');
+
+INSERT INTO sys_menu (menu_name, parent_id, order_num, path, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time)
+SELECT action.name, @shared_app_version_menu, action.position, '#', 1, 0, 'F', '0', '0', action.permission, '#', 'admin', NOW()
+FROM (
+    SELECT '版本查询' AS name, 1 AS position, 'tool:appVersion:query' AS permission
+    UNION ALL SELECT '版本新增', 2, 'tool:appVersion:add'
+    UNION ALL SELECT '版本修改', 3, 'tool:appVersion:edit'
+    UNION ALL SELECT '版本删除', 4, 'tool:appVersion:remove'
+    UNION ALL SELECT '资源包上传', 5, 'tool:appVersion:upload'
+    UNION ALL SELECT '管理宝宝渠道', 6, 'tool:appVersion:pregnancy'
+) action
+WHERE @shared_app_version_menu IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM sys_menu existing WHERE existing.parent_id = @shared_app_version_menu AND existing.perms = action.permission);

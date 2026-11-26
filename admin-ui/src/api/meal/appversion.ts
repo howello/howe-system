@@ -5,7 +5,7 @@ import type { AppReleaseKey } from '@/types/api/meal/appversion'
 // 查询 App 版本列表
 export function listAppVersion(query: MealAppVersionQueryParams): Promise<TableDataInfo<MealAppVersion[]>> {
   return request({
-    url: '/meal/app/version/list',
+    url: '/app/version/list',
     method: 'get',
     params: query
   })
@@ -14,7 +14,7 @@ export function listAppVersion(query: MealAppVersionQueryParams): Promise<TableD
 // 查询 App 版本详情
 export function getAppVersion(versionId: number): Promise<AjaxResult<MealAppVersion>> {
   return request({
-    url: '/meal/app/version/' + versionId,
+    url: '/app/version/' + versionId,
     method: 'get'
   })
 }
@@ -22,7 +22,7 @@ export function getAppVersion(versionId: number): Promise<AjaxResult<MealAppVers
 // 新增 App 版本
 export function addAppVersion(data: MealAppVersion): Promise<AjaxResult> {
   return request({
-    url: '/meal/app/version',
+    url: '/app/version',
     method: 'post',
     data: data
   })
@@ -31,7 +31,7 @@ export function addAppVersion(data: MealAppVersion): Promise<AjaxResult> {
 // 修改 App 版本
 export function updateAppVersion(data: MealAppVersion): Promise<AjaxResult> {
   return request({
-    url: '/meal/app/version',
+    url: '/app/version',
     method: 'put',
     data: data
   })
@@ -40,7 +40,7 @@ export function updateAppVersion(data: MealAppVersion): Promise<AjaxResult> {
 // 删除 App 版本
 export function delAppVersion(versionId: number | number[]): Promise<AjaxResult> {
   return request({
-    url: '/meal/app/version/' + versionId,
+    url: '/app/version/' + versionId,
     method: 'delete'
   })
 }
@@ -51,7 +51,7 @@ export function uploadAppVersionWgt(file: File, appKey: AppReleaseKey = 'meal'):
   data.append('file', file)
   data.append('appKey', appKey)
   return request({
-    url: '/meal/app/version/upload',
+    url: '/app/version/upload',
     method: 'post',
     data: data,
     headers: {
@@ -61,9 +61,10 @@ export function uploadAppVersionWgt(file: File, appKey: AppReleaseKey = 'meal'):
 }
 
 // 校验远程 wgt 链接（有界下载 + wgt 结构验证）；前端超时放宽到 60s 覆盖后端预算
-export function checkAppPackage(url: string): Promise<AjaxResult<AppPackageCheckResult>> {
+export function checkAppPackage(url: string, appKey: AppReleaseKey = 'meal'): Promise<AjaxResult<AppPackageCheckResult>> {
   return request({
-    url: '/meal/app/version/check-package',
+    url: '/app/version/check-package',
+    params: { appKey },
     method: 'post',
     data: { url },
     timeout: 60000
