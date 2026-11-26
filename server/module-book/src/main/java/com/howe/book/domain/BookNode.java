@@ -9,6 +9,7 @@ import lombok.Data;
 @TableName("book_node")
 public class BookNode {
     private String id;
+    /** 创建节点的用户 ID。 */
     private Long userId;
     private String parentId;
     private String nodeType;

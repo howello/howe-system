@@ -13,8 +13,16 @@ CREATE TABLE IF NOT EXISTS book_node (
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     deleted_at DATETIME(3) NULL,
     PRIMARY KEY (id),
-    KEY idx_book_node_children (user_id, parent_id, deleted_at, sort_order, id)
+    KEY idx_book_node_children (user_id, parent_id, deleted_at, sort_order, id),
+    KEY idx_book_node_parent (parent_id, deleted_at, sort_order, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='读书笔记节点';
+
+-- 锁住固定的一行，串行化创建、移动和删除等共享树变更。
+CREATE TABLE IF NOT EXISTS book_tree_lock (
+    id TINYINT NOT NULL PRIMARY KEY
+) ENGINE=InnoDB COMMENT='共享书架写入锁';
+
+INSERT IGNORE INTO book_tree_lock (id) VALUES (1);
 
 -- 读书管理目录、节点菜单和操作权限。
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, menu_type, is_frame, is_cache, visible, status, icon, create_by, create_time)
@@ -42,7 +50,7 @@ WHERE NOT EXISTS (SELECT 1 FROM sys_menu m WHERE m.parent_id = @book_nodes_menu 
 -- 节点管理角色。通过用户管理按需授予，不自动给现有账号授权。
 INSERT INTO sys_role (role_name, role_key, role_sort, data_scope, menu_check_strictly, dept_check_strictly, status, del_flag, create_by, create_time, remark)
 SELECT '读书管理员', 'book_manager', 30, '1', 1, 1, '0', '0', 'admin', NOW(),
-       '管理读书后台节点，可跨账号查看和操作读书节点'
+       '管理共享书架的后台节点'
 WHERE NOT EXISTS (SELECT 1 FROM sys_role WHERE role_key = 'book_manager');
 
 INSERT INTO sys_role_menu (role_id, menu_id)
@@ -69,7 +77,7 @@ WHERE NOT EXISTS (SELECT 1 FROM sys_config WHERE config_key = 'book.app.publishT
 UPDATE sys_config SET `sensitive` = 'Y'
 WHERE config_key = 'book.app.publishToken' AND `sensitive` <> 'Y';
 
--- 演示数据：可浏览的分类 / 书本 / 感悟 / 备注（挂在 admin 名下）。
+-- 演示数据：共享书架的分类 / 书本 / 感悟 / 备注，创建人记录为 admin。
 -- 固定 UUID 前缀，重复执行本文件时先清理旧演示数据，不影响真实节点。
 DELETE FROM book_node
 WHERE id LIKE '11111111-1111-4111-8111-%'

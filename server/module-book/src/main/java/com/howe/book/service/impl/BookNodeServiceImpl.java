@@ -18,24 +18,24 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Isolation;
 
-/** 读书节点的归属、层级与版本校验。 */
+/** 共享书架节点的层级与版本校验。 */
 @Service
 @RequiredArgsConstructor
 public class BookNodeServiceImpl implements BookNodeService {
     private final BookNodeMapper mapper;
     private final ObjectMapper json;
 
-    /** 查找账号下的有效节点，可限定父节点或按标题筛选。 */
+    /** 查找有效节点，可限定父节点或按标题筛选。 */
     @Override
-    public List<BookNode> list(Long owner, String parent, boolean children, String type, String title) {
-        return list(owner, parent, children, type, title, false);
+    public List<BookNode> list(Long creator, String parent, boolean children, String type, String title) {
+        return list(creator, parent, children, type, title, false);
     }
 
-    /** 查找账号下的有效节点，可选是否带正文。 */
+    /** 查找有效节点，可选是否带正文。 */
     @Override
-    public List<BookNode> list(Long owner, String parent, boolean children, String type, String title, boolean withContent) {
+    public List<BookNode> list(Long creator, String parent, boolean children, String type, String title, boolean withContent) {
         var query = new LambdaQueryWrapper<BookNode>()
-            .eq(owner != null, BookNode::getUserId, owner)
+            .eq(creator != null, BookNode::getUserId, creator)
             .isNull(BookNode::getDeletedAt)
             .eq(type != null && !type.isBlank(), BookNode::getNodeType, type)
             .like(title != null && !title.isBlank(), BookNode::getTitle, title);
@@ -60,27 +60,27 @@ public class BookNodeServiceImpl implements BookNodeService {
         return mapper.selectList(query.orderByAsc(BookNode::getSortOrder, BookNode::getId));
     }
 
-    /** 读取有效节点，普通用户只能访问自己的节点。 */
+    /** 读取共享书架的有效节点。 */
     @Override
-    public BookNode get(Long owner, String id) {
+    public BookNode get(String id) {
         BookNode node = mapper.selectById(id);
-        if (node == null || node.getDeletedAt() != null || (owner != null && !owner.equals(node.getUserId()))) {
+        if (node == null || node.getDeletedAt() != null) {
             throw new ServiceException("节点不存在", 404);
         }
         return node;
     }
 
-    /** 新增节点，调用方指定所属账号。 */
+    /** 新增共享节点并记录创建人。 */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     @Override
-    public BookNode create(long owner, BookNode input) {
-        lockOwner(owner);
-        input.setUserId(owner);
+    public BookNode create(long creator, BookNode input) {
+        lockTree();
+        input.setUserId(creator);
         input.setId(input.getId() == null ? UUID.randomUUID().toString() : uuid(input.getId()));
         validate(input);
         BookNode existing = mapper.selectById(input.getId());
         if (existing != null) {
-            if (existing.getDeletedAt() == null && existing.getUserId().equals(owner)
+            if (existing.getDeletedAt() == null && existing.getUserId().equals(creator)
                 && existing.getNodeType().equals(input.getNodeType())
                 && java.util.Objects.equals(existing.getParentId(), input.getParentId())
                 && existing.getTitle().equals(input.getTitle())
@@ -102,10 +102,9 @@ public class BookNodeServiceImpl implements BookNodeService {
     /** 更新节点或移动子树，按已有节点版本进行比较。 */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     @Override
-    public BookNode update(Long owner, String id, BookNode input) {
-        BookNode before = get(owner, id);
-        lockOwner(before.getUserId());
-        BookNode current = get(owner, id);
+    public BookNode update(String id, BookNode input) {
+        lockTree();
+        BookNode current = get(id);
         if (!current.getVersion().equals(input.getVersion())) {
             throw new ServiceException("节点已更新，请重新加载后保存", 409);
         }
@@ -123,16 +122,15 @@ public class BookNodeServiceImpl implements BookNodeService {
         if (changed != 1) {
             throw new ServiceException("节点已更新，请重新加载后保存", 409);
         }
-        return get(owner, id);
+        return get(id);
     }
 
     /** 按批遍历并软删除整棵子树。 */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     @Override
-    public List<String> remove(Long owner, String id) {
-        long userId = get(owner, id).getUserId();
-        lockOwner(userId);
-        get(owner, id);
+    public List<String> remove(String id) {
+        lockTree();
+        get(id);
         var pending = new ArrayDeque<String>();
         var visited = new HashSet<String>();
         pending.add(id);
@@ -149,19 +147,19 @@ public class BookNodeServiceImpl implements BookNodeService {
                 continue;
             }
             mapper.selectList(new LambdaQueryWrapper<BookNode>().select(BookNode::getId)
-                .eq(BookNode::getUserId, userId).in(BookNode::getParentId, batch)
+                .in(BookNode::getParentId, batch)
                 .isNull(BookNode::getDeletedAt)).forEach(node -> pending.add(node.getId()));
-            mapper.update(null, new LambdaUpdateWrapper<BookNode>().eq(BookNode::getUserId, userId)
-                .in(BookNode::getId, batch).set(BookNode::getDeletedAt, now)
+            mapper.update(null, new LambdaUpdateWrapper<BookNode>().in(BookNode::getId, batch)
+                .isNull(BookNode::getDeletedAt).set(BookNode::getDeletedAt, now)
                 .set(BookNode::getUpdatedAt, now).setSql("version = version + 1"));
         }
         return List.copyOf(visited);
     }
 
-    /** 串行化同一个账号的树变更。 */
-    private void lockOwner(long owner) {
-        if (mapper.lockOwner(owner) == null) {
-            throw new ServiceException("归属用户不存在");
+    /** 串行化共享书架的树变更，锁随当前事务释放。 */
+    private void lockTree() {
+        if (mapper.lockTree() == null) {
+            throw new ServiceException("共享书架尚未初始化");
         }
     }
 
@@ -215,7 +213,7 @@ public class BookNodeServiceImpl implements BookNodeService {
         if (input.getParentId() == null || "category".equals(type)) {
             throw new ServiceException("请选择合法的父节点");
         }
-        BookNode parent = get(input.getUserId(), input.getParentId());
+        BookNode parent = get(input.getParentId());
         boolean valid = switch (type) {
             case "book" -> "category".equals(parent.getNodeType());
             case "note" -> "book".equals(parent.getNodeType());
@@ -230,7 +228,7 @@ public class BookNodeServiceImpl implements BookNodeService {
             if (!seen.add(parent.getId())) {
                 throw new ServiceException("不能移动到当前节点或其后代");
             }
-            parent = parent.getParentId() == null ? null : get(input.getUserId(), parent.getParentId());
+            parent = parent.getParentId() == null ? null : get(parent.getParentId());
         }
     }
 }

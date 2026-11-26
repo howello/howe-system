@@ -8,7 +8,7 @@ import com.howe.common.enums.BusinessType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import com.howe.common.core.controller.BaseController;
 import com.howe.common.core.page.TableDataInfo;
-import com.howe.common.exception.ServiceException;
+import com.howe.common.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -39,7 +39,7 @@ public class BookAdminNodeController extends BaseController {
     @PreAuthorize("@ss.hasAnyPermi('book:node:query,book:node:edit')")
     @Operation(summary = "查看读书节点")
     public AjaxResult get(@PathVariable String id) {
-        return AjaxResult.success(nodes.get(null, id));
+        return AjaxResult.success(nodes.get(id));
     }
 
     /** 新建节点。 */
@@ -48,10 +48,7 @@ public class BookAdminNodeController extends BaseController {
     @Log(title = "读书节点", businessType = BusinessType.INSERT, isSaveRequestData = false, isSaveResponseData = false)
     @Operation(summary = "新建读书节点")
     public AjaxResult create(@RequestBody BookNode input) {
-        if (input.getUserId() == null) {
-            throw new ServiceException("请选择归属用户");
-        }
-        return AjaxResult.success(nodes.create(input.getUserId(), input));
+        return AjaxResult.success(nodes.create(SecurityUtils.getUserId(), input));
     }
 
     /** 编辑节点。 */
@@ -60,7 +57,7 @@ public class BookAdminNodeController extends BaseController {
     @Log(title = "读书节点", businessType = BusinessType.UPDATE, isSaveRequestData = false, isSaveResponseData = false)
     @Operation(summary = "编辑读书节点")
     public AjaxResult update(@PathVariable String id, @RequestBody BookNode input) {
-        return AjaxResult.success(nodes.update(null, id, input));
+        return AjaxResult.success(nodes.update(id, input));
     }
 
     /** 删除节点及其后代。 */
@@ -69,7 +66,7 @@ public class BookAdminNodeController extends BaseController {
     @Log(title = "读书节点", businessType = BusinessType.DELETE)
     @Operation(summary = "删除读书节点")
     public AjaxResult remove(@PathVariable String id) {
-        nodes.remove(null, id);
+        nodes.remove(id);
         return AjaxResult.success();
     }
 }

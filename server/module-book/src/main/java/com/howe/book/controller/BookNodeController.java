@@ -22,14 +22,14 @@ public class BookNodeController {
     public AjaxResult list(@RequestParam(required = false) String parentId,
         @RequestParam(defaultValue = "false") boolean tree,
         @RequestParam(defaultValue = "false") boolean withContent) {
-        return AjaxResult.success(nodes.list(SecurityUtils.getUserId(), parentId, !tree, null, null, withContent));
+        return AjaxResult.success(nodes.list(null, parentId, !tree, null, null, withContent));
     }
 
     /** 读取节点详情。 */
     @GetMapping("/{id}")
     @Operation(summary = "查看读书节点")
     public AjaxResult get(@PathVariable String id) {
-        return AjaxResult.success(nodes.get(SecurityUtils.getUserId(), id));
+        return AjaxResult.success(nodes.get(id));
     }
 
     /** 新建节点。 */
@@ -43,13 +43,13 @@ public class BookNodeController {
     @PutMapping("/{id}")
     @Operation(summary = "编辑读书节点")
     public AjaxResult update(@PathVariable String id, @RequestBody BookNode input) {
-        return AjaxResult.success(nodes.update(SecurityUtils.getUserId(), id, input));
+        return AjaxResult.success(nodes.update(id, input));
     }
 
     /** 删除节点及其后代。 */
     @DeleteMapping("/{id}")
     @Operation(summary = "删除读书节点")
     public AjaxResult remove(@PathVariable String id) {
-        return AjaxResult.success(nodes.remove(SecurityUtils.getUserId(), id));
+        return AjaxResult.success(nodes.remove(id));
     }
 }

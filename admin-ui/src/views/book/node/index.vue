@@ -1,7 +1,7 @@
 <template>
   <div class="app-container">
     <el-form inline @submit.prevent="load(1)">
-      <el-form-item label="归属用户"><el-input v-model="filters.userId" placeholder="用户 ID" clearable /></el-form-item>
+      <el-form-item label="创建人"><el-input v-model="filters.userId" placeholder="用户 ID" clearable /></el-form-item>
       <el-form-item label="标题"><el-input v-model="filters.title" clearable /></el-form-item>
       <el-form-item label="类型">
         <el-select v-model="filters.type" clearable style="width: 130px">
@@ -14,7 +14,7 @@
     <el-table :data="rows">
       <el-table-column prop="title" label="标题" />
       <el-table-column prop="nodeType" label="类型" />
-      <el-table-column prop="userId" label="用户 ID" />
+      <el-table-column prop="userId" label="创建人 ID" />
       <el-table-column prop="parentId" label="父节点" />
       <el-table-column prop="updatedAt" label="更新时间" />
       <el-table-column label="操作" width="180">
@@ -28,7 +28,6 @@
     <el-pagination v-model:current-page="page" :page-size="20" :total="total" @current-change="load" />
     <el-dialog v-model="visible" :title="readOnly ? '节点详情' : form.id ? '编辑节点' : '新增节点'">
       <el-form label-width="100" :disabled="readOnly">
-        <el-form-item label="归属用户 ID"><el-input v-model="form.userId" :disabled="!!form.id" /></el-form-item>
         <el-form-item label="节点类型">
           <el-select v-model="form.nodeType" :disabled="!!form.id">
             <el-option v-for="item in types" :key="item.value" v-bind="item" />
@@ -36,7 +35,7 @@
         </el-form-item>
         <el-form-item label="父节点">
           <el-select v-model="form.parentId" filterable remote clearable
-            :disabled="form.nodeType === 'category' || !form.userId" :remote-method="loadParents"
+            :disabled="form.nodeType === 'category'" :remote-method="loadParents"
             placeholder="按标题找父节点" @visible-change="(shown: boolean) => shown && loadParents('')">
             <el-option v-for="item in parents" :key="item.id" :label="item.title" :value="item.id!" />
           </el-select>
@@ -106,18 +105,18 @@ const attachmentCount = computed(() => {
 })
 const parents = ref<Node[]>([])
 let parentQuery = 0
-watch(() => [form.value.userId, form.value.nodeType], () => {
+watch(() => [form.value, form.value.nodeType], () => {
   parentQuery++
   parents.value = []
   if (!form.value.id) form.value.parentId = undefined
 })
 async function loadParents(title: string) {
-  const { userId, nodeType, id } = form.value
-  if (!userId || nodeType === 'category') return
+  const { nodeType, id } = form.value
+  if (nodeType === 'category') return
   const sequence = ++parentQuery
   const parentTypes = nodeType === 'book' ? ['category'] : nodeType === 'note' ? ['book'] : ['note', 'remark']
   const results = await Promise.all(parentTypes.map(type => request({
-    url, method: 'get', params: { userId, type, title, pageNum: 1, pageSize: 30 },
+    url, method: 'get', params: { type, title, pageNum: 1, pageSize: 30 },
   }) as unknown as Promise<{ rows: Node[] }>))
   if (sequence === parentQuery) parents.value = results.flatMap(result => result.rows).filter(node => node.id !== id)
 }
@@ -133,7 +132,7 @@ async function open(id?: string, preview = false) {
     const response = await request({ url: url + '/' + id, method: 'get' }) as unknown as { data: Node }
     form.value = response.data
   } else {
-    form.value = { nodeType: 'category', title: '', sortOrder: 0, userId: filters.userId }
+    form.value = { nodeType: 'category', title: '', sortOrder: 0 }
   }
   content.value = JSON.parse(form.value.contentJson || "{}")
   visible.value = true
