@@ -29,7 +29,7 @@ public class AiChannel extends BaseEntity
     private Long id;
 
     @NotBlank(message = "服务商标识不能为空")
-    @Schema(description = "关联 ai_provider.code", example = "dashscope")
+    @Schema(description = "固定服务商标识", example = "dashscope")
     private String providerCode;
 
     @NotBlank(message = "渠道名称不能为空")

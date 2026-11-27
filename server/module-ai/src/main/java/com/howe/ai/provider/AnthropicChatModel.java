@@ -54,7 +54,7 @@ public class AnthropicChatModel implements ChatModel {
     @Override
     public ChatResponse call(Prompt prompt) {
         JSONObject body = bodyBuilder.apply(prompt.getInstructions());
-        AnthropicMessagesClient.AnthropicMessage message = client.call(body, AiProperties.load().getTimeoutChatMs());
+        AnthropicMessagesClient.AnthropicMessage message = client.call(body, AiProperties.CHAT_TIMEOUT_MS);
         AiUsage usage = toUsage(message.usage());
         AssistantMessage output = new AssistantMessage(message.text());
         ChatGenerationMetadata metadata = ChatGenerationMetadata.builder()

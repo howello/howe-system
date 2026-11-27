@@ -35,7 +35,7 @@
         </el-form-item>
         <el-form-item label="父节点">
           <el-select v-model="form.parentId" filterable remote clearable
-            :disabled="form.nodeType === 'category'" :remote-method="loadParents"
+            :remote-method="loadParents"
             placeholder="按标题找父节点" @visible-change="(shown: boolean) => shown && loadParents('')">
             <el-option v-for="item in parents" :key="item.id" :label="item.title" :value="item.id!" />
           </el-select>
@@ -112,9 +112,8 @@ watch(() => [form.value, form.value.nodeType], () => {
 })
 async function loadParents(title: string) {
   const { nodeType, id } = form.value
-  if (nodeType === 'category') return
   const sequence = ++parentQuery
-  const parentTypes = nodeType === 'book' ? ['category'] : nodeType === 'note' ? ['book'] : ['note', 'remark']
+  const parentTypes = ['category', 'book'].includes(nodeType) ? ['category'] : nodeType === 'note' ? ['book'] : ['note', 'remark']
   const results = await Promise.all(parentTypes.map(type => request({
     url, method: 'get', params: { type, title, pageNum: 1, pageSize: 30 },
   }) as unknown as Promise<{ rows: Node[] }>))

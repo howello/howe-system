@@ -59,7 +59,7 @@ public class AiSceneRoute extends BaseEntity
     private String fallbackModelIds;
 
     @Schema(description = "场景级参数覆盖（JSON 对象）",
-            example = "{\"temperature\":0.7,\"size\":\"1024*1024\",\"styleSuffixKey\":\"recipe.photo\"}")
+            example = "{\"temperature\":0.7,\"size\":\"1024*1024\",\"styleSuffix\":\"自然光美食摄影\"}")
     private String routeParams;
 
     @Schema(description = "是否启用（0停用 1启用）", example = "1")

@@ -11,7 +11,6 @@ import com.howe.ai.config.AiProperties;
 import com.howe.ai.config.AiSecretCipher;
 import com.howe.ai.persistence.domain.AiChannel;
 import com.howe.ai.persistence.domain.AiModel;
-import com.howe.ai.persistence.mapper.AiProviderMapper;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.MessageType;
@@ -52,24 +51,20 @@ import java.util.concurrent.atomic.AtomicReference;
 @Component
 public class AnthropicAdapter extends AbstractAiProviderAdapter
 {
-    /** 协议标识 */
-    public static final String PROTOCOL = "anthropic";
-
     /** 模型列表接口超时 */
     private static final int MODEL_LIST_TIMEOUT_MS = 15000;
 
     /** 健康检查的最小输出上限，足够验证鉴权与调用链 */
     private static final int HEALTH_MAX_TOKENS = 16;
 
-    public AnthropicAdapter(AiSecretCipher cipher, AiProviderMapper providerMapper)
+    public AnthropicAdapter(AiSecretCipher cipher)
     {
-        super(cipher, providerMapper);
+        super(cipher);
     }
 
     @Override
-    public String protocol()
-    {
-        return PROTOCOL;
+    public AiProvider provider() {
+        return AiProvider.ANTHROPIC;
     }
 
     /**
@@ -114,7 +109,7 @@ public class AnthropicAdapter extends AbstractAiProviderAdapter
             StringBuilder buffer = new StringBuilder();
             try
             {
-                String stopReason = client.stream(body, AiProperties.load().getTimeoutChatMs(),
+                String stopReason = client.stream(body, AiProperties.CHAT_TIMEOUT_MS,
                         text ->
                         {
                             buffer.append(text);
@@ -125,7 +120,7 @@ public class AnthropicAdapter extends AbstractAiProviderAdapter
                 long elapsed = System.currentTimeMillis() - start;
                 sink.next(AiTextChunk.done(AiChatResult.builder()
                         .text(buffer.toString())
-                        .provider(PROTOCOL)
+                        .provider(provider().getCode())
                         .model(model.getModelName())
                         .usage(resultUsage)
                         .elapsedMs(elapsed)

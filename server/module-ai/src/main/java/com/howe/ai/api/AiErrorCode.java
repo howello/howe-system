@@ -13,7 +13,7 @@ public enum AiErrorCode
     /** 总开关关闭 */
     AI_DISABLED("AI 能力未启用"),
 
-    /** 场景未配路由且无全局默认 */
+    /** 场景路由或指定目标没有可用模型 */
     NO_AVAILABLE_MODEL("没有可用的模型"),
 
     /** 指定的渠道/模型被停用 */

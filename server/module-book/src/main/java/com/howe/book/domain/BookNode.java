@@ -1,5 +1,6 @@
 package com.howe.book.domain;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDateTime;
 import lombok.Data;
@@ -22,4 +23,10 @@ public class BookNode {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;
+    /** 直接子节点数，供按层展开和书架摘要使用。 */
+    @TableField(exist = false)
+    private Integer childCount;
+    /** 当前层中该节点的内容指纹。 */
+    @TableField(exist = false)
+    private String cacheVersion;
 }

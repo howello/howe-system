@@ -7,15 +7,13 @@ import com.howe.ai.config.AiConfigCache;
 import com.howe.ai.config.AiConfigService;
 import com.howe.ai.persistence.domain.AiChannel;
 import com.howe.ai.persistence.domain.AiModel;
-import com.howe.ai.persistence.domain.AiProvider;
+import com.howe.ai.provider.AiProvider;
 import com.howe.ai.persistence.domain.dto.AiModelImportRequest;
 import com.howe.ai.persistence.domain.vo.AiRemoteModel;
 import com.howe.ai.persistence.mapper.AiChannelMapper;
 import com.howe.ai.persistence.mapper.AiModelMapper;
-import com.howe.ai.persistence.mapper.AiProviderMapper;
 import com.howe.ai.persistence.mapper.AiSceneRouteMapper;
 import com.howe.ai.provider.AiProviderAdapter;
-import com.howe.ai.provider.AnthropicAdapter;
 import com.howe.ai.service.IAiModelService;
 import com.howe.common.exception.ServiceException;
 import com.howe.common.utils.SecurityUtils;
@@ -43,8 +41,6 @@ public class AiModelServiceImpl implements IAiModelService
     private final AiModelMapper aiModelMapper;
 
     private final AiChannelMapper aiChannelMapper;
-
-    private final AiProviderMapper aiProviderMapper;
 
     private final AiSceneRouteMapper aiSceneRouteMapper;
 
@@ -106,15 +102,14 @@ public class AiModelServiceImpl implements IAiModelService
      * 校验渠道所属服务商是否支持该能力
      *
      * <p>Anthropic 只覆盖对话与图片理解；给它配文生图或向量模型，
-     * 只会在运行时才暴露为「协议不支持某能力」。这里提前拦住，
-     * 与 {@code ai_provider.supports} 和运行时异常三层保持一致。</p>
+     * 只会在运行时才暴露为「协议不支持某能力」。</p>
      *
      * @param channel    渠道
      * @param capability 能力类型
      */
     private void requireCapabilitySupported(AiChannel channel, String capability)
     {
-        if (!AnthropicAdapter.PROTOCOL.equals(providerProtocol(channel.getProviderCode())))
+        if (AiProvider.ANTHROPIC != AiProvider.fromCode(channel.getProviderCode()))
         {
             return;
         }
@@ -124,22 +119,6 @@ public class AiModelServiceImpl implements IAiModelService
             throw new ServiceException("Anthropic 协议只支持对话（CHAT）与图片理解（VISION），"
                     + "不支持 " + normalized);
         }
-    }
-
-    /**
-     * 取渠道所属服务商的协议
-     *
-     * @param providerCode 服务商标识
-     * @return 协议标识，服务商不存在时返回 null
-     */
-    private String providerProtocol(String providerCode)
-    {
-        if (StrUtil.isBlank(providerCode))
-        {
-            return null;
-        }
-        AiProvider provider = aiProviderMapper.selectAiProviderByCode(providerCode);
-        return provider == null ? null : provider.getProtocol();
     }
 
     @Override
@@ -184,16 +163,7 @@ public class AiModelServiceImpl implements IAiModelService
     public List<AiRemoteModel> listRemoteModels(Long channelId)
     {
         AiChannel channel = requireChannel(channelId);
-        AiProvider provider = aiConfigCache.getProvider(channel.getProviderCode());
-        if (provider == null)
-        {
-            throw new ServiceException("渠道绑定的服务商不存在或已停用：" + channel.getProviderCode());
-        }
-        AiProviderAdapter adapter = aiConfigCache.getAdapter(provider.getProtocol());
-        if (adapter == null)
-        {
-            throw new ServiceException("没有可用的协议适配器：" + provider.getProtocol());
-        }
+        AiProviderAdapter adapter = aiConfigCache.getAdapter(channel);
         List<String> remoteNames;
         try
         {
@@ -201,7 +171,7 @@ public class AiModelServiceImpl implements IAiModelService
         }
         catch (UnsupportedOperationException e)
         {
-            throw new ServiceException("服务商「" + provider.getName() + "」不提供模型列表接口，请手动添加模型");
+            throw new ServiceException("服务商「" + adapter.provider().getName() + "」不提供模型列表接口，请手动添加模型");
         }
         Set<String> existing = existingModelNames(channelId);
         return remoteNames.stream()

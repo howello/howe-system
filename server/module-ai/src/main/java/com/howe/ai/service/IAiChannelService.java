@@ -1,7 +1,6 @@
 package com.howe.ai.service;
 
 import com.howe.ai.persistence.domain.AiChannel;
-import com.howe.ai.persistence.domain.AiProvider;
 import com.howe.ai.provider.AiHealthResult;
 
 import java.util.List;
@@ -13,13 +12,6 @@ import java.util.List;
  */
 public interface IAiChannelService
 {
-    /**
-     * 查询启用的服务商，供渠道表单的下拉选择使用
-     *
-     * @return 服务商集合
-     */
-    List<AiProvider> selectProviderOptions();
-
     /**
      * 查询渠道列表，密钥以掩码返回
      *

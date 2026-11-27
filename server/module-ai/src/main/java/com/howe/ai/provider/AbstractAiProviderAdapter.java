@@ -12,8 +12,6 @@ import com.howe.ai.capability.AiErrorClassifier;
 import com.howe.ai.config.AiSecretCipher;
 import com.howe.ai.persistence.domain.AiChannel;
 import com.howe.ai.persistence.domain.AiModel;
-import com.howe.ai.persistence.domain.AiProvider;
-import com.howe.ai.persistence.mapper.AiProviderMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.retry.support.RetryTemplate;
 
@@ -41,13 +39,9 @@ public abstract class AbstractAiProviderAdapter implements AiProviderAdapter
     /** 渠道密钥解密器 */
     protected final AiSecretCipher cipher;
 
-    /** 服务商查询，用于取默认接入点 */
-    protected final AiProviderMapper providerMapper;
-
-    protected AbstractAiProviderAdapter(AiSecretCipher cipher, AiProviderMapper providerMapper)
+    protected AbstractAiProviderAdapter(AiSecretCipher cipher)
     {
         this.cipher = cipher;
-        this.providerMapper = providerMapper;
     }
 
     /**
@@ -78,9 +72,7 @@ public abstract class AbstractAiProviderAdapter implements AiProviderAdapter
         {
             return channel.getBaseUrl().trim();
         }
-        AiProvider provider = providerMapper.selectAiProviderByCode(channel.getProviderCode());
-        return provider == null || StrUtil.isBlank(provider.getDefaultBaseUrl())
-                ? null : provider.getDefaultBaseUrl().trim();
+        return provider().getDefaultBaseUrl();
     }
 
     /**

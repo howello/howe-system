@@ -117,8 +117,8 @@
                <div class="ai-hint">顺序即降级顺序；只在主模型出现超时、厂商 5xx、限流、鉴权失败时才会切换。</div>
             </el-form-item>
             <el-form-item label="参数覆盖">
-               <el-input v-model="form.routeParams" type="textarea" :rows="3" placeholder='JSON 对象，如 {"temperature":0.7,"size":"1024*1024","styleSuffixKey":"recipe.photo"}' />
-               <div class="ai-hint">优先级：全局默认 &lt; 这里的场景参数 &lt; 请求显式字段。留空表示不覆盖。</div>
+               <el-input v-model="form.routeParams" type="textarea" :rows="3" placeholder='JSON 对象，如 {"temperature":0.7,"size":"1024*1024","styleSuffix":"自然光美食摄影"}' />
+               <div class="ai-hint">优先级：默认值 &lt; 这里的场景参数 &lt; 请求显式字段。留空表示不覆盖。</div>
             </el-form-item>
             <el-form-item label="启用">
                <el-radio-group v-model="form.enabled">

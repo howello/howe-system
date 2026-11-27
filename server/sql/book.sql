@@ -17,13 +17,6 @@ CREATE TABLE IF NOT EXISTS book_node (
     KEY idx_book_node_parent (parent_id, deleted_at, sort_order, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='读书笔记节点';
 
--- 锁住固定的一行，串行化创建、移动和删除等共享树变更。
-CREATE TABLE IF NOT EXISTS book_tree_lock (
-    id TINYINT NOT NULL PRIMARY KEY
-) ENGINE=InnoDB COMMENT='共享书架写入锁';
-
-INSERT IGNORE INTO book_tree_lock (id) VALUES (1);
-
 -- 读书管理目录、节点菜单和操作权限。
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, menu_type, is_frame, is_cache, visible, status, icon, create_by, create_time)
 SELECT '读书管理', 0, 8, 'book', 'M', 1, 0, '0', '0', 'documentation', 'admin', NOW()

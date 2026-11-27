@@ -14,7 +14,6 @@ import com.howe.ai.api.AiException;
 import com.howe.ai.config.AiSecretCipher;
 import com.howe.ai.persistence.domain.AiChannel;
 import com.howe.ai.persistence.domain.AiModel;
-import com.howe.ai.persistence.mapper.AiProviderMapper;
 import io.micrometer.observation.ObservationRegistry;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.ChatOptions;
@@ -38,24 +37,17 @@ import java.util.List;
 @Component
 public class DashScopeAdapter extends AbstractAiProviderAdapter
 {
-    /** 协议标识 */
-    public static final String PROTOCOL = "dashscope";
-
-    /** 未配置接入点时的兜底地址 */
-    private static final String DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com";
-
     /** 兼容模式下的模型列表路径 */
     private static final String COMPATIBLE_MODELS_PATH = "/compatible-mode/v1/models";
 
-    public DashScopeAdapter(AiSecretCipher cipher, AiProviderMapper providerMapper)
+    public DashScopeAdapter(AiSecretCipher cipher)
     {
-        super(cipher, providerMapper);
+        super(cipher);
     }
 
     @Override
-    public String protocol()
-    {
-        return PROTOCOL;
+    public AiProvider provider() {
+        return AiProvider.DASHSCOPE;
     }
 
     @Override
@@ -182,11 +174,7 @@ public class DashScopeAdapter extends AbstractAiProviderAdapter
     private DashScopeApi chatApi(AiChannel channel)
     {
         DashScopeApi.Builder builder = DashScopeApi.builder().apiKey(apiKey(channel));
-        String baseUrl = baseUrl(channel);
-        if (baseUrl != null)
-        {
-            builder.baseUrl(baseUrl);
-        }
+        builder.baseUrl(baseUrl(channel));
         return builder.build();
     }
 
@@ -199,11 +187,7 @@ public class DashScopeAdapter extends AbstractAiProviderAdapter
     private DashScopeImageApi imageApi(AiChannel channel)
     {
         DashScopeImageApi.Builder builder = DashScopeImageApi.builder().apiKey(apiKey(channel));
-        String baseUrl = baseUrl(channel);
-        if (baseUrl != null)
-        {
-            builder.baseUrl(baseUrl);
-        }
+        builder.baseUrl(baseUrl(channel));
         return builder.build();
     }
 
@@ -218,8 +202,7 @@ public class DashScopeAdapter extends AbstractAiProviderAdapter
      */
     private String compatibleModelsUrl(AiChannel channel)
     {
-        String baseUrl = baseUrl(channel);
-        String url = StrUtil.isBlank(baseUrl) ? DEFAULT_BASE_URL : StrUtil.removeSuffix(baseUrl.trim(), "/");
+        String url = StrUtil.removeSuffix(baseUrl(channel), "/");
         return url.contains("/compatible-mode") ? url + "/models" : url + COMPATIBLE_MODELS_PATH;
     }
 }

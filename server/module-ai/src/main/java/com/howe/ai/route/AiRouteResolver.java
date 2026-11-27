@@ -22,11 +22,10 @@ import java.util.List;
 /**
  * 场景路由解析
  *
- * <p>解析顺序固定为四档：</p>
+ * <p>解析顺序：</p>
  * <ol>
  *   <li>请求显式指定渠道或模型 → 直接用（后台「测试」按钮走这条）</li>
  *   <li>请求场景命中 {@code ai_scene_route} → 用主模型，并带上降级链</li>
- *   <li>全局默认 {@code ai.default.&lt;capability&gt;.model}</li>
  *   <li>都没有 → 抛 {@code NO_AVAILABLE_MODEL}</li>
  * </ol>
  *
@@ -72,16 +71,10 @@ public class AiRouteResolver
             return fromRoute;
         }
 
-        AiRoutePlan fromDefault = resolveGlobalDefault(scene, capability, properties);
-        if (fromDefault != null)
-        {
-            return fromDefault;
-        }
-
         throw new AiException(AiErrorCode.NO_AVAILABLE_MODEL,
                 StrUtil.isBlank(scene)
-                        ? "未配置全局默认模型，且请求没有指定场景"
-                        : "场景「" + scene + "」没有配置路由，也没有配置全局默认模型");
+                        ? "请指定场景、渠道或模型"
+                        : "场景「" + scene + "」没有可用的路由模型");
     }
 
     /**
@@ -153,40 +146,9 @@ public class AiRouteResolver
         }
         if (targets.isEmpty())
         {
-            log.warn("场景 {} 的模型都不可用，回落到全局默认模型", scene);
             return null;
         }
         return new AiRoutePlan(scene, capabilityName, targets, parseParams(route.getRouteParams()));
-    }
-
-    /**
-     * 第三档：全局默认模型
-     *
-     * @param scene      场景标识
-     * @param capability 能力类型
-     * @param properties 参数快照
-     * @return 路由计划；未配置全局默认时返回 null
-     */
-    private AiRoutePlan resolveGlobalDefault(String scene, AiCapability capability, AiProperties properties)
-    {
-        Long modelId = switch (capability)
-        {
-            case CHAT -> properties.getDefaultChatModelId();
-            case VISION -> properties.getDefaultVisionModelId();
-            case IMAGE -> properties.getDefaultImageModelId();
-            case EMBEDDING -> properties.getDefaultEmbeddingModelId();
-        };
-        if (modelId == null)
-        {
-            return null;
-        }
-        List<AiRouteTarget> targets = new ArrayList<>(1);
-        appendTarget(targets, modelId, "全局默认模型");
-        if (targets.isEmpty())
-        {
-            return null;
-        }
-        return new AiRoutePlan(scene, capability.name(), targets, new JSONObject());
     }
 
     /**

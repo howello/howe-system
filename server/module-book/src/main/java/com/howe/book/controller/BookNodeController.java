@@ -1,6 +1,7 @@
 package com.howe.book.controller;
 
 import com.howe.book.domain.BookNode;
+import com.howe.book.domain.BookScopeRequest;
 import com.howe.book.service.BookNodeService;
 import com.howe.common.core.domain.AjaxResult;
 import com.howe.common.utils.SecurityUtils;
@@ -23,6 +24,27 @@ public class BookNodeController {
         @RequestParam(defaultValue = "false") boolean tree,
         @RequestParam(defaultValue = "false") boolean withContent) {
         return AjaxResult.success(nodes.list(null, parentId, !tree, null, null, withContent));
+    }
+
+    /** 同步指定父节点下的直接内容。 */
+    @PostMapping("/scope")
+    @Operation(summary = "同步当前层读书节点")
+    public AjaxResult syncScope(@RequestBody BookScopeRequest input) {
+        return AjaxResult.success(nodes.syncScope(input.parentId(), input.known(), input.parentVersion()));
+    }
+
+    /** 读取当前书架统计。 */
+    @GetMapping("/stats")
+    @Operation(summary = "查询读书统计")
+    public AjaxResult stats() {
+        return AjaxResult.success(nodes.stats());
+    }
+
+    /** 读取节点及其祖先。 */
+    @GetMapping("/{id}/path")
+    @Operation(summary = "查询读书节点路径")
+    public AjaxResult path(@PathVariable String id) {
+        return AjaxResult.success(nodes.path(id));
     }
 
     /** 读取节点详情。 */

@@ -14,7 +14,6 @@ import com.howe.ai.config.AiProperties;
 import com.howe.ai.config.AiSecretCipher;
 import com.howe.ai.persistence.domain.AiChannel;
 import com.howe.ai.persistence.domain.AiModel;
-import com.howe.ai.persistence.mapper.AiProviderMapper;
 import io.micrometer.observation.ObservationRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.Message;
@@ -64,12 +63,6 @@ import java.util.Map;
 @Component
 public class OpenAiCompatibleAdapter extends AbstractAiProviderAdapter
 {
-    /** 协议标识 */
-    public static final String PROTOCOL = "openai";
-
-    /** 未配置接入点时的兜底地址 */
-    private static final String DEFAULT_BASE_URL = "https://api.openai.com";
-
     /** 流式对话路径 */
     private static final String CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
 
@@ -79,15 +72,14 @@ public class OpenAiCompatibleAdapter extends AbstractAiProviderAdapter
     /** 原样打进日志的上游事件个数，用于确认厂商的字段名 */
     private static final int RAW_SAMPLE_SIZE = 3;
 
-    public OpenAiCompatibleAdapter(AiSecretCipher cipher, AiProviderMapper providerMapper)
+    public OpenAiCompatibleAdapter(AiSecretCipher cipher)
     {
-        super(cipher, providerMapper);
+        super(cipher);
     }
 
     @Override
-    public String protocol()
-    {
-        return PROTOCOL;
+    public AiProvider provider() {
+        return AiProvider.OPENAI;
     }
 
     @Override
@@ -106,7 +98,7 @@ public class OpenAiCompatibleAdapter extends AbstractAiProviderAdapter
     public ImageModel createImageModel(AiChannel channel, AiModel model)
     {
         OpenAiImageApi api = OpenAiImageApi.builder()
-                .baseUrl(resolveBaseUrl(channel))
+                .baseUrl(baseUrl(channel))
                 .apiKey(apiKey(channel))
                 .build();
         return new OpenAiImageModel(api,
@@ -175,7 +167,7 @@ public class OpenAiCompatibleAdapter extends AbstractAiProviderAdapter
     @Override
     public List<String> listModels(AiChannel channel)
     {
-        return fetchModelIds(modelsUrl(resolveBaseUrl(channel)), "查询 OpenAI 兼容端点模型列表", channel);
+        return fetchModelIds(modelsUrl(baseUrl(channel)), "查询 OpenAI 兼容端点模型列表", channel);
     }
 
     @Override
@@ -212,10 +204,10 @@ public class OpenAiCompatibleAdapter extends AbstractAiProviderAdapter
      */
     private Flux<AiTextChunk> rawStream(AiChannel channel, AiModel model, ChatSpec spec, List<Message> messages)
     {
-        String url = chatCompletionsUrl(resolveBaseUrl(channel));
+        String url = chatCompletionsUrl(baseUrl(channel));
         String key = apiKey(channel);
         String body = buildStreamBody(model, spec, messages).toJSONString();
-        int timeout = (int) AiProperties.load().getTimeoutChatMs();
+        int timeout = (int) AiProperties.CHAT_TIMEOUT_MS;
         String modelName = model.getModelName();
         log.debug("上游流式请求：url={}, body={}", url, brief(body));
         return Flux.<AiTextChunk>create(sink ->
@@ -538,21 +530,9 @@ public class OpenAiCompatibleAdapter extends AbstractAiProviderAdapter
     private OpenAiApi chatApi(AiChannel channel)
     {
         return OpenAiApi.builder()
-                .baseUrl(resolveBaseUrl(channel))
+                .baseUrl(baseUrl(channel))
                 .apiKey(apiKey(channel))
                 .build();
-    }
-
-    /**
-     * 解析生效接入点，未配置时用 OpenAI 官方地址
-     *
-     * @param channel 渠道
-     * @return 接入点
-     */
-    private String resolveBaseUrl(AiChannel channel)
-    {
-        String baseUrl = baseUrl(channel);
-        return StrUtil.isBlank(baseUrl) ? DEFAULT_BASE_URL : baseUrl;
     }
 
     /**

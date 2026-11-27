@@ -5,7 +5,7 @@ import com.howe.ai.persistence.domain.AiCallLog;
 import com.howe.ai.persistence.domain.AiChannel;
 import com.howe.ai.persistence.domain.AiImageAsset;
 import com.howe.ai.persistence.domain.AiModel;
-import com.howe.ai.persistence.domain.AiProvider;
+import com.howe.ai.provider.AiProvider;
 import com.howe.ai.persistence.domain.AiSceneRoute;
 import com.howe.ai.persistence.domain.vo.AiCallLogDetailVO;
 import com.howe.ai.persistence.domain.vo.AiCallLogStats;
@@ -13,7 +13,6 @@ import com.howe.ai.persistence.mapper.AiCallLogMapper;
 import com.howe.ai.persistence.mapper.AiChannelMapper;
 import com.howe.ai.persistence.mapper.AiImageAssetMapper;
 import com.howe.ai.persistence.mapper.AiModelMapper;
-import com.howe.ai.persistence.mapper.AiProviderMapper;
 import com.howe.ai.persistence.mapper.AiSceneRouteMapper;
 import com.howe.ai.service.IAiCallLogService;
 import com.howe.common.exception.ServiceException;
@@ -54,8 +53,6 @@ public class AiCallLogServiceImpl implements IAiCallLogService
     private final AiChannelMapper aiChannelMapper;
 
     private final AiModelMapper aiModelMapper;
-
-    private final AiProviderMapper aiProviderMapper;
 
     private final AiSceneRouteMapper aiSceneRouteMapper;
 
@@ -267,7 +264,7 @@ public class AiCallLogServiceImpl implements IAiCallLogService
         {
             return null;
         }
-        AiProvider provider = aiProviderMapper.selectAiProviderByCode(providerCode);
+        AiProvider provider = AiProvider.fromCode(providerCode);
         return provider == null ? providerCode : provider.getName();
     }
 

@@ -2,6 +2,8 @@ package com.howe.book.service;
 
 import com.howe.book.domain.BookNode;
 import java.util.List;
+import java.util.Map;
+import com.howe.book.domain.BookScopeDelta;
 
 /** 读书节点业务接口。 */
 public interface BookNodeService {
@@ -16,6 +18,15 @@ public interface BookNodeService {
      *                    书本页的感悟摘要、备注正文才需要正文
      */
     List<BookNode> list(Long creator, String parent, boolean children, String type, String title, boolean withContent);
+
+    /** 比较当前层快照，返回变更节点和移除项。 */
+    BookScopeDelta syncScope(String parent, Map<String, String> known, String parentVersion);
+
+    /** 沿父链返回面包屑所需的节点。 */
+    List<BookNode> path(String id);
+
+    /** 查询书架统计，不传输节点内容。 */
+    Map<String, Long> stats();
 
     /** 查询共享书架的有效节点详情。 */
     BookNode get(String id);

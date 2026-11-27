@@ -27,8 +27,9 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class AiImageCompensateTask
-{
+public class AiImageCompensateTask {
+    private static final int MAX_ATTEMPTS = 30;
+
     /** 单批最多处理条数，避免一次调度占用过久 */
     private static final int BATCH = 20;
 
@@ -48,8 +49,6 @@ public class AiImageCompensateTask
         {
             return;
         }
-        int maxAttempt = Math.max(1,
-                ConfigUtils.getInt(ConfigConstants.AI_IMAGE_TRANSFER_COMPENSATE_MAX_ATTEMPT, 30));
         List<AiTransferTask> tasks = compensationStore.dueTasks(BATCH);
         if (tasks.isEmpty())
         {
@@ -59,7 +58,7 @@ public class AiImageCompensateTask
         {
             try
             {
-                retry(task, maxAttempt);
+                retry(task);
             }
             catch (Exception e)
             {
@@ -71,9 +70,9 @@ public class AiImageCompensateTask
     /**
      * 单条重传：读暂存字节 → 上传 → 记录资产并清理；失败累计次数重排
      */
-    private void retry(AiTransferTask task, int maxAttempt)
+    private void retry(AiTransferTask task)
     {
-        if (System.currentTimeMillis() > task.getExpireTime() || task.getAttempt() >= maxAttempt)
+        if (System.currentTimeMillis() > task.getExpireTime() || task.getAttempt() >= MAX_ATTEMPTS)
         {
             log.warn("补偿重传放弃：objectKey={}, attempt={}", task.getObjectKey(), task.getAttempt());
             compensationStore.discard(task);

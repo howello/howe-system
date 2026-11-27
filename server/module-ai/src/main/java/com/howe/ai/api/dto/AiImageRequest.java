@@ -12,7 +12,7 @@ import java.util.Map;
  * 文生图请求
  *
  * <p>{@code prompt} 由业务模块自己拼好——AI 模块不认业务语义，
- * 只按 {@code style} 追加风格后缀模板。尺寸统一用 {@code 1024*1024} 形式，
+ * 只追加请求或场景中的风格描述。尺寸统一用 {@code 1024*1024} 形式，
  * 厂商侧的格式差异由模块内部转换。</p>
  *
  * @author howe
@@ -39,16 +39,16 @@ public class AiImageRequest
     @Schema(description = "生成张数，默认 1，上限由 ai.image.maxCount 控制", example = "1")
     private Integer count;
 
-    @Schema(description = "风格后缀模板的 key，由本模块读取模板并追加到 prompt", example = "photo")
-    private String style;
+    @Schema(description = "追加到提示词的风格描述，留空使用场景配置", example = "自然光美食摄影")
+    private String styleSuffix;
 
     @Schema(description = "随机种子")
     private Long seed;
 
-    @Schema(description = "指定模型名，留空走场景路由或全局默认")
+    @Schema(description = "指定模型名，留空时可通过场景或另一项指定目标")
     private String model;
 
-    @Schema(description = "指定渠道 ID，留空走场景路由或全局默认")
+    @Schema(description = "指定渠道 ID，留空时可通过场景或另一项指定目标")
     private String channel;
 
     @Schema(description = "超时（毫秒），留空取全局配置")

@@ -22,8 +22,6 @@ public class ConfigConstants {
     public static final String MCP_PUBLIC_BASE_URL = "mcp.publicBaseUrl";
     /** MCP 前端授权页面基址，在线保存后重启生效。 */
     public static final String MCP_FRONTEND_BASE_URL = "mcp.frontendBaseUrl";
-    /** AI 受理次数及并发参数前缀，后接能力名和限制类型。 */
-    public static final String AI_USAGE_PREFIX = "ai.usage.";
     /** 存储类型：r2 对象存储 / local 本地磁盘 */
     public static final String STORAGE_TYPE = "sys.storage.type";
 
@@ -148,61 +146,17 @@ public class ConfigConstants {
     /** AI 模块总开关，关闭时所有 AI 调用直接抛 AI_DISABLED */
     public static final String AI_ENABLED = "ai.enabled";
 
-    /** 全局默认对话模型 ID */
-    public static final String AI_DEFAULT_CHAT_MODEL = "ai.default.chat.model";
-
-    /** 全局默认视觉模型 ID */
-    public static final String AI_DEFAULT_VISION_MODEL = "ai.default.vision.model";
-
-    /** 全局默认文生图模型 ID */
-    public static final String AI_DEFAULT_IMAGE_MODEL = "ai.default.image.model";
-
-    /** 全局默认向量模型 ID */
-    public static final String AI_DEFAULT_EMBEDDING_MODEL = "ai.default.embedding.model";
-
     /** 是否启用降级链 */
     public static final String AI_FALLBACK_ENABLED = "ai.fallback.enabled";
-
-    /** 同模型瞬时错误重试次数 */
-    public static final String AI_RETRY_MAX = "ai.retry.max";
-
-    /** 重试退避基数（毫秒） */
-    public static final String AI_RETRY_BACKOFF_MS = "ai.retry.backoffMs";
-
-    /** 对话超时（毫秒） */
-    public static final String AI_TIMEOUT_CHAT = "ai.timeout.chat";
-
-    /** 文生图超时（毫秒） */
-    public static final String AI_TIMEOUT_IMAGE = "ai.timeout.image";
 
     /** 单次最多生成张数 */
     public static final String AI_IMAGE_MAX_COUNT = "ai.image.maxCount";
 
-    /**
-     * 风格后缀模板的键名前缀
-     *
-     * <p>完整键名形如 {@code ai.image.styleSuffix.recipe.photo}，
-     * 由本前缀加业务方传入的 style key 拼成，因此只登记前缀。</p>
-     */
-    public static final String AI_IMAGE_STYLE_SUFFIX_PREFIX = "ai.image.styleSuffix.";
-
     /** 调用记录保留天数 */
     public static final String AI_LOG_RETENTION_DAYS = "ai.log.retentionDays";
 
-    /** 生成图转存：请求内重试次数 */
-    public static final String AI_IMAGE_TRANSFER_RETRY_MAX = "ai.image.transfer.retryMax";
-
-    /** 生成图转存：请求内重试退避基数（毫秒） */
-    public static final String AI_IMAGE_TRANSFER_RETRY_BACKOFF_MS = "ai.image.transfer.retryBackoffMs";
-
     /** 生成图转存补偿：是否启用定时重传 */
     public static final String AI_IMAGE_TRANSFER_COMPENSATE_ENABLED = "ai.image.transfer.compensateEnabled";
-
-    /** 生成图转存补偿：单条任务最大重传次数 */
-    public static final String AI_IMAGE_TRANSFER_COMPENSATE_MAX_ATTEMPT = "ai.image.transfer.compensateMaxAttempt";
-
-    /** 生成图转存补偿：任务保留时长（分钟），超时丢弃 */
-    public static final String AI_IMAGE_TRANSFER_EXPIRE_MINUTES = "ai.image.transfer.expireMinutes";
 
     /** 菜品一键 AI 文本补齐的 system 提示词 */
     public static final String AI_PROMPT_MEAL_DISH_SYSTEM = "ai.prompt.meal.dish.system";

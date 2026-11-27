@@ -1,16 +1,23 @@
 package com.howe.book.service.impl;
 
+import cn.hutool.crypto.SecureUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.howe.book.domain.BookNode;
+import com.howe.book.domain.BookScopeDelta;
 import com.howe.book.mapper.BookNodeMapper;
 import com.howe.book.service.BookNodeService;
 import com.howe.common.exception.ServiceException;
 import java.time.LocalDateTime;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -60,6 +67,74 @@ public class BookNodeServiceImpl implements BookNodeService {
         return mapper.selectList(query.orderByAsc(BookNode::getSortOrder, BookNode::getId));
     }
 
+    /** 比对指定父节点下的直接子节点。 */
+    @Override
+    @Transactional(readOnly = true)
+    public BookScopeDelta syncScope(String parent, Map<String, String> known, String parentVersion) {
+        String scope = parent == null || parent.isBlank() ? null : uuid(parent);
+        Map<String, String> baseline = known == null ? Map.of() : known;
+        BookNode current = scope == null ? null : get(scope);
+        List<BookNode> rows = list(null, scope, true, null, null, true);
+        if (current != null) {
+            current.setChildCount(rows.size());
+            current.setCacheVersion(SecureUtil.sha256(json.valueToTree(current).toString()));
+            if (current.getCacheVersion().equals(parentVersion)) {
+                current = null;
+            }
+        }
+        Map<String, Integer> counts = new HashMap<>();
+        if (!rows.isEmpty()) {
+            mapper.selectMaps(new QueryWrapper<BookNode>().select("parent_id", "COUNT(*) AS child_count")
+                .in("parent_id", rows.stream().map(BookNode::getId).toList())
+                .isNull("deleted_at").groupBy("parent_id"))
+                .forEach(row -> counts.put((String) row.get("parent_id"), ((Number) row.get("child_count")).intValue()));
+        }
+        List<String> order = new ArrayList<>();
+        List<BookNode> upserts = new ArrayList<>();
+        Set<String> live = new HashSet<>();
+        for (BookNode node : rows) {
+            node.setChildCount(counts.getOrDefault(node.getId(), 0));
+            String version = SecureUtil.sha256(json.valueToTree(node).toString());
+            node.setCacheVersion(version);
+            order.add(node.getId());
+            live.add(node.getId());
+            if (!version.equals(baseline.get(node.getId()))) {
+                upserts.add(node);
+            }
+        }
+        return new BookScopeDelta(upserts, baseline.keySet().stream().filter(id -> !live.contains(id)).toList(), order, current);
+    }
+
+    /** 沿父链读取当前节点的路径，不读取兄弟及后代。 */
+    @Override
+    public List<BookNode> path(String id) {
+        List<BookNode> chain = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        BookNode node = get(id);
+        while (seen.add(node.getId())) {
+            chain.add(node);
+            if (node.getParentId() == null) {
+                break;
+            }
+            node = get(node.getParentId());
+        }
+        Collections.reverse(chain);
+        return chain;
+    }
+
+    /** 聚合当前共享书架的统计。 */
+    @Override
+    public Map<String, Long> stats() {
+        return Map.of("categories", countType("category", null), "books", countType("book", null),
+            "notes", countType("note", null), "weekNotes", countType("note", LocalDateTime.now().minusDays(7)));
+    }
+
+    /** 统计指定类型的有效节点。 */
+    private long countType(String type, LocalDateTime since) {
+        return mapper.selectCount(new LambdaQueryWrapper<BookNode>().eq(BookNode::getNodeType, type)
+            .isNull(BookNode::getDeletedAt).ge(since != null, BookNode::getCreatedAt, since));
+    }
+
     /** 读取共享书架的有效节点。 */
     @Override
     public BookNode get(String id) {
@@ -74,7 +149,6 @@ public class BookNodeServiceImpl implements BookNodeService {
     @Transactional(isolation = Isolation.READ_COMMITTED)
     @Override
     public BookNode create(long creator, BookNode input) {
-        lockTree();
         input.setUserId(creator);
         input.setId(input.getId() == null ? UUID.randomUUID().toString() : uuid(input.getId()));
         validate(input);
@@ -103,7 +177,6 @@ public class BookNodeServiceImpl implements BookNodeService {
     @Transactional(isolation = Isolation.READ_COMMITTED)
     @Override
     public BookNode update(String id, BookNode input) {
-        lockTree();
         BookNode current = get(id);
         if (!current.getVersion().equals(input.getVersion())) {
             throw new ServiceException("节点已更新，请重新加载后保存", 409);
@@ -129,7 +202,6 @@ public class BookNodeServiceImpl implements BookNodeService {
     @Transactional(isolation = Isolation.READ_COMMITTED)
     @Override
     public List<String> remove(String id) {
-        lockTree();
         get(id);
         var pending = new ArrayDeque<String>();
         var visited = new HashSet<String>();
@@ -154,13 +226,6 @@ public class BookNodeServiceImpl implements BookNodeService {
                 .set(BookNode::getUpdatedAt, now).setSql("version = version + 1"));
         }
         return List.copyOf(visited);
-    }
-
-    /** 串行化共享书架的树变更，锁随当前事务释放。 */
-    private void lockTree() {
-        if (mapper.lockTree() == null) {
-            throw new ServiceException("共享书架尚未初始化");
-        }
     }
 
     /** 规范客户端 UUID。 */
@@ -210,12 +275,12 @@ public class BookNodeServiceImpl implements BookNodeService {
         if ("category".equals(type) && input.getParentId() == null) {
             return;
         }
-        if (input.getParentId() == null || "category".equals(type)) {
+        if (input.getParentId() == null) {
             throw new ServiceException("请选择合法的父节点");
         }
         BookNode parent = get(input.getParentId());
         boolean valid = switch (type) {
-            case "book" -> "category".equals(parent.getNodeType());
+            case "category", "book" -> "category".equals(parent.getNodeType());
             case "note" -> "book".equals(parent.getNodeType());
             default -> Set.of("note", "remark").contains(parent.getNodeType());
         };

@@ -5,8 +5,8 @@ import java.util.Map;
 /**
  * 提醒规则服务
  *
- * <p>规则保存在 {@code sys_config} 的 {@code pregnancy.reminder.rules}，含规则列表与
- * {@code reminderVersion}；由孕期管理员维护，整体更新时比较版本。</p>
+ * <p>规则保存在 {@code preg_reminder_rule}（一行一条规则，表级
+ * {@code rule_version} 做乐观锁）；由孕期管理员维护，整体更新时比较版本。</p>
  *
  * @author howe
  */

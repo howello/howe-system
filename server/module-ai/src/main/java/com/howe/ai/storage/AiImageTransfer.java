@@ -38,6 +38,10 @@ import java.util.Locale;
 @Component
 @RequiredArgsConstructor
 public class AiImageTransfer {
+    private static final int TRANSFER_RETRIES = 3;
+    private static final long TRANSFER_RETRY_DELAY_MS = 1_000;
+    private static final int COMPENSATION_TTL_MINUTES = 120;
+
     /** 生成图在对象存储中的业务目录 */
     public static final String BIZ_DIR = "ai";
 
@@ -104,11 +108,10 @@ public class AiImageTransfer {
             throw new AiException(AiErrorCode.TRANSFER_FAILED, "图片已生成但保存失败，请重试", cause);
         }
         String reason = StrUtil.blankToDefault(cause.getMessage(), cause.getClass().getSimpleName());
-        int expireMinutes = Math.max(1, ConfigUtils.getInt(ConfigConstants.AI_IMAGE_TRANSFER_EXPIRE_MINUTES, 120));
         log.error("生成图转存失败，转入补偿重传：key={}", objectKey, cause);
         String taskId;
         try {
-            taskId = compensationStore.enqueue(objectKey, uploadBytes, contentType, expireMinutes, reason);
+            taskId = compensationStore.enqueue(objectKey, uploadBytes, contentType, COMPENSATION_TTL_MINUTES, reason);
         } catch (Exception e) {
             throw new AiException(AiErrorCode.TRANSFER_FAILED, "图片保存失败且无法持久化补偿任务，请重试", e);
         }
@@ -138,16 +141,14 @@ public class AiImageTransfer {
             }
             return data;
         }
-        int retryMax = retryMax();
-        long backoffMs = retryBackoffMs();
         AiException last = null;
-        for (int attempt = 0; attempt <= retryMax; attempt++) {
+        for (int attempt = 0; attempt <= TRANSFER_RETRIES; attempt++) {
             try {
                 return download(tempUrl);
             } catch (AiException e) {
                 last = e;
-                if (attempt < retryMax) {
-                    ThreadUtil.sleep(backoffMs * (attempt + 1));
+                if (attempt < TRANSFER_RETRIES) {
+                    ThreadUtil.sleep(TRANSFER_RETRY_DELAY_MS * (attempt + 1));
                 }
             }
         }
@@ -164,36 +165,20 @@ public class AiImageTransfer {
      * @throws AiException 重试后仍失败
      */
     private String uploadWithRetry(String objectKey, byte[] data, String contentType) {
-        int retryMax = retryMax();
-        long backoffMs = retryBackoffMs();
         Exception last = null;
-        for (int attempt = 0; attempt <= retryMax; attempt++) {
+        for (int attempt = 0; attempt <= TRANSFER_RETRIES; attempt++) {
             try {
                 return storageService.store(objectKey, () -> IoUtil.toStream(data), data.length, contentType);
             } catch (Exception e) {
                 last = e;
                 log.warn("上传生成图失败（第 {} 次）：key={}，原因：{}", attempt + 1, objectKey, e.getMessage());
-                if (attempt < retryMax) {
-                    ThreadUtil.sleep(backoffMs * (attempt + 1));
+                if (attempt < TRANSFER_RETRIES) {
+                    ThreadUtil.sleep(TRANSFER_RETRY_DELAY_MS * (attempt + 1));
                 }
             }
         }
         throw new AiException(AiErrorCode.TRANSFER_FAILED,
                 "上传生成图失败：" + (last == null ? "未知错误" : last.getMessage()), last);
-    }
-
-    /**
-     * 转存重试次数
-     */
-    private int retryMax() {
-        return Math.max(0, ConfigUtils.getInt(ConfigConstants.AI_IMAGE_TRANSFER_RETRY_MAX, 3));
-    }
-
-    /**
-     * 转存重试退避基数（毫秒）
-     */
-    private long retryBackoffMs() {
-        return Math.max(0L, ConfigUtils.getInt(ConfigConstants.AI_IMAGE_TRANSFER_RETRY_BACKOFF_MS, 1000));
     }
 
     /**

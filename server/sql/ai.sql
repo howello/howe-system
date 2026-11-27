@@ -5,8 +5,7 @@
 -- 执行：mysql -u root -p howe-system < ai.sql
 -- 依赖：需先执行 base.sql（本脚本会向 sys_config / sys_menu 写入数据）
 --
--- 建六张表：
---   ai_provider     服务商（协议 + 默认接入点），只读基础数据，由本脚本初始化
+-- 建五张表：
 --   ai_channel      渠道（服务商 + 一组密钥），密钥加密存储
 --   ai_model        模型（渠道下的具体模型，按能力类型区分）
 --   ai_scene_route  场景路由（场景 → 主模型 + 有序降级链 + 参数覆盖）
@@ -22,34 +21,12 @@
 -- ----------------------------------------------------------------------------
 
 -- ----------------------------------------------------------------------------
--- 1. 服务商
--- ----------------------------------------------------------------------------
-drop table if exists ai_provider;
-create table ai_provider (
-  id                bigint(20)      not null auto_increment    comment '主键ID',
-  code              varchar(64)     not null                   comment '服务商标识，全局唯一',
-  name              varchar(128)    not null                   comment '展示名',
-  protocol          varchar(32)     not null                   comment '适配器协议：dashscope / openai / raw-http',
-  default_base_url  varchar(255)    default null               comment '默认接入点，可被渠道覆盖',
-  supports          json            default null               comment '支持的能力列表，如 ["chat","vision","image","embedding"]',
-  enabled           tinyint(1)      not null default 1         comment '是否启用（0停用 1启用）',
-  sort              int(11)         not null default 1         comment '排序，越小越靠前',
-  remark            varchar(500)    default null               comment '备注',
-  create_by         varchar(64)     default ''                 comment '创建者',
-  create_time       datetime                                   comment '创建时间',
-  update_by         varchar(64)     default ''                 comment '更新者',
-  update_time       datetime                                   comment '更新时间',
-  primary key (id),
-  unique key uk_ai_provider_code (code)                        comment '服务商标识唯一'
-) engine=innodb auto_increment=1 comment = 'AI 服务商表（协议与默认接入点）';
-
--- ----------------------------------------------------------------------------
--- 2. 渠道
+-- 1. 渠道
 -- ----------------------------------------------------------------------------
 drop table if exists ai_channel;
 create table ai_channel (
   id                bigint(20)      not null auto_increment    comment '主键ID',
-  provider_code     varchar(64)     not null                   comment '关联 ai_provider.code',
+  provider_code     varchar(64)     not null                   comment '固定服务商标识',
   name              varchar(128)    not null                   comment '渠道名称，如「百炼-主账号」',
   api_key           varchar(512)    default null               comment '接口密钥，AES-GCM 加密后入库，绝不存明文',
   base_url          varchar(255)    default null               comment '接入点，覆盖服务商默认值',
@@ -69,7 +46,7 @@ create table ai_channel (
 ) engine=innodb auto_increment=1 comment = 'AI 渠道表（服务商下的一组密钥）';
 
 -- ----------------------------------------------------------------------------
--- 3. 模型
+-- 2. 模型
 -- ----------------------------------------------------------------------------
 drop table if exists ai_model;
 create table ai_model (
@@ -92,7 +69,7 @@ create table ai_model (
 ) engine=innodb auto_increment=1 comment = 'AI 模型表（渠道下的具体模型）';
 
 -- ----------------------------------------------------------------------------
--- 4. 场景路由
+-- 3. 场景路由
 -- ----------------------------------------------------------------------------
 drop table if exists ai_scene_route;
 create table ai_scene_route (
@@ -102,7 +79,7 @@ create table ai_scene_route (
   capability          varchar(16)   not null                   comment '能力类型：CHAT / VISION / IMAGE / EMBEDDING',
   primary_model_id    bigint(20)    not null                   comment '主模型ID',
   fallback_model_ids  json          default null               comment '有序降级链，元素为模型ID，如 [3,7]',
-  params              json          default null               comment '场景级参数覆盖，如 {"temperature":0.7,"size":"1024*1024","styleSuffixKey":"recipe.photo"}',
+  params              json          default null               comment '场景级参数覆盖，如 {"temperature":0.7,"size":"1024*1024","styleSuffix":"自然光美食摄影"}',
   enabled             tinyint(1)    not null default 1         comment '是否启用（0停用 1启用）',
   remark              varchar(500)  default null               comment '备注',
   create_by           varchar(64)   default ''                 comment '创建者',
@@ -114,7 +91,7 @@ create table ai_scene_route (
 ) engine=innodb auto_increment=1 comment = 'AI 场景路由表（场景到模型的映射与降级链）';
 
 -- ----------------------------------------------------------------------------
--- 5. 调用记录
+-- 4. 调用记录
 -- ----------------------------------------------------------------------------
 drop table if exists ai_call_log;
 create table ai_call_log (
@@ -144,7 +121,7 @@ create table ai_call_log (
 ) engine=innodb auto_increment=1 comment = 'AI 调用记录表（每次尝试一条）';
 
 -- ----------------------------------------------------------------------------
--- 6. 生成图资产
+-- 5. 生成图资产
 -- ----------------------------------------------------------------------------
 drop table if exists ai_image_asset;
 create table ai_image_asset (
@@ -161,37 +138,14 @@ create table ai_image_asset (
 ) engine=innodb auto_increment=1 comment = 'AI 生成图资产表';
 
 -- ----------------------------------------------------------------------------
--- 7. 服务商基础数据（配置入口只保留三项：阿里百炼 / OpenAI / Anthropic）
---
--- raw-http 不再种入：它是历史协议，存量渠道保留为停用状态供审计，
--- 新库不需要它。已有库由增量脚本把对应渠道停用。
--- ----------------------------------------------------------------------------
-delete from ai_provider where code in ('dashscope', 'openai-compatible', 'anthropic', 'raw-http');
-
-insert into ai_provider (code, name, protocol, default_base_url, supports, enabled, sort, remark, create_by, create_time)
-values ('dashscope', '阿里百炼', 'dashscope', 'https://dashscope.aliyuncs.com',
-        '["chat","vision","image","embedding"]', 1, 1,
-        '通义千问（对话/图片理解）、通义万相（文生图）、text-embedding', 'admin', sysdate());
-
-insert into ai_provider (code, name, protocol, default_base_url, supports, enabled, sort, remark, create_by, create_time)
-values ('openai-compatible', 'OpenAI', 'openai', 'https://api.openai.com',
-        '["chat","vision","image","embedding"]', 1, 2,
-        'OpenAI 及任何 OpenAI 兼容协议的服务：DeepSeek、月之暗面、智谱、火山方舟、自建 vLLM；接入点可在渠道上覆盖。保留 code openai-compatible 以兼容既有渠道', 'admin', sysdate());
-
-insert into ai_provider (code, name, protocol, default_base_url, supports, enabled, sort, remark, create_by, create_time)
-values ('anthropic', 'Anthropic', 'anthropic', 'https://api.anthropic.com',
-        '["chat","vision"]', 1, 3,
-        'Anthropic Messages API；只支持对话与图片理解，不支持文生图与向量。API 版本 2026-10-21 起不再接受 temperature/top_p/top_k', 'admin', sysdate());
-
--- ----------------------------------------------------------------------------
--- 8. 业务场景路由种子（meal.* 一键 AI / 新菜审核）
+-- 6. 业务场景路由种子（meal.* 一键 AI / 新菜审核）
 --
 -- 只做「有可用模型时的便利初始化」：ai_model 由后台录入，本脚本执行时若还没有
 -- 对应能力的启用模型，这几条 select 会插入 0 行，不影响脚本执行；之后可在
 -- 「AI 管理 > 场景路由」里手工维护。
 -- 场景标识与 module-meal 代码里写死的常量一致，不要改名。
 -- ----------------------------------------------------------------------------
-delete from ai_scene_route where scene in ('meal.dish.generate', 'meal.dish.audit', 'meal.dish.update', 'meal.dish.search', 'meal.dish.cover', 'meal.app.version.log', 'meal.category.review', 'meal.order.prep');
+delete from ai_scene_route where scene in ('meal.dish.generate', 'meal.dish.audit', 'meal.dish.update', 'meal.dish.search', 'meal.dish.cover', 'app.version.log', 'meal.category.review', 'meal.order.prep');
 
 -- 对话补齐：优先名为 deepseek-flash 的对话模型，否则取首个启用的对话模型
 insert into ai_scene_route (scene, scene_name, capability, primary_model_id, params, enabled, remark, create_by, create_time)
@@ -227,7 +181,7 @@ limit 1;
 
 -- App 发版日志润色：CI 发布前把提交摘要提炼成用户可读的更新说明
 insert into ai_scene_route (scene, scene_name, capability, primary_model_id, params, enabled, remark, create_by, create_time)
-select 'meal.app.version.log', 'App 发版日志润色', 'CHAT', m.id, '{"temperature":0.5}', 1, 'App发版日志AI润色', 'admin', sysdate()
+select 'app.version.log', 'App 发版日志润色', 'CHAT', m.id, '{"temperature":0.5}', 1, 'App发版日志AI润色', 'admin', sysdate()
 from ai_model m
 where m.capability = 'CHAT' and m.enabled = 1
 order by (m.model_name = 'deepseek-flash') desc, m.id asc
@@ -251,37 +205,21 @@ limit 1;
 
 -- 封面图：取首个启用的文生图模型；没有可用文生图模型时不写入（接口按未配置降级）
 insert into ai_scene_route (scene, scene_name, capability, primary_model_id, params, enabled, remark, create_by, create_time)
-select 'meal.dish.cover', '菜品封面生成', 'IMAGE', m.id, '{"size":"1024*1024","styleSuffixKey":"recipe.photo"}', 1, '菜品一键AI-封面图', 'admin', sysdate()
+select 'meal.dish.cover', '菜品封面生成', 'IMAGE', m.id, '{"size":"1024*1024","styleSuffix":"中式美食摄影，俯拍四十五度，白色或浅木色桌面，自然光，摆盘精致，热气腾腾，浅景深，高清细节，无文字，无水印，正方形构图。"}', 1, '菜品一键AI-封面图', 'admin', sysdate()
 from ai_model m
 where m.capability = 'IMAGE' and m.enabled = 1
 order by m.id asc
 limit 1;
 
 -- ----------------------------------------------------------------------------
--- 9. 参数配置（ai.*）
+-- 7. 参数配置（ai.*）
 -- ----------------------------------------------------------------------------
 delete from sys_config where config_key in (
   'ai.enabled',
-  'ai.default.chat.model',
-  'ai.default.vision.model',
-  'ai.default.image.model',
-  'ai.default.embedding.model',
   'ai.fallback.enabled',
-  'ai.retry.max',
-  'ai.retry.backoffMs',
-  'ai.timeout.chat',
-  'ai.timeout.image',
   'ai.image.maxCount',
-  'ai.image.styleSuffix.recipe.photo',
-  'ai.image.styleSuffix.recipe.illustration',
-  'ai.image.styleSuffix.recipe.watercolor',
-  'ai.image.styleSuffix.recipe.minimal',
   'ai.log.retentionDays',
-  'ai.image.transfer.retryMax',
-  'ai.image.transfer.retryBackoffMs',
   'ai.image.transfer.compensateEnabled',
-  'ai.image.transfer.compensateMaxAttempt',
-  'ai.image.transfer.expireMinutes',
   'ai.prompt.meal.dish.system',
   'ai.prompt.meal.dish.auditSuffix',
   'ai.prompt.meal.dish.updateSystem',
@@ -296,88 +234,20 @@ values ('AI-总开关', 'ai.enabled', 'false', 'Y', 'admin', sysdate(),
         '关闭时所有 AI 调用直接抛 AI_DISABLED，不发起外部请求', 'AI');
 
 insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
-values ('AI-全局默认对话模型', 'ai.default.chat.model', '', 'Y', 'admin', sysdate(),
-        '填 ai_model 的主键ID；场景未配路由时用它兜底', 'AI');
-
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
-values ('AI-全局默认视觉模型', 'ai.default.vision.model', '', 'Y', 'admin', sysdate(),
-        '填 ai_model 的主键ID', 'AI');
-
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
-values ('AI-全局默认文生图模型', 'ai.default.image.model', '', 'Y', 'admin', sysdate(),
-        '填 ai_model 的主键ID', 'AI');
-
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
-values ('AI-全局默认向量模型', 'ai.default.embedding.model', '', 'Y', 'admin', sysdate(),
-        '填 ai_model 的主键ID', 'AI');
-
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-是否启用降级链', 'ai.fallback.enabled', 'true', 'Y', 'admin', sysdate(),
         '关闭后场景路由只走主模型，不做故障切换', 'AI');
-
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
-values ('AI-同模型重试次数', 'ai.retry.max', '1', 'Y', 'admin', sysdate(),
-        '只对超时、厂商5xx、限流等瞬时错误生效；重试与降级分开计数', 'AI');
-
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
-values ('AI-重试退避基数', 'ai.retry.backoffMs', '500', 'Y', 'admin', sysdate(),
-        '第 n 次重试等待 n 倍基数，单位毫秒', 'AI');
-
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
-values ('AI-对话超时', 'ai.timeout.chat', '60000', 'Y', 'admin', sysdate(),
-        '单位毫秒', 'AI');
-
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
-values ('AI-文生图超时', 'ai.timeout.image', '120000', 'Y', 'admin', sysdate(),
-        '单位毫秒；异步厂商的轮询总时长也受它约束', 'AI');
 
 insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-单次最多生成张数', 'ai.image.maxCount', '4', 'Y', 'admin', sysdate(),
         '超过该值的请求直接抛 BAD_REQUEST', 'AI');
 
 insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
-values ('AI-风格后缀-美食摄影', 'ai.image.styleSuffix.recipe.photo',
-        '中式美食摄影，俯拍四十五度，白色或浅木色桌面，自然光，摆盘精致，热气腾腾，浅景深，高清细节，无文字，无水印，正方形构图。',
-        'Y', 'admin', sysdate(), '菜谱封面的写实风格后缀，拼在业务提示词之后', 'AI');
-
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
-values ('AI-风格后缀-插画', 'ai.image.styleSuffix.recipe.illustration',
-        '扁平化矢量插画，暖色调，色块干净，构图居中，背景简洁，无文字，无水印，正方形构图。',
-        'Y', 'admin', sysdate(), '菜谱封面的插画风格后缀', 'AI');
-
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
-values ('AI-风格后缀-水彩', 'ai.image.styleSuffix.recipe.watercolor',
-        '清新水彩手绘，晕染自然，留白充足，纸张纹理，柔和光线，无文字，无水印，正方形构图。',
-        'Y', 'admin', sysdate(), '菜谱封面的水彩风格后缀', 'AI');
-
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
-values ('AI-风格后缀-极简', 'ai.image.styleSuffix.recipe.minimal',
-        '极简静物，纯色背景，单一光源，大量留白，构图克制，无文字，无水印，正方形构图。',
-        'Y', 'admin', sysdate(), '菜谱封面的极简风格后缀', 'AI');
-
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-调用记录保留天数', 'ai.log.retentionDays', '30', 'Y', 'admin', sysdate(),
         '超过天数的调用记录可清理，单位天', 'AI');
 
 insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
-values ('AI-转存重试次数', 'ai.image.transfer.retryMax', '3', 'Y', 'admin', sysdate(),
-        '生成图下载/上传的请求内重试次数，复用已拿到字节，不会重新生成', 'AI');
-
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
-values ('AI-转存重试退避', 'ai.image.transfer.retryBackoffMs', '1000', 'Y', 'admin', sysdate(),
-        '第 n 次重试等待 n 倍基数，单位毫秒', 'AI');
-
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-转存补偿开关', 'ai.image.transfer.compensateEnabled', 'true', 'Y', 'admin', sysdate(),
         '关闭后转存失败直接报错，不入队重传、也不写占位地址', 'AI');
-
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
-values ('AI-转存补偿最大次数', 'ai.image.transfer.compensateMaxAttempt', '30', 'Y', 'admin', sysdate(),
-        '定时重传的最大次数，超过即放弃', 'AI');
-
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
-values ('AI-转存补偿保留时长', 'ai.image.transfer.expireMinutes', '120', 'Y', 'admin', sysdate(),
-        '待补偿任务的保留时长，单位分钟，超时丢弃', 'AI');
 
 insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type)
 values ('AI-菜品补全提示词', 'ai.prompt.meal.dish.system',
@@ -415,7 +285,7 @@ values ('AI-一键备菜清单提示词', 'ai.prompt.meal.order.prepSystem',
         'Y', 'admin', sysdate(), '一键备菜清单生成的 system 提示词；留空则用代码内缺省值。固定内容规则由代码追加，不随本配置改变', 'AI');
 
 -- ----------------------------------------------------------------------------
--- 10. 菜单与按钮权限
+-- 8. 菜单与按钮权限
 -- 不硬编码 menu_id：sys_menu 的 auto_increment 与既有数据无关，写死会撞车。
 -- 先按名称捕获或新建「AI 管理」目录，再用 LAST_INSERT_ID() 逐级捕获新建菜单的 ID。
 -- ----------------------------------------------------------------------------
@@ -482,36 +352,3 @@ insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame
 values ('记录查询', @aiCallLogMenuId, '1', '#', '', 1, 0, 'F', '0', '0', 'ai:calllog:query', '#', 'admin', sysdate(), '');
 insert into sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 values ('用量统计', @aiCallLogMenuId, '2', '#', '', 1, 0, 'F', '0', '0', 'ai:calllog:stats', '#', 'admin', sysdate(), '');
-
-
--- AI 受理次数和并发上限：按上海自然日，失败的已受理调用也计数，拒绝不扣次数。
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, `sensitive`, param_type)
-select '用户每日文本AI受理次数', 'ai.usage.chat.userDailyLimit', '100', 'N', 'admin', sysdate(), '受理次数限额，不等同于人民币费用预算；正整数', 'N', 'AI'
-where not exists (select 1 from sys_config where config_key = 'ai.usage.chat.userDailyLimit');
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, `sensitive`, param_type)
-select '家庭每日文本AI受理次数', 'ai.usage.chat.familyDailyLimit', '500', 'N', 'admin', sysdate(), '受理次数限额，不等同于人民币费用预算；正整数', 'N', 'AI'
-where not exists (select 1 from sys_config where config_key = 'ai.usage.chat.familyDailyLimit');
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, `sensitive`, param_type)
-select '用户文本AI并发数', 'ai.usage.chat.userConcurrency', '2', 'N', 'admin', sysdate(), '受理次数限额，不等同于人民币费用预算；正整数', 'N', 'AI'
-where not exists (select 1 from sys_config where config_key = 'ai.usage.chat.userConcurrency');
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, `sensitive`, param_type)
-select '家庭文本AI并发数', 'ai.usage.chat.familyConcurrency', '4', 'N', 'admin', sysdate(), '受理次数限额，不等同于人民币费用预算；正整数', 'N', 'AI'
-where not exists (select 1 from sys_config where config_key = 'ai.usage.chat.familyConcurrency');
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, `sensitive`, param_type)
-select '用户每日图片AI受理次数', 'ai.usage.image.userDailyLimit', '20', 'N', 'admin', sysdate(), '受理次数限额，不等同于人民币费用预算；正整数', 'N', 'AI'
-where not exists (select 1 from sys_config where config_key = 'ai.usage.image.userDailyLimit');
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, `sensitive`, param_type)
-select '家庭每日图片AI受理次数', 'ai.usage.image.familyDailyLimit', '100', 'N', 'admin', sysdate(), '受理次数限额，不等同于人民币费用预算；正整数', 'N', 'AI'
-where not exists (select 1 from sys_config where config_key = 'ai.usage.image.familyDailyLimit');
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, `sensitive`, param_type)
-select '用户图片AI并发数', 'ai.usage.image.userConcurrency', '2', 'N', 'admin', sysdate(), '受理次数限额，不等同于人民币费用预算；正整数', 'N', 'AI'
-where not exists (select 1 from sys_config where config_key = 'ai.usage.image.userConcurrency');
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, `sensitive`, param_type)
-select '家庭图片AI并发数', 'ai.usage.image.familyConcurrency', '4', 'N', 'admin', sysdate(), '受理次数限额，不等同于人民币费用预算；正整数', 'N', 'AI'
-where not exists (select 1 from sys_config where config_key = 'ai.usage.image.familyConcurrency');
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, `sensitive`, param_type)
-select '全局文本AI并发数', 'ai.usage.chat.globalConcurrency', '8', 'N', 'admin', sysdate(), '全局并发保护，正整数', 'N', 'AI'
-where not exists (select 1 from sys_config where config_key = 'ai.usage.chat.globalConcurrency');
-insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, `sensitive`, param_type)
-select '全局图片AI并发数', 'ai.usage.image.globalConcurrency', '4', 'N', 'admin', sysdate(), '全局并发保护，正整数', 'N', 'AI'
-where not exists (select 1 from sys_config where config_key = 'ai.usage.image.globalConcurrency');

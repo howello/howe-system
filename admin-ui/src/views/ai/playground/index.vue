@@ -21,7 +21,7 @@
                   <el-form-item label="渠道">
                      <el-select
                         v-model="channelId"
-                        placeholder="不指定：走场景路由或全局默认"
+                        placeholder="按渠道测试时请选择"
                         clearable
                         filterable
                         style="width: 100%"
@@ -34,7 +34,7 @@
                      <el-select v-model="modelName" placeholder="不指定：用该渠道下能力匹配的模型" clearable filterable style="width: 100%">
                         <el-option v-for="item in modelOptions" :key="item.id" :label="modelLabel(item)" :value="item.modelName" />
                      </el-select>
-                     <div class="ai-hint">只列出当前渠道与能力下已启用的模型；两个都不选则走全局默认模型。</div>
+                     <div class="ai-hint">选择渠道或模型即可测试。</div>
                   </el-form-item>
 
                   <template v-if="isChatLike">
@@ -610,6 +610,10 @@ async function handleSend() {
   if (sending.value) {
     return
   }
+   if (!channelId.value && !modelName.value) {
+      proxy.$modal.msgWarning("请先选择渠道或模型")
+      return
+   }
   const text = inputText.value.trim()
   if (!text) {
     proxy.$modal.msgWarning("请先输入内容")

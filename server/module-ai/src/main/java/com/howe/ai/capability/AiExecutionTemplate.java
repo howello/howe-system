@@ -3,8 +3,6 @@ package com.howe.ai.capability;
 import cn.hutool.core.thread.ThreadUtil;
 import com.howe.ai.api.AiErrorCode;
 import com.howe.ai.api.AiException;
-import com.howe.ai.config.AiConfigCache;
-import com.howe.ai.config.AiProperties;
 import com.howe.ai.persistence.domain.AiCallLog;
 import com.howe.ai.persistence.domain.AiImageAsset;
 import com.howe.ai.route.AiFallbackPolicy;
@@ -23,7 +21,7 @@ import java.util.List;
  *
  * <p>把「重试与降级」这件事收敛到一处：</p>
  * <ul>
- *   <li>同模型内的瞬时错误按 {@code ai.retry.max} 与 {@code ai.retry.backoffMs} 重试；</li>
+ *   <li>同模型内的瞬时错误等待 500 毫秒后重试一次；</li>
  *   <li>可降级的错误才换下一个模型，且降级链只在场景路由命中时才有；</li>
  *   <li>重试与降级分别计数，{@code ai_call_log.attempt} 记录真实的第几次尝试；</li>
  *   <li>每次尝试都单独落一条调用记录。</li>
@@ -36,7 +34,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AiExecutionTemplate
 {
-    private final AiConfigCache aiConfigCache;
+    private static final long RETRY_DELAY_MS = 500;
 
     private final AiCallLogRecorder aiCallLogRecorder;
 
@@ -54,9 +52,6 @@ public class AiExecutionTemplate
     public <T> AiInvocation<T> execute(AiRoutePlan plan, AiCallContext context, AiCall<T> call,
             AiSuccessEnricher<T> enricher)
     {
-        AiProperties properties = aiConfigCache.getProperties();
-        int maxRetries = Math.max(0, properties.getRetryMax());
-        long backoffMs = Math.max(0L, properties.getRetryBackoffMs());
         List<AiRouteTarget> targets = plan.targets();
 
         int attempt = 0;
@@ -67,7 +62,7 @@ public class AiExecutionTemplate
         {
             AiRouteTarget target = targets.get(index);
             lastTarget = target;
-            for (int retry = 0; retry <= maxRetries; retry++)
+            for (int retry = 0; retry <= 1; retry++)
             {
                 attempt++;
                 long start = System.currentTimeMillis();
@@ -86,10 +81,9 @@ public class AiExecutionTemplate
                     AiErrorCode code = translated.getAiErrorCode();
                     recordFailure(context, target, attempt, elapsed, code, translated.getMessage());
 
-                    boolean exhausted = retry >= maxRetries || !AiFallbackPolicy.canRetry(code);
-                    if (!exhausted)
+                    if (retry == 0 && AiFallbackPolicy.canRetry(code))
                     {
-                        ThreadUtil.sleep(backoffMs * (retry + 1));
+                        ThreadUtil.sleep(RETRY_DELAY_MS);
                         continue;
                     }
                     lastError = translated;

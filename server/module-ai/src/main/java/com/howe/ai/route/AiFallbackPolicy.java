@@ -27,19 +27,6 @@ public final class AiFallbackPolicy
             AiErrorCode.CHANNEL_DISABLED,
             AiErrorCode.AUTH_FAILED);
 
-    /**
-     * 绝不降级的错误
-     *
-     * <p>参数错、内容审核、余额不足、总开关关闭、没有可用模型：
-     * 换模型要么必然失败，要么会放大错误，直接抛给调用方。</p>
-     */
-    private static final Set<AiErrorCode> NEVER_FALLBACK = EnumSet.of(
-            AiErrorCode.BAD_REQUEST,
-            AiErrorCode.CONTENT_BLOCKED,
-            AiErrorCode.QUOTA_EXCEEDED,
-            AiErrorCode.AI_DISABLED,
-            AiErrorCode.NO_AVAILABLE_MODEL);
-
     /** 可以在同一模型上重试的瞬时错误 */
     private static final Set<AiErrorCode> RETRYABLE = EnumSet.of(
             AiErrorCode.TIMEOUT,
@@ -70,16 +57,5 @@ public final class AiFallbackPolicy
     public static boolean canRetry(AiErrorCode code)
     {
         return RETRYABLE.contains(code);
-    }
-
-    /**
-     * 判断该错误是否被明确排除在降级之外
-     *
-     * @param code 错误码
-     * @return 绝不降级时为 true
-     */
-    public static boolean isNeverFallback(AiErrorCode code)
-    {
-        return NEVER_FALLBACK.contains(code);
     }
 }

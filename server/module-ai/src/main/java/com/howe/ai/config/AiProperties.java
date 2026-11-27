@@ -14,41 +14,17 @@ import lombok.Data;
  */
 @Data
 public class AiProperties {
+    /** 固定的对话超时（毫秒）。 */
+    public static final long CHAT_TIMEOUT_MS = 60_000L;
+
     /** 总开关，关闭时所有 AI 调用直接抛 AI_DISABLED */
     private boolean enabled;
-
-    /** 全局默认对话模型 ID */
-    private Long defaultChatModelId;
-
-    /** 全局默认视觉模型 ID */
-    private Long defaultVisionModelId;
-
-    /** 全局默认文生图模型 ID */
-    private Long defaultImageModelId;
-
-    /** 全局默认向量模型 ID */
-    private Long defaultEmbeddingModelId;
 
     /** 是否启用降级链 */
     private boolean fallbackEnabled;
 
-    /** 同模型瞬时错误重试次数 */
-    private int retryMax;
-
-    /** 重试退避基数（毫秒） */
-    private long retryBackoffMs;
-
-    /** 对话超时（毫秒） */
-    private long timeoutChatMs;
-
-    /** 文生图超时（毫秒） */
-    private long timeoutImageMs;
-
     /** 单次最多生成张数 */
     private int imageMaxCount;
-
-    /** 调用记录保留天数 */
-    private int logRetentionDays;
 
     /**
      * 从参数配置表加载快照
@@ -58,35 +34,8 @@ public class AiProperties {
     public static AiProperties load() {
         AiProperties properties = new AiProperties();
         properties.setEnabled(ConfigUtils.getBoolean(ConfigConstants.AI_ENABLED, false));
-        properties.setDefaultChatModelId(readId(ConfigConstants.AI_DEFAULT_CHAT_MODEL));
-        properties.setDefaultVisionModelId(readId(ConfigConstants.AI_DEFAULT_VISION_MODEL));
-        properties.setDefaultImageModelId(readId(ConfigConstants.AI_DEFAULT_IMAGE_MODEL));
-        properties.setDefaultEmbeddingModelId(readId(ConfigConstants.AI_DEFAULT_EMBEDDING_MODEL));
         properties.setFallbackEnabled(ConfigUtils.getBoolean(ConfigConstants.AI_FALLBACK_ENABLED, true));
-        properties.setRetryMax(Math.max(0, Math.min(2, ConfigUtils.getInt(ConfigConstants.AI_RETRY_MAX, 1))));
-        properties.setRetryBackoffMs(Math.max(0, Math.min(5000, ConfigUtils.getInt(ConfigConstants.AI_RETRY_BACKOFF_MS, 500))));
-        properties.setTimeoutChatMs(Math.max(1, Math.min(300000, ConfigUtils.getInt(ConfigConstants.AI_TIMEOUT_CHAT, 60000))));
-        properties.setTimeoutImageMs(Math.max(1, Math.min(300000, ConfigUtils.getInt(ConfigConstants.AI_TIMEOUT_IMAGE, 120000))));
         properties.setImageMaxCount(Math.max(1, Math.min(4, ConfigUtils.getInt(ConfigConstants.AI_IMAGE_MAX_COUNT, 4))));
-        properties.setLogRetentionDays(ConfigUtils.getInt(ConfigConstants.AI_LOG_RETENTION_DAYS, 30));
         return properties;
-    }
-
-    /**
-     * 读取模型 ID 配置，空值或非法值返回 null
-     *
-     * @param configKey 配置键
-     * @return 模型 ID
-     */
-    private static Long readId(String configKey) {
-        String value = ConfigUtils.getString(configKey, "");
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        try {
-            return Long.valueOf(value.trim());
-        } catch (NumberFormatException e) {
-            return null;
-        }
     }
 }

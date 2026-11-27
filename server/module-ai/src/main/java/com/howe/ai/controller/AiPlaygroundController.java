@@ -78,7 +78,7 @@ public class AiPlaygroundController extends BaseController
         // 表现就是「一直转圈、最后一次性出现」。这个响应头让 nginx 对本次响应关掉缓冲；
         // 其它网关不认识它，忽略即可，不会有副作用。
         response.setHeader("X-Accel-Buffering", "no");
-        SseEmitter emitter = new SseEmitter(AiProperties.load().getTimeoutChatMs());
+        SseEmitter emitter = new SseEmitter(AiProperties.CHAT_TIMEOUT_MS);
         AtomicReference<Disposable> subscription = new AtomicReference<>();
         AtomicInteger pushed = new AtomicInteger();
         AtomicLong firstPushAt = new AtomicLong();

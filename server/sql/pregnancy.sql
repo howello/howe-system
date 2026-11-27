@@ -1,10 +1,10 @@
 -- ============================================================
 -- pregnancy.sql — 孕期助手模块脚本（module-pregnancy）
 --
--- 目标模型：单家庭、单次孕期、11 张业务表。
+-- 目标模型：单家庭、单次孕期、12 张业务表。
 -- 用户、角色与授权关系使用现有系统表（sys_user / sys_role / sys_user_role）。
 --
--- 11 张表：
+-- 12 张表：
 --   preg_measurement     固定指标测量（一行存主值、次值与受控补充字段）
 --   preg_checkup         产检计划（建议窗口、预约、完成与状态）
 --   preg_checkup_detail  产检详情（项目 ITEM / 准备事项 PREPARATION）
@@ -16,6 +16,7 @@
 --   preg_expense         统一费用明细（来源类型 + 来源 ID + 槽位唯一）
 --   preg_file            私有原图（TEMP / BOUND / ORPHAN / DELETING）
 --   preg_task            后台任务（提醒 / 物品内容 / 导出）
+--   preg_reminder_rule   提醒规则（一行一条，表级版本做乐观锁）
 --
 -- 库名 howe-system，字符集 utf8mb4。执行方式：
 --   mysql -u root -p howe-system < pregnancy.sql
@@ -347,9 +348,53 @@ create table preg_task (
 ) engine=innodb auto_increment=1 comment = '孕期-后台任务';
 
 -- ----------------------------
--- 12、孕期角色
+-- 12、提醒规则
 -- ----------------------------
-insert into sys_role (role_name, role_key, role_sort, data_scope, menu_check_strictly, dept_check_strictly,
+drop table if exists preg_reminder_rule;
+create table preg_reminder_rule (
+  id            bigint unsigned not null auto_increment comment '规则ID',
+  rule_code     varchar(32)     not null                comment '规则编码（与 PregnancyReminderRule 枚举一致）',
+  enabled       tinyint(1)      not null default 0      comment '是否启用（1启用 0关闭）',
+  remind_time   varchar(5)       not null default '09:00' comment '提醒时刻 HH:mm（业务时区）',
+  days_before   int             default null            comment '提前天数（产检提前提醒）',
+  weekday       tinyint         default null            comment '星期（0 周日；待产包周提醒）',
+  rule_version  int             not null default 1      comment '表级规则版本（整体保存时递增）',
+  del_flag      char(1)         not null default '0'    comment '删除标记（0存在 2删除）',
+  create_by     varchar(64)     default ''              comment '创建者',
+  create_time   datetime(3)     default null            comment '创建时间',
+  update_by     varchar(64)     default ''              comment '更新者',
+  update_time   datetime(3)     default null            comment '更新时间',
+  remark        varchar(500)    default null            comment '备注',
+  primary key (id),
+  unique key uk_preg_reminder_rule_code (rule_code, del_flag)
+) engine=innodb auto_increment=1 comment = '孕期-提醒规则';
+
+-- 规则种子：编码与默认值来自 PregnancyReminderRule 枚举，表中缺少的规则运行时回落到默认值。
+insert into preg_reminder_rule (rule_code, enabled, remind_time, days_before, weekday, rule_version, create_by, create_time)
+select 'CHECKUP_BEFORE', 1, '20:00', 1, null, 1, 'admin', sysdate() from dual
+where not exists (select 1 from preg_reminder_rule where rule_code = 'CHECKUP_BEFORE' and del_flag = '0');
+insert into preg_reminder_rule (rule_code, enabled, remind_time, days_before, weekday, rule_version, create_by, create_time)
+select 'CHECKUP_TODAY', 1, '07:30', 0, null, 1, 'admin', sysdate() from dual
+where not exists (select 1 from preg_reminder_rule where rule_code = 'CHECKUP_TODAY' and del_flag = '0');
+insert into preg_reminder_rule (rule_code, enabled, remind_time, days_before, weekday, rule_version, create_by, create_time)
+select 'DAILY_RECORD', 0, '21:00', 0, null, 1, 'admin', sysdate() from dual
+where not exists (select 1 from preg_reminder_rule where rule_code = 'DAILY_RECORD' and del_flag = '0');
+insert into preg_reminder_rule (rule_code, enabled, remind_time, days_before, weekday, rule_version, create_by, create_time)
+select 'BAG_WEEKLY', 0, '10:00', 0, 0, 1, 'admin', sysdate() from dual
+where not exists (select 1 from preg_reminder_rule where rule_code = 'BAG_WEEKLY' and del_flag = '0');
+insert into preg_reminder_rule (rule_code, enabled, remind_time, days_before, weekday, rule_version, create_by, create_time)
+select 'FOLIC_ACID', 1, '20:00', null, null, 1, 'admin', sysdate() from dual
+where not exists (select 1 from preg_reminder_rule where rule_code = 'FOLIC_ACID' and del_flag = '0');
+insert into preg_reminder_rule (rule_code, enabled, remind_time, days_before, weekday, rule_version, create_by, create_time)
+select 'DAILY_GROWTH', 1, '09:00', null, null, 1, 'admin', sysdate() from dual
+where not exists (select 1 from preg_reminder_rule where rule_code = 'DAILY_GROWTH' and del_flag = '0');
+insert into preg_reminder_rule (rule_code, enabled, remind_time, days_before, weekday, rule_version, create_by, create_time)
+select 'WEEKLY_GROWTH', 1, '10:00', null, null, 1, 'admin', sysdate() from dual
+where not exists (select 1 from preg_reminder_rule where rule_code = 'WEEKLY_GROWTH' and del_flag = '0');
+
+-- ----------------------------
+-- 13、孕期角色
+-- ----------------------------insert into sys_role (role_name, role_key, role_sort, data_scope, menu_check_strictly, dept_check_strictly,
                       status, del_flag, create_by, create_time, remark)
 select '孕期管理员', 'pregnancy_manager', 20, '1', 1, 1, '0', '0', 'admin', sysdate(),
        '孕期业务全部权限，可管理提醒规则与查看最近发送结果'
@@ -364,19 +409,13 @@ where u.user_name = 'admin' and u.del_flag = '0'
   and not exists (select 1 from sys_user_role ur where ur.user_id = u.user_id and ur.role_id = r.role_id);
 
 -- ----------------------------
--- 13、参数种子
+-- 14、参数种子
 -- ----------------------------
 insert into sys_config (config_name, config_key, config_value, config_type, param_type, create_by, create_time, remark)
 select '孕期-末次月经', 'pregnancy.lastMenstrualPeriod', '', 'N', '孕期', 'admin', sysdate(),
        '填写末次月经第一天，格式 YYYY-MM-DD。37 周足月，40 周预产期'
 from dual
 where not exists (select 1 from sys_config where config_key = 'pregnancy.lastMenstrualPeriod');
-
-insert into sys_config (config_name, config_key, config_value, config_type, param_type, create_by, create_time, remark)
-select '孕期-提醒规则', 'pregnancy.reminder.rules', '', 'N', '内部', 'admin', sysdate(),
-       '受控 JSON：规则列表与 reminderVersion'
-from dual
-where not exists (select 1 from sys_config where config_key = 'pregnancy.reminder.rules');
 
 insert into sys_config (config_name, config_key, config_value, config_type, param_type, create_by, create_time, remark, `sensitive`)
 select '孕期-企微机器人凭证', 'pregnancy.wecom.webhookKey', '', 'N', '孕期', 'admin', sysdate(),

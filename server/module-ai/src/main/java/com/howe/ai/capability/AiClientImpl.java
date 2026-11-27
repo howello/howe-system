@@ -61,7 +61,7 @@ public class AiClientImpl implements AiClient {
     @Override
     public AiImageResult image(AiImageRequest request) {
         if (request == null) throw bad("图片请求不能为空");
-        checkText(request.getPrompt(), request.getNegativePrompt());
+        checkText(request.getPrompt(), request.getNegativePrompt(), request.getStyleSuffix());
         checkTimeout(request.getTimeoutMs());
         if (request.getCount() != null && (request.getCount() < 1 || request.getCount() > 4)) {
             throw bad("每次最多生成4张图片");

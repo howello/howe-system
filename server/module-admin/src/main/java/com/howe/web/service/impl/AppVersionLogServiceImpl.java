@@ -33,7 +33,7 @@ import java.util.List;
 public class AppVersionLogServiceImpl implements AppVersionLogService {
 
     /** 发版日志润色场景（路由 key） */
-    private static final String SCENE_VERSION_LOG = "meal.app.version.log";
+    private static final String SCENE_VERSION_LOG = "app.version.log";
 
     /** 输入摘要最大长度，避免把整段 git log 塞给模型 */
     private static final int SOURCE_MAX_LENGTH = 2000;

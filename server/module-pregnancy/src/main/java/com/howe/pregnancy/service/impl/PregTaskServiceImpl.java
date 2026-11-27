@@ -301,7 +301,7 @@ public class PregTaskServiceImpl implements IPregTaskService {
         LocalDateTime current = now.toLocalDateTime();
         LocalDateTime cutoff = current.minusMinutes(PregnancyConfig.reminderLateMinutes());
         LocalDate dueDate = PregnancyConfig.dueDate();
-        JSONObject settings = PregnancyReminderRule.readSettings();
+        var settings = PregnancyReminderRule.readSettings();
         for (PregnancyReminderRule rule : PERIODIC_RULES) {
             var setting = rule.resolve(settings);
             if (!setting.enabled()) continue;

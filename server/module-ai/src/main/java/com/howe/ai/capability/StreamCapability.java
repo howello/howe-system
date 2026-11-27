@@ -11,7 +11,6 @@ import com.howe.ai.api.dto.AiTextChunk;
 import com.howe.ai.api.dto.AiUsage;
 import com.howe.ai.config.AiConfigCache;
 import com.howe.ai.persistence.domain.AiCallLog;
-import com.howe.ai.persistence.domain.AiProvider;
 import com.howe.ai.provider.AiProviderAdapter;
 import com.howe.ai.provider.ChatSpec;
 import com.howe.ai.route.AiRoutePlan;
@@ -76,8 +75,7 @@ public class StreamCapability
                 request.getModel(), resolvePromptText(request), countMessages(request), request.getMetadata());
         String operator = currentOperator();
 
-        AiProvider provider = aiConfigCache.requireProvider(target.channel());
-        AiProviderAdapter adapter = aiConfigCache.getAdapter(provider.getProtocol());
+        AiProviderAdapter adapter = aiConfigCache.getAdapter(target.channel());
 
         StringBuilder buffer = new StringBuilder();
         AtomicBoolean delivered = new AtomicBoolean(false);

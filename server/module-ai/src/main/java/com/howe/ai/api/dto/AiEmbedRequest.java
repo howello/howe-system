@@ -31,10 +31,10 @@ public class AiEmbedRequest
     @Schema(description = "目标维度，留空用模型默认")
     private Integer dimensions;
 
-    @Schema(description = "指定模型名，留空走场景路由或全局默认")
+    @Schema(description = "指定模型名，留空时可通过场景或另一项指定目标")
     private String model;
 
-    @Schema(description = "指定渠道 ID，留空走场景路由或全局默认")
+    @Schema(description = "指定渠道 ID，留空时可通过场景或另一项指定目标")
     private String channel;
 
     @Schema(description = "超时（毫秒），留空取全局配置")

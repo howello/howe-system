@@ -8,12 +8,10 @@ import com.howe.ai.config.AiConfigService;
 import com.howe.ai.config.AiSecretCipher;
 import com.howe.ai.persistence.domain.AiChannel;
 import com.howe.ai.persistence.domain.AiModel;
-import com.howe.ai.persistence.domain.AiProvider;
+import com.howe.ai.provider.AiProvider;
 import com.howe.ai.persistence.mapper.AiChannelMapper;
 import com.howe.ai.persistence.mapper.AiModelMapper;
-import com.howe.ai.persistence.mapper.AiProviderMapper;
 import com.howe.ai.provider.AiHealthResult;
-import com.howe.ai.provider.AiProviderAdapter;
 import com.howe.ai.service.IAiChannelService;
 import com.howe.common.exception.ServiceException;
 import com.howe.common.utils.SecurityUtils;
@@ -23,7 +21,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.Date;
 import java.util.List;
-import java.util.Set;
 
 /**
  * AI 渠道 服务层实现
@@ -50,31 +47,11 @@ public class AiChannelServiceImpl implements IAiChannelService
 
     private final AiModelMapper aiModelMapper;
 
-    private final AiProviderMapper aiProviderMapper;
-
     private final AiSecretCipher aiSecretCipher;
 
     private final AiConfigService aiConfigService;
 
     private final AiConfigCache aiConfigCache;
-
-    /**
-     * 当前可配置的服务商协议
-     *
-     * <p>只有这三项进入配置入口。旧的 {@code raw-http} 不在此列：它的渠道可能还引用着
-     * 历史模型，直接删除会破坏审计链路，因此保留为停用状态，但不再允许新建或重新启用。</p>
-     */
-    private static final Set<String> CONFIGURABLE_PROTOCOLS = Set.of("dashscope", "openai", "anthropic");
-
-    @Override
-    public List<AiProvider> selectProviderOptions()
-    {
-        // 按协议过滤而不是按 code 过滤：OpenAI 的历史 code 是 openai-compatible，
-        // 不能因为改展示名就动已有渠道的外键引用
-        return aiProviderMapper.selectEnabledList().stream()
-                .filter(provider -> CONFIGURABLE_PROTOCOLS.contains(provider.getProtocol()))
-                .toList();
-    }
 
     @Override
     public List<AiChannel> selectAiChannelList(AiChannel aiChannel)
@@ -99,11 +76,7 @@ public class AiChannelServiceImpl implements IAiChannelService
     @Override
     public int insertAiChannel(AiChannel aiChannel)
     {
-        AiProvider provider = aiConfigCache.getProvider(aiChannel.getProviderCode());
-        if (provider == null)
-        {
-            throw new ServiceException("服务商不存在或已停用：" + aiChannel.getProviderCode());
-        }
+        requireSupportedProvider(aiChannel.getProviderCode());
         aiChannel.setApiKey(aiSecretCipher.encrypt(aiChannel.getApiKey()));
         aiChannel.setEnabled(aiChannel.getEnabled() == null ? ENABLED : aiChannel.getEnabled());
         aiChannel.setPriority(aiChannel.getPriority() == null ? 1 : aiChannel.getPriority());
@@ -121,6 +94,11 @@ public class AiChannelServiceImpl implements IAiChannelService
         if (existing == null)
         {
             throw new ServiceException("渠道不存在");
+        }
+        String providerCode = StrUtil.emptyToDefault(aiChannel.getProviderCode(), existing.getProviderCode());
+        Integer enabled = aiChannel.getEnabled() == null ? existing.getEnabled() : aiChannel.getEnabled();
+        if (!providerCode.equals(existing.getProviderCode()) || Integer.valueOf(ENABLED).equals(enabled)) {
+            requireSupportedProvider(providerCode);
         }
         aiChannel.setUpdateBy(SecurityUtils.getUsername());
         int rows = aiChannelMapper.updateAiChannel(aiChannel);
@@ -159,6 +137,13 @@ public class AiChannelServiceImpl implements IAiChannelService
     @Override
     public int updateStatus(Long id, Integer enabled)
     {
+        if (Integer.valueOf(ENABLED).equals(enabled)) {
+            AiChannel existing = aiChannelMapper.selectAiChannelById(id);
+            if (existing == null) {
+                throw new ServiceException("渠道不存在");
+            }
+            requireSupportedProvider(existing.getProviderCode());
+        }
         AiChannel channel = new AiChannel();
         channel.setId(id);
         channel.setEnabled(enabled);
@@ -204,17 +189,7 @@ public class AiChannelServiceImpl implements IAiChannelService
         {
             try
             {
-                AiProvider provider = aiConfigCache.getProvider(channel.getProviderCode());
-                if (provider == null)
-                {
-                    result = AiHealthResult.fail("渠道绑定的服务商不存在或已停用：" + channel.getProviderCode(),
-                            AiErrorCode.CHANNEL_DISABLED.name());
-                }
-                else
-                {
-                    AiProviderAdapter adapter = aiConfigCache.getAdapter(provider.getProtocol());
-                    result = adapter.healthCheck(channel, model);
-                }
+                result = aiConfigCache.getAdapter(channel).healthCheck(channel, model);
             }
             catch (AiException e)
             {
@@ -229,6 +204,13 @@ public class AiChannelServiceImpl implements IAiChannelService
         }
         aiChannelMapper.updateHealth(id, result.success() ? "UP" : "DOWN", new Date());
         return result;
+    }
+
+    /** 校验渠道填写的服务商标识。 */
+    private void requireSupportedProvider(String providerCode) {
+        if (AiProvider.fromCode(providerCode) == null) {
+            throw new ServiceException("服务商不受支持：" + providerCode);
+        }
     }
 
     /**

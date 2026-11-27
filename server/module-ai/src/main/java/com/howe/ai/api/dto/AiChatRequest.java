@@ -40,10 +40,10 @@ public class AiChatRequest
     @Schema(description = "系统提示词", example = "你是一位中餐菜谱编辑")
     private String system;
 
-    @Schema(description = "指定模型名，留空走场景路由或全局默认")
+    @Schema(description = "指定模型名，留空时可通过场景或另一项指定目标")
     private String model;
 
-    @Schema(description = "指定渠道 ID，留空走场景路由或全局默认")
+    @Schema(description = "指定渠道 ID，留空时可通过场景或另一项指定目标")
     private String channel;
 
     @Schema(description = "采样温度")

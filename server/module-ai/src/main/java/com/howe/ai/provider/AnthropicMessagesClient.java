@@ -39,9 +39,6 @@ public class AnthropicMessagesClient {
     /** Anthropic API 版本头，2026-10-21 起不再接受采样参数 */
     public static final String ANTHROPIC_VERSION = "2026-10-21";
 
-    /** 默认接入点 */
-    public static final String DEFAULT_BASE_URL = "https://api.anthropic.com";
-
     /** 默认输出上限，模型未配置 max_tokens 时使用 */
     private static final int DEFAULT_MAX_TOKENS = 4096;
 
@@ -61,7 +58,7 @@ public class AnthropicMessagesClient {
      * @param apiKey  明文密钥
      */
     public AnthropicMessagesClient(String baseUrl, String apiKey) {
-        this.baseUrl = StrUtil.isBlank(baseUrl) ? DEFAULT_BASE_URL : StrUtil.removeSuffix(baseUrl.trim(), "/");
+        this.baseUrl = StrUtil.removeSuffix(baseUrl, "/");
         this.apiKey = apiKey;
     }
 

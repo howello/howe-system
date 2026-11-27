@@ -4,12 +4,11 @@ import com.howe.ai.api.AiErrorCode;
 import com.howe.ai.api.AiException;
 import com.howe.ai.persistence.domain.AiChannel;
 import com.howe.ai.persistence.domain.AiModel;
-import com.howe.ai.persistence.domain.AiProvider;
 import com.howe.ai.persistence.domain.AiSceneRoute;
 import com.howe.ai.persistence.mapper.AiChannelMapper;
 import com.howe.ai.persistence.mapper.AiModelMapper;
-import com.howe.ai.persistence.mapper.AiProviderMapper;
 import com.howe.ai.persistence.mapper.AiSceneRouteMapper;
+import com.howe.ai.provider.AiProvider;
 import com.howe.ai.provider.AiProviderAdapter;
 import com.howe.ai.provider.ChatSpec;
 import com.howe.ai.provider.ImageSpec;
@@ -46,15 +45,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AiConfigCache
 {
-    private final AiProviderMapper aiProviderMapper;
-
     private final AiChannelMapper aiChannelMapper;
 
     private final AiModelMapper aiModelMapper;
 
     private final AiSceneRouteMapper aiSceneRouteMapper;
 
-    /** 协议适配器，按 protocol 索引 */
+    /** 协议适配器，按服务商标识查找 */
     private final List<AiProviderAdapter> adapters;
 
     /** 已构建的模型实例，key 为「类型:渠道ID:模型名」 */
@@ -68,10 +65,9 @@ public class AiConfigCache
      */
     public void refresh()
     {
-        Map<String, AiProvider> providers = aiProviderMapper.selectEnabledList().stream()
-                .collect(Collectors.toMap(AiProvider::getCode, Function.identity(), (a, b) -> a));
-
-        List<AiChannel> channels = aiChannelMapper.selectEnabledList();
+        List<AiChannel> channels = aiChannelMapper.selectEnabledList().stream()
+                .filter(channel -> AiProvider.fromCode(channel.getProviderCode()) != null)
+                .toList();
         Map<Long, AiChannel> channelMap = channels.stream()
                 .collect(Collectors.toMap(AiChannel::getId, Function.identity(), (a, b) -> a));
 
@@ -86,10 +82,10 @@ public class AiConfigCache
         }
 
         AiProperties properties = AiProperties.load();
-        this.snapshot = new Snapshot(providers, channelMap, modelMap, routes);
+        this.snapshot = new Snapshot(channelMap, modelMap, routes);
         this.modelInstances.clear();
-        log.info("AI 配置缓存已刷新：服务商 {} 个，渠道 {} 个，模型 {} 个，场景路由 {} 条，总开关 {}",
-                providers.size(), channelMap.size(), modelMap.size(), routes.size(),
+        log.info("AI 配置缓存已刷新：渠道 {} 个，模型 {} 个，场景路由 {} 条，总开关 {}",
+                channelMap.size(), modelMap.size(), routes.size(),
                 properties.isEnabled() ? "开启" : "关闭");
         // 逐个打出模型与它的 extra：库里的值就是这里的值，
         // 「配置写了却不生效」时靠这行判断是没存进去还是解析没生效
@@ -104,7 +100,7 @@ public class AiConfigCache
     /**
      * 获取当前参数快照
      *
-     * <p>每次都从参数配置表重新读取：{@code ai.enabled}、全局默认模型 ID 这类值在
+     * <p>每次都从参数配置表重新读取：{@code ai.enabled}等设置在
      * 「参数设置」里改完就应立即生效，不需要等数据表快照刷新。底层走 Redis 缓存，代价很低。</p>
      *
      * @return 参数快照
@@ -112,17 +108,6 @@ public class AiConfigCache
     public AiProperties getProperties()
     {
         return AiProperties.load();
-    }
-
-    /**
-     * 按标识获取服务商
-     *
-     * @param code 服务商标识
-     * @return 服务商，不存在时返回 null
-     */
-    public AiProvider getProvider(String code)
-    {
-        return current().providers.get(code);
     }
 
     /**
@@ -175,10 +160,12 @@ public class AiConfigCache
         {
             return null;
         }
-        for (AiModel model : current().models.values())
+        Snapshot config = current();
+        for (AiModel model : config.models.values())
         {
             if (modelName.equals(model.getModelName())
-                    && (channelId == null || channelId.equals(model.getChannelId())))
+                    && (channelId == null ? config.channels.containsKey(model.getChannelId())
+                            : channelId.equals(model.getChannelId())))
             {
                 return model;
             }
@@ -209,22 +196,20 @@ public class AiConfigCache
     }
 
     /**
-     * 获取协议适配器
+     * 取渠道的服务商适配器。
      *
-     * @param protocol 协议标识
+     * @param channel 渠道
      * @return 适配器
-     * @throws AiException 协议没有对应实现
+     * @throws AiException 渠道使用的服务商已不受支持
      */
-    public AiProviderAdapter getAdapter(String protocol)
-    {
-        for (AiProviderAdapter adapter : adapters)
-        {
-            if (adapter.protocol().equalsIgnoreCase(protocol))
-            {
+    public AiProviderAdapter getAdapter(AiChannel channel) {
+        for (AiProviderAdapter adapter : adapters) {
+            if (adapter.provider().getCode().equals(channel.getProviderCode())) {
                 return adapter;
             }
         }
-        throw new AiException(AiErrorCode.PROVIDER_ERROR, "没有可用的协议适配器：" + protocol);
+        throw new AiException(AiErrorCode.CHANNEL_DISABLED,
+                "渠道绑定的服务商不受支持：" + channel.getProviderCode());
     }
 
     /**
@@ -236,7 +221,7 @@ public class AiConfigCache
      */
     public ChatModel chatModel(AiChannel channel, AiModel model)
     {
-        return instance("chat", channel, model, ChatModel.class,
+        return instance("chat", channel, model,
                 adapter -> adapter.createChatModel(channel, model));
     }
 
@@ -249,7 +234,7 @@ public class AiConfigCache
      */
     public ImageModel imageModel(AiChannel channel, AiModel model)
     {
-        return instance("image", channel, model, ImageModel.class,
+        return instance("image", channel, model,
                 adapter -> adapter.createImageModel(channel, model));
     }
 
@@ -262,7 +247,7 @@ public class AiConfigCache
      */
     public EmbeddingModel embeddingModel(AiChannel channel, AiModel model)
     {
-        return instance("embedding", channel, model, EmbeddingModel.class,
+        return instance("embedding", channel, model,
                 adapter -> adapter.createEmbeddingModel(channel, model));
     }
 
@@ -272,13 +257,12 @@ public class AiConfigCache
      * @param type      实例类型标识
      * @param channel   渠道
      * @param model     模型
-     * @param modelType 期望的实例类型
      * @param builder   构建函数
      * @param <T>       实例类型
      * @return 模型实例
      */
     @SuppressWarnings("unchecked")
-    private <T> T instance(String type, AiChannel channel, AiModel model, Class<T> modelType,
+    private <T> T instance(String type, AiChannel channel, AiModel model,
             Function<AiProviderAdapter, T> builder)
     {
         String key = type + ":" + channel.getId() + ":" + model.getModelName();
@@ -287,13 +271,7 @@ public class AiConfigCache
         {
             return (T) cached;
         }
-        AiProvider provider = requireProvider(channel);
-        T created = builder.apply(getAdapter(provider.getProtocol()));
-        if (created == null || !modelType.isInstance(created))
-        {
-            throw new AiException(AiErrorCode.PROVIDER_ERROR,
-                    "协议 " + provider.getProtocol() + " 不支持该能力：" + type);
-        }
+        T created = builder.apply(getAdapter(channel));
         modelInstances.put(key, created);
         return created;
     }
@@ -308,8 +286,7 @@ public class AiConfigCache
      */
     public ChatOptions chatOptions(AiChannel channel, AiModel model, ChatSpec spec)
     {
-        AiProvider provider = requireProvider(channel);
-        return getAdapter(provider.getProtocol()).chatOptions(model, spec);
+        return getAdapter(channel).chatOptions(model, spec);
     }
 
     /**
@@ -322,8 +299,7 @@ public class AiConfigCache
      */
     public ImageOptions imageOptions(AiChannel channel, AiModel model, ImageSpec spec)
     {
-        AiProvider provider = requireProvider(channel);
-        return getAdapter(provider.getProtocol()).imageOptions(model, spec);
+        return getAdapter(channel).imageOptions(model, spec);
     }
 
     /**
@@ -336,26 +312,7 @@ public class AiConfigCache
      */
     public EmbeddingOptions embeddingOptions(AiChannel channel, AiModel model, Integer dimensions)
     {
-        AiProvider provider = requireProvider(channel);
-        return getAdapter(provider.getProtocol()).embeddingOptions(model, dimensions);
-    }
-
-    /**
-     * 取渠道绑定的服务商
-     *
-     * @param channel 渠道
-     * @return 服务商
-     * @throws AiException 服务商不存在或已停用
-     */
-    public AiProvider requireProvider(AiChannel channel)
-    {
-        AiProvider provider = getProvider(channel.getProviderCode());
-        if (provider == null)
-        {
-            throw new AiException(AiErrorCode.CHANNEL_DISABLED,
-                    "渠道「" + channel.getName() + "」绑定的服务商已停用或不存在：" + channel.getProviderCode());
-        }
-        return provider;
+        return getAdapter(channel).embeddingOptions(model, dimensions);
     }
 
     /**
@@ -395,17 +352,15 @@ public class AiConfigCache
     /**
      * 配置快照
      *
-     * @param providers 启用的服务商，按标识索引
      * @param channels  启用的渠道，按主键索引
      * @param models    启用的模型，按主键索引
      * @param routes    启用的场景路由，按「场景|能力」索引
      */
-    private record Snapshot(Map<String, AiProvider> providers, Map<Long, AiChannel> channels,
+    private record Snapshot(Map<Long, AiChannel> channels,
             Map<Long, AiModel> models, Map<String, AiSceneRoute> routes)
     {
         private Snapshot
         {
-            providers = Collections.unmodifiableMap(providers);
             channels = Collections.unmodifiableMap(channels);
             models = Collections.unmodifiableMap(models);
             routes = Collections.unmodifiableMap(routes);

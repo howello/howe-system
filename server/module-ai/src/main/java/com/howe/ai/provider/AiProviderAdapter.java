@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * AI 协议适配器
  *
  * <p>把「渠道 + 模型」翻译成 Spring AI 的模型实例。协议标识对应
- * {@code ai_provider.protocol}，新增协议只需再实现一个适配器。</p>
+ * 固定服务商标识。</p>
  *
  * <p>能力不是每个协议都齐全，缺的能力用默认实现抛出明确错误，由调用侧转成
  * {@code AiException}。</p>
@@ -34,11 +34,11 @@ import java.util.concurrent.atomic.AtomicReference;
 public interface AiProviderAdapter
 {
     /**
-     * 协议标识
+     * 适配器所属的固定服务商。
      *
-     * @return 协议标识，如 {@code dashscope} / {@code openai} / {@code raw-http}
+     * @return 服务商
      */
-    String protocol();
+    AiProvider provider();
 
     /**
      * 构建对话模型
@@ -49,7 +49,7 @@ public interface AiProviderAdapter
      */
     default ChatModel createChatModel(AiChannel channel, AiModel model)
     {
-        throw new UnsupportedOperationException("协议 " + protocol() + " 不支持对话能力");
+        throw new UnsupportedOperationException("协议 " + provider().getProtocol() + " 不支持对话能力");
     }
 
     /**
@@ -61,7 +61,7 @@ public interface AiProviderAdapter
      */
     default ImageModel createImageModel(AiChannel channel, AiModel model)
     {
-        throw new UnsupportedOperationException("协议 " + protocol() + " 不支持文生图能力");
+        throw new UnsupportedOperationException("协议 " + provider().getProtocol() + " 不支持文生图能力");
     }
 
     /**
@@ -73,7 +73,7 @@ public interface AiProviderAdapter
      */
     default EmbeddingModel createEmbeddingModel(AiChannel channel, AiModel model)
     {
-        throw new UnsupportedOperationException("协议 " + protocol() + " 不支持向量能力");
+        throw new UnsupportedOperationException("协议 " + provider().getProtocol() + " 不支持向量能力");
     }
 
     /**
@@ -183,7 +183,7 @@ public interface AiProviderAdapter
      */
     default List<String> listModels(AiChannel channel)
     {
-        throw new UnsupportedOperationException("协议 " + protocol() + " 不支持获取模型列表");
+        throw new UnsupportedOperationException("协议 " + provider().getProtocol() + " 不支持获取模型列表");
     }
 
     /**

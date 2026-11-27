@@ -232,9 +232,6 @@ public final class PregnancyConstants {
     /** 配置键：末次月经日期 */
     public static final String CONFIG_LAST_MENSTRUAL_PERIOD = "pregnancy.lastMenstrualPeriod";
 
-    /** 配置键：提醒规则 */
-    public static final String CONFIG_REMINDER_RULES = "pregnancy.reminder.rules";
-
     /**
      * 工具类不允许实例化
      */

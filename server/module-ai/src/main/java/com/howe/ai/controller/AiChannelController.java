@@ -2,6 +2,7 @@ package com.howe.ai.controller;
 
 import com.howe.ai.persistence.domain.AiChannel;
 import com.howe.ai.provider.AiHealthResult;
+import com.howe.ai.provider.AiProvider;
 import com.howe.ai.service.IAiChannelService;
 import com.howe.common.annotation.Log;
 import com.howe.common.core.controller.BaseController;
@@ -46,12 +47,12 @@ public class AiChannelController extends BaseController
     /**
      * 查询服务商下拉选项
      */
-    @Operation(summary = "查询服务商下拉选项", description = "返回启用的服务商，供渠道表单选择")
+    @Operation(summary = "查询服务商下拉选项", description = "返回固定的服务商，供渠道表单选择")
     @PreAuthorize("@ss.hasPermi('ai:channel:list')")
     @GetMapping("/providers")
     public AjaxResult providers()
     {
-        return success(aiChannelService.selectProviderOptions());
+        return success(AiProvider.values());
     }
 
     /**

@@ -20,7 +20,7 @@ export interface AiChannelQueryParams extends PageDomain {
 export interface AiChannel extends BaseEntity {
   /** 主键ID */
   id?: number;
-  /** 关联 ai_provider.code */
+  /** 固定服务商标识 */
   providerCode?: string;
   /** 渠道名称 */
   name?: string;
@@ -42,20 +42,8 @@ export interface AiChannel extends BaseEntity {
 
 /** AI 服务商（只读，由初始化脚本写入） */
 export interface AiProvider {
-  /** 主键ID */
-  id?: number;
-  /** 服务商标识 */
-  code?: string;
-  /** 展示名 */
-  name?: string;
-  /** 适配器协议：dashscope / openai / raw-http */
-  protocol?: string;
-  /** 默认接入点 */
-  defaultBaseUrl?: string;
-  /** 支持的能力列表（JSON 数组） */
-  supports?: string;
-  /** 是否启用（0停用 1启用） */
-  enabled?: number;
-  /** 排序 */
-  sort?: number;
+  code: string;
+  name: string;
+  protocol: string;
+  defaultBaseUrl: string;
 }

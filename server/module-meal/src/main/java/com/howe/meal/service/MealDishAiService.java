@@ -76,8 +76,9 @@ public class MealDishAiService {
     /** AI 更新写入的操作人标识 */
     private static final String AI_UPDATER = "AI 自动更新";
 
-    /** 封面风格后缀模板 key，对应 sys_config 的 ai.image.styleSuffix.recipe.photo */
-    private static final String STYLE_KEY = "recipe.photo";
+    /** 菜品封面提示词中的写实摄影描述。 */
+    private static final String COVER_STYLE_SUFFIX =
+            "中式美食摄影，俯拍四十五度，白色或浅木色桌面，自然光，摆盘精致，热气腾腾，浅景深，高清细节，无文字，无水印，正方形构图。";
 
     /** 菜名相似度阈值：归一化后字符集合 Jaccard 达到该值即视为同一道菜 */
     private static final double DUPLICATE_SIMILARITY = 0.8D;
@@ -729,7 +730,7 @@ public class MealDishAiService {
             AiImageResult imageResult = aiClient.image(AiImageRequest.builder()
                     .scene(SCENE_COVER)
                     .prompt(buildCoverPrompt(name, description))
-                    .style(STYLE_KEY)
+                    .styleSuffix(COVER_STYLE_SUFFIX)
                     .build());
             AiImage image = firstImage(imageResult);
             if (image == null) {

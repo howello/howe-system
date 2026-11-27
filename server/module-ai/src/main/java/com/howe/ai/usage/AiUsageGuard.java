@@ -3,9 +3,7 @@ package com.howe.ai.usage;
 import cn.hutool.core.util.IdUtil;
 import com.howe.ai.api.AiErrorCode;
 import com.howe.ai.api.AiException;
-import com.howe.common.constant.ConfigConstants;
 import com.howe.common.core.domain.model.LoginUser;
-import com.howe.common.utils.ConfigUtils;
 import com.howe.common.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -59,14 +57,11 @@ public class AiUsageGuard {
                 prefix + "daily:" + day + ":" + identity[1],
                 prefix + "active:" + identity[0], prefix + "active:" + identity[1], prefix + "active:global");
         boolean image = "image".equals(capability);
-        String config = ConfigConstants.AI_USAGE_PREFIX + capability + ".";
         String id = IdUtil.fastSimpleUUID();
         try {
             Long result = redis.execute(ACQUIRE, keys,
-                    limit(config + "userDailyLimit", image ? 20 : 100),
-                    limit(config + "familyDailyLimit", image ? 100 : 500),
-                    limit(config + "userConcurrency", 2), limit(config + "familyConcurrency", 4),
-                    limit(config + "globalConcurrency", image ? 4 : 8), id);
+                    image ? "20" : "100", image ? "100" : "500",
+                    "2", "4", image ? "4" : "8", id);
             if (result == null) throw new IllegalStateException("Redis 未返回额度判定");
             if (result == 1 || result == 2) throw new AiException(AiErrorCode.QUOTA_EXCEEDED, "今日 AI 受理次数已达上限");
             if (result != 0) throw new AiException(AiErrorCode.RATE_LIMITED, "AI 正在处理其他任务，请稍后重试");
@@ -76,11 +71,6 @@ public class AiUsageGuard {
         } catch (Exception e) {
             throw new AiException(AiErrorCode.RATE_LIMITED, "AI 额度服务暂不可用，请稍后重试", e);
         }
-    }
-
-    /** 读取正数限制，错误配置不能静默变成无限调用。 */
-    private String limit(String key, int fallback) {
-        return Integer.toString(Math.max(1, Math.min(1_000_000, ConfigUtils.getInt(key, fallback))));
     }
 
     /** 一次调用的并发租约，完成、失败和取消时都释放，进程崩溃由 TTL 兜底。 */

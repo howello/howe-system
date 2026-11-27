@@ -8,7 +8,6 @@ import com.howe.ai.api.dto.AiImage;
 import com.howe.ai.api.dto.AiImageRequest;
 import com.howe.ai.api.dto.AiImageResult;
 import com.howe.ai.config.AiConfigCache;
-import com.howe.ai.config.AiConfigService;
 import com.howe.ai.config.AiProperties;
 import com.howe.ai.persistence.domain.AiCallLog;
 import com.howe.ai.persistence.domain.AiImageAsset;
@@ -53,8 +52,6 @@ public class ImageCapability
     private final AiRouteResolver aiRouteResolver;
 
     private final AiConfigCache aiConfigCache;
-
-    private final AiConfigService aiConfigService;
 
     private final AiExecutionTemplate aiExecutionTemplate;
 
@@ -158,14 +155,12 @@ public class ImageCapability
      */
     private String buildPrompt(AiImageRequest request, AiRoutePlan plan)
     {
-        String styleKey = StrUtil.isNotBlank(request.getStyle())
-                ? request.getStyle().trim() : plan.params().getString("styleSuffixKey");
-        String suffix = aiConfigService.styleSuffix(styleKey);
+        String suffix = StrUtil.blankToDefault(request.getStyleSuffix(), plan.params().getString("styleSuffix"));
         if (StrUtil.isBlank(suffix))
         {
             return request.getPrompt().trim();
         }
-        return request.getPrompt().trim() + "，" + suffix;
+        return request.getPrompt().trim() + "，" + suffix.trim();
     }
 
     /**
