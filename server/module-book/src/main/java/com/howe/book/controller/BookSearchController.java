@@ -23,6 +23,14 @@ public class BookSearchController {
         return AjaxResult.success(search.catalog(q, source));
     }
 
+    /** 读取选中的微信读书书目及封面信息。 */
+    @GetMapping("/weread-book")
+    @RateLimiter(time = 60, count = 20, limitType = LimitType.IP)
+    @Operation(summary = "查询微信读书书目详情")
+    public AjaxResult weReadBook(@RequestParam String bookId, @RequestParam String searchToken) {
+        return AjaxResult.success(search.weReadBook(bookId, searchToken));
+    }
+
     /** 按分类关键词查图。 */
     @GetMapping("/images")
     @RateLimiter(time = 60, count = 12, limitType = LimitType.IP)

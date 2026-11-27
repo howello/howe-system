@@ -194,6 +194,9 @@ public class ConfigConstants {
     /** 读书 App 专用 WGT 发布令牌。 */
     public static final String BOOK_APP_PUBLISH_TOKEN = "book.app.publishToken";
 
+    /** 微信读书网关凭据。 */
+    public static final String BOOK_WEREAD_API_KEY = "book.weread.apiKey";
+
     /** 孕期企微机器人凭证。 */
     public static final String PREGNANCY_WECOM_WEBHOOK_KEY = "pregnancy.wecom.webhookKey";
 
@@ -293,6 +296,7 @@ public class ConfigConstants {
             MEAL_APP_PUBLISH_TOKEN,
             PREGNANCY_APP_PUBLISH_TOKEN,
             BOOK_APP_PUBLISH_TOKEN,
+            BOOK_WEREAD_API_KEY,
             PREGNANCY_WECOM_WEBHOOK_KEY,
             TURNSTILE_SECRET_KEY)));
 

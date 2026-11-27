@@ -5,6 +5,9 @@ import java.util.Map;
 
 /** 在线书目和配图候选。 */
 public interface BookSearchService {
+
+    /** 查询微信读书候选的详细书目和封面。 */
+    Map<String, Object> weReadBook(String bookId, String searchToken);
     /** 查询书目。 */
     List<Map<String, Object>> catalog(String keyword, String source);
 

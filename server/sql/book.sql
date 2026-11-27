@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS book_node (
     cover_kind VARCHAR(16) NULL,
     cover_ref VARCHAR(512) NULL,
     content_json JSON NULL,
+    weread_source_keys JSON NULL COMMENT '微信读书来源绑定键',
     version BIGINT NOT NULL DEFAULT 1,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
@@ -69,6 +70,15 @@ WHERE NOT EXISTS (SELECT 1 FROM sys_config WHERE config_key = 'book.app.publishT
 -- 兼容已手工登记参数的库。保留当前值，后续通过参数维护接口保存时按敏感配置处理。
 UPDATE sys_config SET `sensitive` = 'Y'
 WHERE config_key = 'book.app.publishToken' AND `sensitive` <> 'Y';
+
+-- 微信读书同步配置。重复执行保留已保存的值。
+INSERT INTO sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark, param_type, `sensitive`)
+SELECT '微信读书 API Key', 'book.weread.apiKey', '', 'N', 'admin', NOW(),
+       '用于服务端书目查询和书架同步，留空停用微信读书接入', '读书', 'Y'
+WHERE NOT EXISTS (SELECT 1 FROM sys_config WHERE config_key = 'book.weread.apiKey');
+
+UPDATE sys_config SET `sensitive` = 'Y'
+WHERE config_key = 'book.weread.apiKey' AND `sensitive` <> 'Y';
 
 -- 演示数据：共享书架的分类 / 书本 / 感悟 / 备注，创建人记录为 admin。
 -- 固定 UUID 前缀，重复执行本文件时先清理旧演示数据，不影响真实节点。

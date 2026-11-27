@@ -1,6 +1,7 @@
 package com.howe.book.service;
 
 import com.howe.book.domain.BookNode;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import com.howe.book.domain.BookScopeDelta;
@@ -33,6 +34,9 @@ public interface BookNodeService {
 
     /** 创建共享节点并记录创建人。 */
     BookNode create(long creator, BookNode input);
+
+    /** 导入新节点，保留来源的创建时间。 */
+    BookNode createImported(long creator, BookNode input, LocalDateTime createdAt);
 
     /** 按版本编辑节点或移动子树。 */
     BookNode update(String id, BookNode input);

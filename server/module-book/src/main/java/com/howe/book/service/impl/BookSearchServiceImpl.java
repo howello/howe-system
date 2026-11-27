@@ -4,14 +4,21 @@ import cn.hutool.http.HttpRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.howe.book.service.BookSearchService;
+import com.howe.common.constant.ConfigConstants;
 import com.howe.common.exception.ServiceException;
+import com.howe.common.utils.ConfigUtils;
+import com.howe.common.weread.service.WeReadService;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 /** 从固定的公共数据源读取检索候选。 */
@@ -19,7 +26,11 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class BookSearchServiceImpl implements BookSearchService {
+    private static final String WEREAD_SEARCH_PREFIX = "book:weread:search:";
+    private static final java.util.regex.Pattern WEREAD_BOOK_ID = java.util.regex.Pattern.compile("[A-Za-z0-9_-]{1,128}");
     private final ObjectMapper json;
+    private final WeReadService weRead;
+    private final StringRedisTemplate redis;
 
     /** 按来源查询电子书或图书条目。 */
     @Override
@@ -54,17 +65,23 @@ public class BookSearchServiceImpl implements BookSearchService {
                 }
             }
             case "weread" -> {
-                for (JsonNode group : fetch(HttpRequest.get("https://weread.qq.com/api/store/search?keyword=" + query),
-                        "https://weread.qq.com/").path("results")) {
-                    if (group.path("type").asInt() != 1) {
-                        continue;
-                    }
+                String searchText = keyword.strip();
+                var seen = new HashSet<String>();
+                for (JsonNode group : weRead.search(weReadKey(), searchText, "在悟的书目检索中查找书籍：" + searchText)
+                        .path("results")) {
                     for (JsonNode result : group.path("books")) {
                         JsonNode item = result.path("bookInfo");
-                        String rating = item.hasNonNull("newRating") ? String.valueOf(item.path("newRating").asDouble() / 100) : "";
-                        addBook(items, item, item.path("author").asText(), item.path("cover").asText(),
-                            "", "微信读书", "", rating);
+                        String id = item.path("bookId").asText();
+                        if (WEREAD_BOOK_ID.matcher(id).matches() && seen.add(id)) {
+                            addWeReadBook(items, item, result.path("newRating"));
+                        }
                     }
+                }
+                if (!items.isEmpty()) {
+                    String searchToken = UUID.randomUUID().toString();
+                    var ids = items.stream().map(item -> (String) item.get("bookId")).toList();
+                    redis.opsForValue().set(WEREAD_SEARCH_PREFIX + searchToken, String.join("\n", ids), Duration.ofMinutes(15));
+                    items.forEach(item -> item.put("searchToken", searchToken));
                 }
             }
             case "openlibrary" -> {
@@ -101,6 +118,46 @@ public class BookSearchServiceImpl implements BookSearchService {
             default -> throw new ServiceException("不支持的书目来源");
         }
         return items;
+    }
+
+    /** 选中候选时读取详情，搜索列表仅使用搜索回包。 */
+    @Override
+    public Map<String, Object> weReadBook(String bookId, String searchToken) {
+        if (bookId == null || !WEREAD_BOOK_ID.matcher(bookId).matches()) {
+            throw new ServiceException("微信读书书籍 ID 无效");
+        }
+        if (searchToken == null || !searchToken.matches("[0-9a-f-]{36}")) {
+            throw new ServiceException("请先搜索微信读书书目");
+        }
+        String ids = redis.opsForValue().get(WEREAD_SEARCH_PREFIX + searchToken);
+        if (ids == null || ids.lines().noneMatch(bookId::equals)) {
+            throw new ServiceException("书目候选已过期，请重新搜索");
+        }
+        JsonNode info = weRead.bookInfo(weReadKey(), bookId);
+        var items = new ArrayList<Map<String, Object>>();
+        addWeReadBook(items, info, info.path("newRating"));
+        if (items.isEmpty()) {
+            throw new ServiceException("未找到微信读书书籍详情");
+        }
+        return items.get(0);
+    }
+
+    /** 读取仅供服务端使用的网关密钥。 */
+    private String weReadKey() {
+        return ConfigUtils.getRequired(ConfigConstants.BOOK_WEREAD_API_KEY, "微信读书 API Key");
+    }
+
+    /** 规范化微信读书书目及封面。 */
+    private void addWeReadBook(List<Map<String, Object>> items, JsonNode info, JsonNode rating) {
+        int initialSize = items.size();
+        String score = BookWeReadMetadata.rating(rating);
+        addBook(items, info, info.path("author").asText(), info.path("cover").asText(), BookWeReadMetadata.year(info),
+            "微信读书", info.path("intro").asText(), score.isEmpty() ? BookWeReadMetadata.rating(info.path("newRating")) : score,
+            info.path("publisher").asText(), info.path("translator").asText(), "", info.path("isbn").asText(),
+            String.join("、", BookWeReadMetadata.categories(info)));
+        if (items.size() > initialSize) {
+            items.get(initialSize).put("bookId", info.path("bookId").asText());
+        }
     }
 
     /** 规范化三个来源的共同字段。 */

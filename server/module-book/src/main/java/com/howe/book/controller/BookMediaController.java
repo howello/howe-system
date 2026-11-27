@@ -12,12 +12,16 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.web.bind.annotation.*;
 
 /** 读书在线封面导入。 */
 @RestController
 @RequestMapping("/book/media")
 public class BookMediaController {
+    private static final Set<String> WEREAD_COVER_HOSTS = Set.of("cdn.weread.qq.com", "res.weread.qq.com",
+        "wfqqreader-1252317822.image.myqcloud.com", "weread-1258476243.file.myqcloud.com",
+        "wehear-1258476243.file.myqcloud.com", "rescdn.qqmail.com");
     private static final Map<String, String> COVER_EXTENSIONS = Map.of(
             "image/png", "png", "image/jpeg", "jpg", "image/webp", "webp", "image/gif", "gif");
 
@@ -64,7 +68,7 @@ public class BookMediaController {
         if ("pic.arkread.com".equals(host)) {
             return "https://read.douban.com/";
         }
-        if ("cdn.weread.qq.com".equals(host)) {
+        if (WEREAD_COVER_HOSTS.contains(host)) {
             return "https://weread.qq.com/";
         }
         if (host.matches("(?:t|img|gimg)[0-9]+\\.baidu\\.com|img[0-9]+\\.imgtn\\.bdimg\\.com")) {

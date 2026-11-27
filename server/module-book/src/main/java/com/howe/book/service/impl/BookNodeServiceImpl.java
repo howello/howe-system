@@ -149,6 +149,18 @@ public class BookNodeServiceImpl implements BookNodeService {
     @Transactional(isolation = Isolation.READ_COMMITTED)
     @Override
     public BookNode create(long creator, BookNode input) {
+        return createNode(creator, input, null);
+    }
+
+    /** 导入节点时使用有效的原始创建时间。 */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    @Override
+    public BookNode createImported(long creator, BookNode input, LocalDateTime createdAt) {
+        return createNode(creator, input, createdAt);
+    }
+
+    /** 校验并创建节点，重复提交相同内容时返回已有记录。 */
+    private BookNode createNode(long creator, BookNode input, LocalDateTime createdAt) {
         input.setUserId(creator);
         input.setId(input.getId() == null ? UUID.randomUUID().toString() : uuid(input.getId()));
         validate(input);
@@ -167,8 +179,9 @@ public class BookNodeServiceImpl implements BookNodeService {
         }
         input.setDeletedAt(null);
         input.setVersion(1L);
-        input.setCreatedAt(LocalDateTime.now());
-        input.setUpdatedAt(input.getCreatedAt());
+        LocalDateTime now = LocalDateTime.now();
+        input.setCreatedAt(createdAt == null ? now : createdAt);
+        input.setUpdatedAt(now);
         mapper.insert(input);
         return input;
     }
@@ -185,6 +198,7 @@ public class BookNodeServiceImpl implements BookNodeService {
         input.setUserId(current.getUserId());
         input.setNodeType(current.getNodeType());
         validate(input);
+        preserveWeReadOrigin(current, input);
         int changed = mapper.update(null, new LambdaUpdateWrapper<BookNode>()
             .eq(BookNode::getId, id).eq(BookNode::getVersion, input.getVersion())
             .isNull(BookNode::getDeletedAt)
@@ -196,6 +210,27 @@ public class BookNodeServiceImpl implements BookNodeService {
             throw new ServiceException("节点已更新，请重新加载后保存", 409);
         }
         return get(id);
+    }
+
+    /** 保留导入节点的来源，使本地编辑和移动后仍可识别同一记录。 */
+    private void preserveWeReadOrigin(BookNode current, BookNode input) {
+        if (current.getContentJson() == null) {
+            return;
+        }
+        try {
+            var source = json.readTree(current.getContentJson()).path("weread").deepCopy();
+            if (!(source instanceof com.fasterxml.jackson.databind.node.ObjectNode origin)) {
+                return;
+            }
+            if ("archive".equals(origin.path("source").asText()) && !origin.hasNonNull("sourceName")) {
+                origin.put("sourceName", current.getTitle());
+            }
+            var content = input.getContentJson() == null ? json.createObjectNode()
+                : (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(input.getContentJson());
+            input.setContentJson(content.set("weread", origin).toString());
+        } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
+            throw new ServiceException("微信读书来源信息无法读取");
+        }
     }
 
     /** 按批遍历并软删除整棵子树。 */
