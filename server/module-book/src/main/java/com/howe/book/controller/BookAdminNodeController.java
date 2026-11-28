@@ -20,14 +20,25 @@ import org.springframework.web.bind.annotation.*;
 public class BookAdminNodeController extends BaseController {
     private final BookNodeService nodes;
 
-    /** 查询节点。 */
+    /**
+     * 查询节点。
+     *
+     * 不传 parentId 时返回全部节点（后台搜索用）；传 parentId 时只返回该父节点下的一层子节点，
+     * 供树形浏览逐层加载，其中 0 表示顶层分类。
+     */
     @GetMapping
     @PreAuthorize("@ss.hasPermi('book:node:list')")
     @Operation(summary = "查询读书节点")
     public TableDataInfo list(@RequestParam(required = false) Long userId,
-        @RequestParam(required = false) String type, @RequestParam(required = false) String title) {
+        @RequestParam(required = false) String type, @RequestParam(required = false) String title,
+        @RequestParam(required = false) String parentId) {
         startPage();
         try {
+            if (parentId != null) {
+                // 树形浏览要展示一行摘要，按层返回的数据量本身可控，所以连正文一起查
+                String parent = parentId.isBlank() || "0".equals(parentId) ? null : parentId;
+                return getDataTable(nodes.list(userId, parent, true, type, title, true));
+            }
             return getDataTable(nodes.list(userId, null, false, type, title));
         } finally {
             clearPage();

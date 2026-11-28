@@ -24,6 +24,9 @@ export * from "./monitor/operlog";
 export * from "./monitor/online";
 export * from "./monitor/server";
 
+// 读书模块
+export * from "./book/node";
+
 // 博客模块
 export * from "./blog/article";
 export * from "./blog/draft";
